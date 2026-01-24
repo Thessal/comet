@@ -3,10 +3,7 @@
 // Condition: normalized(compare(volume, historical(volume))) > 0.8
 
 import "stdlib.cm"
-import "data/universe.cm"
-
-// Define Combinations (Semantic Types)
-Type PERatio : Instrument derives { Monetary }
+import "data/data.cm"
 
 // Define missing Behaviors
 Behavior Comparator(a, b) -> DataFrame
@@ -19,19 +16,39 @@ Implementation MovingAverage implements Historical(x) {
 
 // 2. Comparator Implementation
 Implementation Ratio implements Comparator(a, b) where b is NonZero {
-    return a / b
+    return divide(a, b) 
+}
+Implementation RankDiff implements Comparator(a, b) {
+    return rank(a) - rank(b)
 }
 
 // 3. Normalizer Implementation
-// Normalizer in stdlib: Behavior Normalizer(T) -> T
-Implementation ZScore implements Normalizer(x) {
-    return zscore(x) // stdlib zscore might need update if x is TimeSeries, relying on flexible stdlib for now
+Behavior UnboundNormalizer(T) -> T
+Implementation UnBoundNormalizer implements Normalizer(x) {
+    return UnboundNormalizer(x) // Added to check nested Behavior
 }
+Implementation ZScore implements UnboundNormalizer(x) {
+    return zscore(x) 
+}
+// Normalizer in stdlib: Behavior Normalizer(T) -> T
+Implementation Clipped implements Normalizer(x) ensures { Ranged } {
+    return clip(UnboundNormalizer(x), 0,1)
+}
+Implementation Rank implements Normalizer(x) ensures { Ranged } {
+    return rank(x)
+}
+Implementation Clip implements Normalizer(x) ensures { Ranged } {
+    return clip(x, 0, 1)
+}
+Implementation ZScore implements Normalizer(x) ensures {} {
+    return zscore(x) //Tests duplicate impl name, and nonhomogeneous ensures
+}
+
 
 Flow Strategy {
     // Load Data
-    daily_pe <- Universe(PERatio) 
-    min_vol  <- Universe_Series(Volume) // Returns TimeSeries
+    daily_pe <- PE_Universe
+    min_vol  <- Volume_Universe // Returns TimeSeries
 
     // Calculate Historical Volume
     hist_vol <- Historical(min_vol)

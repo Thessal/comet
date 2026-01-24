@@ -36,10 +36,11 @@ fn main() {
                          match synthesizer.synthesize("Strategy") {
                              Ok(contexts) => {
                                  println!("Synthesis successful!");
-                                 for (i, ctx) in contexts.iter().enumerate() {
-                                     println!("Context {}:", i);
-                                     println!("{:#?}", ctx);
-                                 }
+                                 let codegen = comet::codegen::Codegen::new();
+                                 let rust_code = codegen.generate_library(&contexts);
+                                 println!("--- Generated Rust Library ---");
+                                 println!("{}", rust_code);
+                                 println!("------------------------------");
                              },
                              Err(e) => eprintln!("Synthesis error: {:?}", e),
                          }

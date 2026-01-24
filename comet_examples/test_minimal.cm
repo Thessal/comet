@@ -1,11 +1,11 @@
 Behavior Comparator(a, b) -> Series
 
 Implementation Ratio implements Comparator(a, b) where b is NonZero {
-    return a / b
+    return divide(a, b)
 }
 
 Flow Test {
-    x <- Universe(Price)
+    x <- Price
     res <- Comparator(x, 2)
     return res
 }

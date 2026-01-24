@@ -2,7 +2,7 @@
 // Defines combinations of binary, ternary, and unary logics
 
 import "stdlib.cm"
-import "data/universe.cm"
+import "data/data.cm"
 
 // 1. Unary Logic (Normalization)
 // Behavior Normalizer(x) -> Series // Defined in stdlib.cm
@@ -23,7 +23,7 @@ Implementation Keep implements Normalizer(x) {
 Behavior Comparator(a, b) -> Series
 
 Implementation Ratio implements Comparator(a, b) where b is NonZero {
-    return a / b
+    return divide(a, b)
 }
 
 Implementation Spread implements Comparator(a, b) { // Logic for Unit check handled where? 

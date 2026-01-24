@@ -31,13 +31,21 @@ This document outlines the plan to build the Comet compiler, orchestrating the d
     -   **Context Management**: Tracking active `Variable -> Value` bindings and their Semantic Properties.
     -   **Branching**: Splitting contexts when multiple Implementations match.
     -   **Pruning**: Dropping contexts where Constraints (`where`) fail.
+    -   **Built-in Logic**:
+        -   **Binary Operators**: Strict type matrix enforcement (e.g., `TimeSeries / TimeSeries -> TimeSeries`) implemented in `evaluate_binary_op`.
+        -   **Functions**: Modular handlers (e.g., `src/comet/functions/divide.rs`) for complex logic like `divide(DataFrame, TimeSeries)`.
 
 ### 4. Backend (Code Generation)
 -   **Goal**: Emit executable code for the Target Runtime.
--   **Reference**: `runtime.md`.
--   **Targets**:
-    -   **Python**: Generate a `.py` script using a library like `pandas`.
-    -   **Rust**: Generate a `.rs` file using `polars` or similar.
+-   **Strategy**: **Transpilation to Rust** (Selected Strategy).
+-   **Reference**: `compile.md`, `runtime.md`.
+-   **Process**:
+    1.  **Expansion**: The Synthesis Engine produces a "Product Space" of valid execution trees.
+    2.  **Codegen**: For each valid tree, generate a unique Rust struct/function (e.g., `Strategy_Variant_142`).
+    3.  **Compilation**: Use `cargo` to compile the generated Rust code into a high-performance library (`.so` / `.dll`).
+-   **Generated Interface**:
+    -   Stateless logic functions: `generate(variant_id, new_data, state)`.
+    -   Metadata structures for describing strategy inputs/outputs.
 
 ## Implementation Roadmap
 
@@ -50,7 +58,7 @@ This document outlines the plan to build the Comet compiler, orchestrating the d
 4.  **Synthesis Prototype**:
     -   Implement the "Context Branching" loop described in `transform.md` for a simple case (e.g., the Ratio vs Spread example).
 5.  **Codegen**:
-    -   Simple string-template based generation for Python.
+    -   Simple string-template based generation for rust.
 
 ## Verification
 

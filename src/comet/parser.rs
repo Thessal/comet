@@ -68,41 +68,46 @@ fn parse_identifier(pair: Pair<Rule>) -> Ident {
 
 fn parse_type_decl(pair: Pair<Rule>) -> Result<TypeDecl, ParserError> {
     let mut inner = pair.into_inner();
-    // Debug print
-    // for p in inner.clone() { println!("Rule: {:?}", p.as_rule()); }
-    
     let _k_type = inner.next().ok_or(ParserError::MissingToken)?; 
     let name = parse_identifier(inner.next().ok_or(ParserError::MissingToken)?);
     let parent = parse_identifier(inner.next().ok_or(ParserError::MissingToken)?);
     
-    // Check next
-    let next_pair = inner.next().ok_or(ParserError::MissingToken)?;
-    if next_pair.as_rule() == Rule::k_derives {
-        // consumed derives
-    } else {
-        // Unexpected?
-        // Maybe parent was missed?
-        // e.g. "Type Any derives {}" (No colon/parent?)
-        // Grammar: `type_decl = { k_type ~ identifier ~ ":" ~ identifier ~ ... }`
-        // It requires parent.
-    }
-    
-    // property_list?
-    let props = if let Some(next) = inner.next() {
-        if next.as_rule() == Rule::property_list {
-             parse_property_list(next)?
-        } else {
-             Vec::new()
+    let mut structure = None;
+    let mut properties = Vec::new();
+    let mut components = None;
+
+    for part in inner {
+        match part.as_rule() {
+            Rule::identifier => {
+                structure = Some(parse_identifier(part));
+            },
+            Rule::property_list => {
+                properties = parse_property_list(part)?;
+            },
+            Rule::component_list => {
+                components = Some(parse_component_list(part)?);
+            },
+            _ => {}
         }
-    } else {
-        Vec::new()
-    };
-    
+    }
+
     Ok(TypeDecl {
         name,
         parent,
-        properties: props,
+        properties,
+        components,
+        structure,
     })
+}
+
+fn parse_component_list(pair: Pair<Rule>) -> Result<Vec<Ident>, ParserError> {
+    let mut comps = Vec::new();
+    for inner in pair.into_inner() {
+        if inner.as_rule() == Rule::identifier {
+            comps.push(parse_identifier(inner));
+        }
+    }
+    Ok(comps)
 }
 
 fn parse_property_list(pair: Pair<Rule>) -> Result<Vec<Ident>, ParserError> {
@@ -194,12 +199,44 @@ fn parse_impl_decl(pair: Pair<Rule>) -> Result<ImplDecl, ParserError> {
         next = inner.next().unwrap();
     }
     
+    // Check for k_ensures (optional)
+    let mut ensures = None;
+    if next.as_rule() == Rule::k_ensures {
+        // consumes k_ensures
+        // next pair is property_list? (optional in grammar but braced)
+        // impl_decl = { ... (k_ensures ~ "{" ~ property_list? ~ "}")? ... }
+        // inner.next() -> property_list
+        let prop_pair = inner.next().unwrap();
+        // Since property_list is optional inside braces? No, grammar: `property_list?`
+        // Pest inner iterates rules. If property_list is present it will be yielded.
+        if prop_pair.as_rule() == Rule::property_list {
+            ensures = Some(parse_property_list(prop_pair)?);
+            next = inner.next().unwrap(); // block
+        } else {
+            // Empy list? {}
+            // Then prop_pair probably is block?
+            // Wait, if braces are literal tokens, inner iterator skips them unless atomic?
+            // "{" ~ property_list? ~ "}"
+            // If property_list is absent, we get just block next?
+            // If property_list is present, we get property_list.
+            // Let's rely on rule checking.
+             if prop_pair.as_rule() == Rule::block {
+                 // Empty ensures list
+                 ensures = Some(Vec::new());
+                 next = prop_pair;
+             } else {
+                 return Err(ParserError::UnexpectedRule(prop_pair.as_rule()));
+             }
+        }
+    }
+
     let body = parse_block(next)?;
     Ok(ImplDecl {
         name,
         behavior,
         args,
         constraints,
+        ensures,
         body,
     })
 }
@@ -280,15 +317,38 @@ fn parse_func_decl(pair: Pair<Rule>) -> Result<FuncDecl, ParserError> {
      
      let mut next = inner.next().unwrap();
      let mut constraints = None;
-     if next.as_rule() == Rule::constraint_list {
-          // parse constraint list
-          // Simplified: just Vec<Constraint> which wraps Expr
-          let mut cons = Vec::new();
-          let c_inner = next.into_inner().next().unwrap(); // where_clause
-          cons.push(Constraint { expr: parse_where_clause(c_inner)? });
-          constraints = Some(cons);
+     if next.as_rule() == Rule::k_where {
+          // grammar FuncDecl: (k_where ~ constraint_block)?
+          let cb = inner.next().unwrap();
+          // constraint_block -> identifier ~ is ~ identifier
+          // Map to Expr::PropertyCheck? Or simple constraint struct?
+          // Existing code: constraints: Option<Vec<Constraint>>
+          // parser used to parse `constraint_list`.
+          // New grammar `constraint_block`.
+          // Let's parse constraint_block manually here for simplicity or define helper.
+          // Constraint: Identifier is Identifier.
+          let mut cb_inner = cb.into_inner();
+          let target = parse_identifier(cb_inner.next().unwrap());
+          let _k_is = cb_inner.next().unwrap();
+          let prop = parse_identifier(cb_inner.next().unwrap());
+          
+          let expr = Expr::PropertyCheck { target: Box::new(Expr::Identifier(target)), property: prop };
+          constraints = Some(expr);
           
           next = inner.next().unwrap();
+     }
+     
+     // Check ensures
+     let mut ensures = None;
+     if next.as_rule() == Rule::k_ensures {
+          let prop_pair = inner.next().unwrap();
+          if prop_pair.as_rule() == Rule::property_list {
+              ensures = Some(parse_property_list(prop_pair)?);
+              next = inner.next().unwrap();
+          } else if prop_pair.as_rule() == Rule::block {
+              ensures = Some(Vec::new());
+              next = prop_pair;
+          }
      }
      
      let body = parse_block(next)?;
@@ -297,6 +357,7 @@ fn parse_func_decl(pair: Pair<Rule>) -> Result<FuncDecl, ParserError> {
          params,
          return_type,
          constraints,
+         ensures,
          body,
      })
 }
@@ -351,7 +412,7 @@ fn parse_or_expr(pair: Pair<Rule>) -> Result<Expr, ParserError> {
     let mut inner = pair.into_inner();
     let mut lhs = parse_and_expr(inner.next().unwrap())?;
     
-    while let Some(op) = inner.next() {
+    while let Some(_op) = inner.next() {
         let rhs = parse_and_expr(inner.next().unwrap())?;
          // op is op_or
          lhs = Expr::BinaryOp { left: Box::new(lhs), op: Op::Or, right: Box::new(rhs) };
@@ -363,7 +424,7 @@ fn parse_and_expr(pair: Pair<Rule>) -> Result<Expr, ParserError> {
      let mut inner = pair.into_inner();
     let mut lhs = parse_eq_expr(inner.next().unwrap())?;
     
-    while let Some(op) = inner.next() {
+    while let Some(_op) = inner.next() {
         let rhs = parse_eq_expr(inner.next().unwrap())?;
         lhs = Expr::BinaryOp { left: Box::new(lhs), op: Op::And, right: Box::new(rhs) };
     }

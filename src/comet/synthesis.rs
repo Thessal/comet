@@ -19,19 +19,25 @@ pub enum SynthesisError {
     NoImplFound(String),
 }
 
+use crate::comet::ir::{ExecutionGraph, ExecutionNode, OperatorOp};
+
 #[derive(Debug, Clone)]
 pub struct Context {
     // Map variable name to its "Type" or "Semantic State"
-    // In Comet, a variable has a Structural Type (DataFrame) and a set of Semantic Properties (Monetary, NonZero).
-    // We can represent this as a "Rich Type".
     pub variables: HashMap<Ident, VariableState>,
+    pub graph: ExecutionGraph,
 }
 
 impl Context {
     pub fn new() -> Self {
         Context {
             variables: HashMap::new(),
+            graph: ExecutionGraph::new(),
         }
+    }
+    
+    pub fn add_node(&mut self, node: ExecutionNode) -> usize {
+        self.graph.add_node(node)
     }
 }
 
@@ -40,6 +46,7 @@ pub struct VariableState {
     pub name: Ident,
     pub type_name: String, // e.g. "PERatio", "DataFrame"
     pub properties: Vec<String>, // e.g. ["Monetary", "Ranged"]
+    pub node_id: usize,
 }
 
 pub struct Synthesizer<'a> {
@@ -56,37 +63,127 @@ impl<'a> Synthesizer<'a> {
         let flow = self.symbol_table.flows.get(flow_name)
             .ok_or(SynthesisError::FlowNotFound(flow_name.to_string()))?;
             
-        let mut context = Context::new();
+        let mut contexts = vec![Context::new()];
         
         for stmt in &flow.body {
-            match stmt {
-                FlowStmt::Generator { target, source, constraints: _ } => {
-                    // Evaluate source (e.g. Universe(PERatio))
-                    let (type_name, props) = self.evaluate_expr(source, &context)?;
-                    context.variables.insert(target.clone(), VariableState {
-                        name: target.clone(),
-                        type_name,
-                        properties: props,
-                    });
-                },
-                FlowStmt::Assignment { target, expr, constraints: _ } => {
-                    let (type_name, props) = self.evaluate_expr(expr, &context)?;
-                     context.variables.insert(target.clone(), VariableState {
-                        name: target.clone(),
-                        type_name,
-                        properties: props,
-                    });
-                },
-                FlowStmt::Return(_) => {
-                    // End of flow
+            let mut next_contexts = Vec::new();
+            
+            for mut context in contexts {
+                match stmt {
+                    FlowStmt::Generator { target, source, constraints: _ } => {
+                        // Check for Universe expansion (Direct Type usage: x <- TypeName)
+                        if let Expr::Identifier(type_name) = source {
+                             if let Some(ty_info) = self.symbol_table.types.get(type_name) {
+                                 // It is a Type, so treat as Universe Source
+                                 
+                                 if let Some(components) = &ty_info.components {
+                                     // Branching!
+                                     for comp in components {
+                                         let mut new_ctx = context.clone();
+                                         
+                                         // Remove heuristic. Use explicit structure from TypeInfo if available.
+                                         let struct_type = if let Some(s) = &ty_info.structure {
+                                             s.clone()
+                                         } else {
+                                             ty_info.parent.clone()
+                                         };
+                                         
+                                         let node = ExecutionNode::Source {
+                                             name: format!("Universe({})", comp), 
+                                             type_name: struct_type.clone(),
+                                         };
+                                         let id = new_ctx.add_node(node);
+                                         
+                                         new_ctx.variables.insert(target.clone(), VariableState {
+                                             name: target.clone(),
+                                             type_name: struct_type,
+                                             properties: ty_info.properties.clone(),
+                                             node_id: id,
+                                         });
+                                         next_contexts.push(new_ctx);
+                                     }
+                                     continue;
+                                 } else {
+                                     // Single Universe Type
+                                     let struct_type = if let Some(s) = &ty_info.structure {
+                                         s.clone()
+                                     } else {
+                                         ty_info.parent.clone()
+                                     };
+                                     
+                                     let node = ExecutionNode::Source {
+                                         name: format!("Universe({})", type_name),
+                                         type_name: struct_type.clone(),
+                                     };
+                                     let id = context.add_node(node);
+                                     context.variables.insert(target.clone(), VariableState {
+                                         name: target.clone(),
+                                         type_name: struct_type, // Explicitly use the resolved structure type
+                                         properties: ty_info.properties.clone(),
+                                         node_id: id,
+                                     });
+                                     next_contexts.push(context);
+                                     continue;
+                                 }
+                             }
+                        }
+                        
+                        // Normal execution (no branching or not Universe)
+                        // If we are here, context has NOT been consumed by single universe branch above because that branch pushes and stops (or we need to be careful).
+                        // Ah, the single universe branch 'else' block consumed 'context' via push.
+                        // So if expanded=true, 'context' is gone.
+                        // But wait, if I did 'expanded = true', I continue. 
+                        // The 'else' block for single universe set expanded=true? No, I logic-ed that wrong in previous block.
+                        // The previous block handled both branching and single.
+                        // So if expanded is true, we already pushed contexts.
+                        
+                        // However, the `source` is accessed again below? No.
+                        
+                        // Normal execution (no branching or not Universe)
+                        match self.evaluate_expr(source, context) {
+                            Ok(results) => {
+                                for (mut ctx, type_name, props, node_id) in results {
+                                    ctx.variables.insert(target.clone(), VariableState {
+                                        name: target.clone(),
+                                        type_name,
+                                        properties: props,
+                                        node_id,
+                                    });
+                                    next_contexts.push(ctx);
+                                }
+                            },
+                            Err(e) => return Err(e),
+                        }
+                    },
+                    FlowStmt::Assignment { target, expr } => {
+                         match self.evaluate_expr(expr, context) {
+                             Ok(results) => {
+                                 for (mut ctx, type_name, props, node_id) in results {
+                                     ctx.variables.insert(target.clone(), VariableState {
+                                        name: target.clone(),
+                                        type_name,
+                                        properties: props,
+                                        node_id,
+                                    });
+                                    next_contexts.push(ctx);
+                                 }
+                             },
+                             Err(e) => return Err(e),
+                         }
+                    },
+                    FlowStmt::Return(_) => {
+                        // End of flow, keep context
+                        next_contexts.push(context);
+                    }
                 }
             }
+            contexts = next_contexts;
         }
         
-        Ok(vec![context])
+        Ok(contexts)
     }
 
-    pub fn evaluate_expr(&self, expr: &Expr, context: &Context) -> Result<(String, Vec<String>), SynthesisError> {
+    pub fn evaluate_expr(&self, expr: &Expr, mut context: Context) -> Result<Vec<(Context, String, Vec<String>, usize)>, SynthesisError> {
         match expr {
             Expr::Call { path, args } => {
                 // Handle Universe logic
@@ -94,7 +191,14 @@ impl<'a> Synthesizer<'a> {
                     if let Some(Expr::Identifier(type_name)) = args.get(0) {
                         let ty_info = self.symbol_table.types.get(type_name)
                             .ok_or(SynthesisError::TypeMismatch("Unknown Type".into(), type_name.clone()))?;
-                        return Ok(("DataFrame".to_string(), ty_info.properties.clone()));
+                        
+                        // Create Source node
+                        let node = ExecutionNode::Source { 
+                            name: format!("Universe({})", type_name), 
+                            type_name: "DataFrame".to_string() // Fallback if called as Expr (should be handled in Stmt, but okay)
+                        };
+                        let id = context.add_node(node);
+                        return Ok(vec![(context, "DataFrame".to_string(), ty_info.properties.clone(), id)]);
                     }
                 }
 
@@ -102,97 +206,304 @@ impl<'a> Synthesizer<'a> {
                      if let Some(Expr::Identifier(type_name)) = args.get(0) {
                         let ty_info = self.symbol_table.types.get(type_name)
                             .ok_or(SynthesisError::TypeMismatch("Unknown Type".into(), type_name.clone()))?;
-                        return Ok(("TimeSeries".to_string(), ty_info.properties.clone()));
+                        
+                        let node = ExecutionNode::Source { 
+                            name: format!("Universe_Series({})", type_name), 
+                            type_name: "TimeSeries".to_string() 
+                        };
+                        let id = context.add_node(node);
+                        return Ok(vec![(context, "TimeSeries".to_string(), ty_info.properties.clone(), id)]);
                     }
                 }
                 
                 let func_name = path.segments.last().unwrap();
                 
-                // Dispatch to Behavior Handlers
-                // specific name check for now since we don't have dynamic loading yet
-                if func_name == "Normalizer" {
-                    use crate::comet::behaviors::BehaviorHandler;
-                    return crate::comet::behaviors::normalizer::Normalizer.handle(self, args, context);
-                }
+                // Normalizer removed from here to allow generic dispatch
+
                 
-                // Dispatch to Function Handlers
+                // Function Handlers
                 if func_name == "update_when" {
                     use crate::comet::functions::FunctionHandler;
                     return crate::comet::functions::update_when::UpdateWhen.handle(self, args, context);
                 }
 
+                if func_name == "divide" {
+                    use crate::comet::functions::FunctionHandler;
+                    return crate::comet::functions::divide::Divide.handle(self, args, context);
+                }
+
                 if func_name == "apply_filter" {
-                    // Logic: returns arg0 type + "Masked" property
                    if let Some(arg0) = args.get(0) {
-                       let (t, mut props) = self.evaluate_expr(arg0, context)?;
-                       props.push("Masked".to_string());
-                       return Ok((t, props));
+                       // Evaluate arg0
+                       let results0 = self.evaluate_expr(arg0, context)?;
+                       let mut final_results = Vec::new();
+
+                       for (mut ctx, t, mut props, id) in results0 {
+                           props.push("Masked".to_string());
+                           
+                           let mut input_nodes = vec![id];
+                           // Check arg1
+                           if let Some(arg1) = args.get(1) {
+                                // Evaluate arg1 in this ctx. 
+                                // Caution: evaluate_expr consumes ctx.
+                                let results1 = self.evaluate_expr(arg1, ctx)?;
+                                for (mut ctx2, _, _, id2) in results1 {
+                                    // Clone input_nodes for each arg1 branch (though naive vec clone is cheap)
+                                    let mut nodes = input_nodes.clone();
+                                    nodes.push(id2);
+                                    
+                                    let op_node = ExecutionNode::Operation {
+                                       op: OperatorOp::Filter,
+                                       args: nodes,
+                                   };
+                                   let new_id = ctx2.add_node(op_node);
+                                   final_results.push((ctx2, t.clone(), props.clone(), new_id));
+                                }
+                           } else {
+                               // No arg1
+                               let op_node = ExecutionNode::Operation {
+                                   op: OperatorOp::Filter,
+                                   args: input_nodes,
+                               };
+                                let new_id = ctx.add_node(op_node);
+                               final_results.push((ctx, t, props, new_id));
+                           }
+                       }
+                       return Ok(final_results);
                    }
                 }
 
-                // Default recursion
-                 if let Some(arg0) = args.get(0) {
-                     return self.evaluate_expr(arg0, context);
-                 }
+                // Generic Behavior / Function Dispatch
+                // 1. Evaluate arguments first to get types
+                // Since each arg evaluation can branch, we have a combinatorial explosion of argument contexts.
+                // Simplified: Evaluate args sequentially across branched contexts.
                 
-                Ok(("Unknown".to_string(), vec![]))
+                // Logic:
+                // Start with [context]
+                // For each arg:
+                //   For each ctx in list:
+                //      evaluate arg -> valid next contexts
+                // Collect all valid next contexts with their arg resolved
+                
+                // This is complex. For now, assume single context flow for args, OR implement the loop.
+                // Let's implement the loop for args.
+                
+                #[derive(Clone, Debug)]
+                struct ArgResult {
+                    node_id: usize,
+                    type_name: String,
+                    properties: Vec<String>,
+                }
+                
+                // Helper to evaluate args recursively
+                // Input: Vec<Context>. Output: Vec<(Context, Vec<ArgResult>)>
+                // Since this recursion is manual, let's just support 1 or 2 args for now or strictly generic?
+                // Generic is needed.
+                
+                let mut current_states: Vec<(Context, Vec<ArgResult>)> = vec![(context.clone(), Vec::new())];
+                
+                for arg in args {
+                    let mut next_states = Vec::new();
+                    for (ctx, mut prev_args) in current_states {
+                         let res = self.evaluate_expr(arg, ctx)?; // branches
+                         for (new_ctx, t, p, id) in res {
+                             let mut args_list = prev_args.clone();
+                             args_list.push(ArgResult { node_id: id, type_name: t, properties: p });
+                             next_states.push((new_ctx, args_list));
+                         }
+                    }
+                    current_states = next_states;
+                }
+                
+                // Now we have contexts with all args evaluated.
+                // Dispatch logic.
+                let mut results = Vec::new();
+                
+                for (mut ctx, arg_results) in current_states {
+                     // Look for Impls matching func_name
+                     // Iterate self.symbol_table.implementations
+                     // Matching behavior == func_name
+                     
+                     let mut found = false;
+                     for impl_info in &self.symbol_table.implementations {
+                         if impl_info.behavior == *func_name {
+                             // Match?
+                             // Constraints? "where b is NonZero"
+                             // Assume args match by position.
+                             // Check constraints.
+                             // impl_info.constraints: Option<Expr>
+                             // We need to evaluate the constraint expr against the arg properties?
+                             // Or simpler: Symbol table has `args: ["A", "B"]`
+                             // Constraints check properties of A or B.
+                             // Currently we don't have a constraint evaluator.
+                             // But we can do simple property check if constraint is `PropertyCheck`.
+                             
+                             let mut matched = true;
+                             if let Some(c) = &impl_info.constraints {
+                                 // Check simplified constraint: `is NonZero`
+                                 // We need to bind params to args.
+                                 // impl_info.args ["a", "b"] correspond to arg_results[0], arg_results[1]
+                                 
+                                 // Hacky check for now: manual traversal of constraint expr
+                                 if let Expr::PropertyCheck { target, property } = c {
+                                     if let Expr::Identifier(id) = target.as_ref() {
+                                         // Find index of `id` in impl_info.args
+                                         if let Some(idx) = impl_info.args.iter().position(|x| x == id) {
+                                              if let Some(arg_res) = arg_results.get(idx) {
+                                                   if !arg_res.properties.contains(property) {
+                                                       matched = false;
+                                                   }
+                                              }
+                                         }
+                                     }
+                                 }
+                             }
+                             
+                             if matched {
+                                 found = true;
+                                 // This implementation is valid!
+                                 // Branch context?
+                                 // Yes, if we have multiple valid impls, we branch.
+                                 
+                                 let mut branch_ctx = ctx.clone();
+                                 let arg_ids: Vec<usize> = arg_results.iter().map(|a| a.node_id).collect();
+                                 
+                                 // Record Function Call in IR
+                                 // Node: FunctionCall(impl_name)
+                                 let node = ExecutionNode::Operation {
+                                     op: OperatorOp::FunctionCall(impl_info.name.clone()),
+                                     args: arg_ids,
+                                 };
+                                 let new_id = branch_ctx.add_node(node);
+                                 
+                                 // Return Type?
+                                 // Look up behavior return type
+                                 let behavior = self.symbol_table.behaviors.get(func_name).unwrap();
+                                 // Only simple return type support for now
+                                 let ret_type = behavior.return_type.clone().unwrap_or("Unknown".to_string());
+                                 
+                                 // Properties? 
+                                 // Heuristic: Propagate properties from 1st arg if return type matches
+                                 let mut ret_props = Vec::new();
+                                 if let Some(arg0) = arg_results.get(0) {
+                                     if arg0.type_name == ret_type {
+                                         ret_props = arg0.properties.clone();
+                                     }
+                                 }
+
+                                 // Add explicit ensures properties
+                                 if let Some(ensures) = &impl_info.ensures {
+                                     for prop in ensures {
+                                         if !ret_props.contains(prop) {
+                                             ret_props.push(prop.clone());
+                                         }
+                                     }
+                                 }
+                                 
+                                 results.push((branch_ctx, ret_type, ret_props, new_id));
+                             }
+                         }
+                     }
+                     
+                     if !found {
+                          // Fallback or error?
+                          // For recursion default, maybe we should return Unknown
+                          // Or recursive single arg?
+                     }
+                }
+                
+                if results.is_empty() {
+                    // Fallback to recursion if 1 arg?
+                     if let Some(arg0) = args.get(0) {
+                         return self.evaluate_expr(arg0, context);
+                     }
+                     Ok(vec![ (context, "Unknown".to_string(), vec![], 0) ])
+                } else {
+                    Ok(results)
+                }
             },
             Expr::BinaryOp { left, op, right } => {
                 self.evaluate_binary_op(left, op, right, context)
             },
             Expr::Identifier(ident) => {
-                let var = context.variables.get(ident)
-                    .ok_or(SynthesisError::VariableNotFound(ident.clone()))?;
-                Ok((var.type_name.clone(), var.properties.clone()))
+                let (type_name, properties, node_id) = {
+                    let var = context.variables.get(ident)
+                        .ok_or(SynthesisError::VariableNotFound(ident.clone()))?;
+                    (var.type_name.clone(), var.properties.clone(), var.node_id)
+                };
+                Ok(vec![(context, type_name, properties, node_id)])
             },
-            _ => Ok(("Unknown".to_string(), vec![])),
+            Expr::Literal(lit) => {
+                 let val_str = match lit {
+                     crate::comet::ast::Literal::Float(f) => f.to_string(),
+                     crate::comet::ast::Literal::Integer(i) => i.to_string(),
+                     _ => "0".to_string(),
+                 };
+                 let node = ExecutionNode::Constant { value: val_str, type_name: "Float".to_string() };
+                 let id = context.add_node(node);
+                 Ok(vec![(context, "Float".to_string(), vec!["Constant".to_string()], id)])
+            },
+            _ => Ok(vec![(context, "Unknown".to_string(), vec![], 0)]),
         }
     }
 
-    fn evaluate_binary_op(&self, left: &Expr, op: &crate::comet::ast::Op, right: &Expr, context: &Context) -> Result<(String, Vec<String>), SynthesisError> {
-        let (lhs_type, _) = self.evaluate_expr(left, context)?;
-        let (rhs_type, _) = self.evaluate_expr(right, context)?;
+    fn evaluate_binary_op(&self, left: &Expr, op: &crate::comet::ast::Op, right: &Expr, context: Context) -> Result<Vec<(Context, String, Vec<String>, usize)>, SynthesisError> {
+        let left_results = self.evaluate_expr(left, context)?;
         
-        // Helper to check for "Constant" property
-        let is_constant = |ty_name: &str| -> bool {
-            if let Some(info) = self.symbol_table.types.get(ty_name) {
-                return info.properties.iter().any(|p| p == "Constant");
-            }
-            false
-        };
-
-        match op {
-            crate::comet::ast::Op::Div => {
-                // Type Matrix:
-                // DF / DF -> DF
-                // DF / TS -> DF
-                // DF / Const -> DF
-                // TS / TS -> TS
-                // TS / Const -> TS
-                // Const / Const -> Const  (New Requirement)
+        let mut final_results = Vec::new();
+        
+        for (ctx, lhs_type, _, lhs_id) in left_results {
+            let right_results = self.evaluate_expr(right, ctx)?;
+            
+            for (mut ctx2, rhs_type, _, rhs_id) in right_results {
+                // Helper to check for "Constant" property
+                let is_constant = |ty_name: &str| -> bool {
+                    if let Some(info) = self.symbol_table.types.get(ty_name) {
+                        return info.properties.iter().any(|p| p == "Constant");
+                    }
+                    false
+                };
                 
                 let lhs_const = is_constant(&lhs_type);
                 let rhs_const = is_constant(&rhs_type);
 
-                if lhs_type == "DataFrame" {
-                    if rhs_type == "DataFrame" || rhs_type == "TimeSeries" || rhs_const {
-                       return Ok(("DataFrame".to_string(), vec![]));
-                    }
-                } else if lhs_type == "TimeSeries" {
-                    if rhs_type == "TimeSeries" || rhs_const {
-                        return Ok(("TimeSeries".to_string(), vec![]));
-                    }
-                } else if lhs_const {
-                    if rhs_const {
-                         // Attempt to find generic Constant type or inherit? 
-                         // For now, return Float or assume LHS type if it is a constant type (like Float)
-                         return Ok((lhs_type, vec![])); 
+                match op {
+                    crate::comet::ast::Op::Div => {
+                         let mut res_type = "Unknown".to_string();
+
+                        if lhs_type == "DataFrame" {
+                            if rhs_type == "DataFrame" || rhs_type == "TimeSeries" || rhs_const {
+                               res_type = "DataFrame".to_string();
+                            }
+                        } else if lhs_type == "TimeSeries" {
+                            if rhs_type == "TimeSeries" || rhs_const {
+                                res_type = "TimeSeries".to_string();
+                            }
+                        } else if lhs_const {
+                            if rhs_const {
+                                 res_type = lhs_type.clone(); 
+                            }
+                        }
+                        
+                        if res_type == "Unknown" {
+                             return Err(SynthesisError::TypeMismatch(format!("Compatible Division Types (LHS: {})", lhs_type), rhs_type));
+                        }
+
+                        // Add OpDivide to graph
+                        let op_node = ExecutionNode::Operation {
+                            op: OperatorOp::Divide,
+                            args: vec![lhs_id, rhs_id],
+                        };
+                        let id = ctx2.add_node(op_node);
+                        final_results.push((ctx2, res_type, vec![], id));
+                    },
+                    _ => {
+                        final_results.push((ctx2, "UnknownOp".to_string(), vec![], 0));
                     }
                 }
-                
-                Err(SynthesisError::TypeMismatch(format!("Compatible Division Types (LHS: {})", lhs_type), rhs_type))
-            },
-            _ => Ok(("UnknownOp".to_string(), vec![])),
+            }
         }
+        
+        Ok(final_results)
     }
 }

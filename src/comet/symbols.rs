@@ -27,6 +27,8 @@ pub struct TypeInfo {
     pub name: Ident,
     pub parent: Ident,
     pub properties: Vec<Ident>,
+    pub components: Option<Vec<Ident>>,
+    pub structure: Option<Ident>,
 }
 
 #[derive(Debug, Clone)]
@@ -59,7 +61,8 @@ pub struct ImplInfo {
     
     // So ImplInfo needs to store the constraint expression.
     pub constraints: Option<Expr>,
-    pub body: Block,
+    pub ensures: Option<Vec<String>>,
+    pub body: Vec<crate::comet::ast::Stmt>,
 }
 
 #[derive(Debug, Clone)]

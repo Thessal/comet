@@ -85,6 +85,8 @@ impl SemanticAnalyzer {
                     name: d.name.clone(),
                     parent: d.parent.clone(),
                     properties: d.properties.clone(),
+                    components: d.components.clone(),
+                    structure: d.structure.clone(),
                 });
             }
             Declaration::Behavior(d) => {
@@ -106,7 +108,8 @@ impl SemanticAnalyzer {
                      behavior: d.behavior.clone(),
                      args: d.args.clone(),
                      constraints: d.constraints.clone(),
-                     body: d.body.clone(),
+                     ensures: d.ensures.clone(),
+                     body: d.body.stmts.clone(),
                  });
             }
             Declaration::Function(d) => {

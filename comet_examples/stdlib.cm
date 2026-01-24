@@ -24,6 +24,15 @@ Property Constant
 Behavior Arithmetic(A, B) -> T
 Behavior Statistical(T) -> Series
 
+fn divide(x: DataFrame, y: DataFrame) -> DataFrame { return x }
+fn divide(x: DataFrame, y: TimeSeries) -> DataFrame { return x }
+fn divide(x: DataFrame, y: Constant) -> DataFrame { return x }
+fn divide(x: TimeSeries, y: TimeSeries) -> TimeSeries { return x }
+fn divide(x: TimeSeries, y: Constant) -> TimeSeries { return x }
+fn divide(x: Constant, y: Constant) -> Constant { return x }
+
+// Normalization
+
 // Normalization
 Behavior Normalizer(T) -> T
 
@@ -49,7 +58,7 @@ fn update_when(data: DataFrame, signal: DataFrame) -> DataFrame where signal is 
 }
 
 // Logic to create a mask
-fn apply_filter(data: DataFrame, threshold: Float) -> DataFrame {
+fn apply_filter(data: DataFrame, threshold: Float) -> DataFrame where data is Ranged ensures { Ranged } {
     // Ideally this attaches 'Masked' property
     return data
 }

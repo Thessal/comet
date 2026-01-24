@@ -37,13 +37,15 @@ k_where = { "where" }
 k_is = { "is" }
 k_return = { "return" }
 k_import = { "import" }
+k_ensures = { "ensures" }
 
 import_decl = { k_import ~ string_literal }
 
 property_decl = { k_property ~ identifier }
 
-type_decl = { k_type ~ identifier ~ ":" ~ identifier ~ k_derives ~ "{" ~ property_list? ~ "}" }
+type_decl = { k_type ~ identifier ~ ":" ~ identifier ~ ("<" ~ identifier ~ ">")? ~ k_derives ~ "{" ~ property_list? ~ "}" ~ ( "[" ~ component_list ~ "]" )? }
 property_list = { identifier ~ ("," ~ identifier)* }
+component_list = { identifier ~ ("," ~ identifier)* }
 
 struct_decl = { k_struct ~ identifier ~ "{" ~ field_list ~ "}" }
 field_list = { (identifier ~ ":" ~ type_ref ~ comma?)* }
@@ -57,14 +59,14 @@ enum_variant_list = { identifier ~ (comma ~ identifier)* ~ comma? }
 behavior_decl = { k_behavior ~ identifier ~ "(" ~ arg_list ~ ")" ~ "->" ~ identifier }
 arg_list = { (identifier ~ (comma ~ identifier)*)? }
 
-impl_decl = { k_impl ~ identifier ~ k_implements ~ identifier ~ "(" ~ arg_list ~ ")" ~ where_clause? ~ "{" ~ block ~ "}" }
-where_clause = { k_where ~ expr }
-block = { statement* }
+impl_decl = { k_impl ~ identifier ~ k_implements ~ identifier ~ "(" ~ arg_list? ~ ")" ~ (k_where ~ constraint_block)? ~ (k_ensures ~ "{" ~ property_list? ~ "}")? ~ block }
+where_clause = { k_where ~ expr } // This rule is now only used by generator_stmt and assignment_stmt
+block = { "{" ~ statement* ~ "}" }
 
-func_decl = { k_fn ~ identifier ~ "(" ~ param_list ~ ")" ~ "->" ~ identifier ~ constraint_list? ~ "{" ~ block ~ "}" }
-param_list = { (param ~ (comma ~ param)*)? }
-param = { identifier ~ ":" ~ type_ref }
-constraint_list = { where_clause }
+func_decl = { k_fn ~ identifier ~ "(" ~ param_list? ~ ")" ~ "->" ~ identifier ~ (k_where ~ constraint_block)? ~ (k_ensures ~ "{" ~ property_list? ~ "}")? ~ block }
+param_list = { param ~ ("," ~ param)* }
+param = { identifier ~ ":" ~ identifier }
+constraint_block = { identifier ~ k_is ~ identifier }
 
 flow_decl = { k_flow ~ identifier ~ "{" ~ flow_stmt* ~ "}" }
 flow_stmt = {

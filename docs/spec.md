@@ -68,7 +68,7 @@ Behavior Comparator(A, B) -> Indicator
 Implementation Ratio implements Comparator(A, B) 
 where B is NonZero 
 {
-    expression = A / B
+    return A / B
 }
 
 // Logic: Spread
@@ -76,7 +76,7 @@ where B is NonZero
 Implementation Spread implements Comparator(A, B)
 where A.Unit == B.Unit
 {
-    expression = A - B
+    return A - B
 }
 ```
 

@@ -4,16 +4,16 @@ Comet is a domain-specific language for describing combinatorial designs in quan
 
 ### Core Concepts
 
-1.  **Combination (Semantic Type)**: 
+1.  **Universe**
+    -   List of signals with same properties and structure
+    -   For example, 'Earnings' universe is ['EBIT', 'Revenue', 'NetIncome'] with DataFrame structure and Monetary property
+
+2.  **Properties (Semantic Type)**: 
     -   Represents a semantic abstraction defined by a set of **Properties**.
-    -   Example: `Type PERatio : Instrument derives { Monetary }`.
     -   These are used for logic dispatch and synthesis.
 
-2.  **Structure (Data Container)**:
+3.  **Structure (Data Container)**:
     -   Represents the underlying physical data layout.
-    -   Example: `Series` (Time-series), `DataFrame` (Tabular), `Matrix` (2D Array).
-    -   Combinations are *stored in* Structures.
+    -   Example: `Series` (Time-series), `DataFrame` (Tabular), `Matrix` (3D Tensor).
 
-### Syntax
 
-XML based (Legacy reference, actual syntax is C-like/Rust-like).

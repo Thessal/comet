@@ -34,6 +34,8 @@ pub struct TypeDecl {
     pub name: Ident,
     pub parent: Ident,
     pub properties: Vec<Ident>,
+    pub components: Option<Vec<Ident>>,
+    pub structure: Option<Ident>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -71,6 +73,7 @@ pub struct ImplDecl {
     pub behavior: Ident,
     pub args: Vec<Ident>, // e.g., ["A", "B"]
     pub constraints: Option<Expr>, // "where B is NonZero"
+    pub ensures: Option<Vec<Ident>>,
     pub body: Block,
 }
 
@@ -79,7 +82,8 @@ pub struct FuncDecl {
     pub name: Ident,
     pub params: Vec<Param>, // ParamList
     pub return_type: Ident,
-    pub constraints: Option<Vec<Constraint>>, // ConstraintList?
+    pub constraints: Option<Expr>, 
+    pub ensures: Option<Vec<Ident>>,
     pub body: Block,
 }
 

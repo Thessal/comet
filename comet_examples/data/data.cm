@@ -1,0 +1,12 @@
+//Type Instrument : Any derives {}
+
+Type Price : DataFrame derives { Monetary, NonZero }
+Type Volume : DataFrame derives { NonZero }
+Type Earnings : DataFrame derives { Monetary }
+
+
+// Define Combinations (Semantic Types) with Components
+Type PE_Universe : DataFrame derives { Monetary } [PE_Trailing, PE_Forward]
+// Type PERatio : DataFrame derives { Monetary } // Old definition, keeping for compat if needed, but we use PE_Universe
+
+Type Volume_Universe : Instrument <TimeSeries> derives { NonZero } [Volume_Main, Volume_DarkPool]
