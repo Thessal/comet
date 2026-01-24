@@ -1,0 +1,118 @@
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+COMMENT = _{ ("//" ~ (!"\n" ~ ANY)*) | ("/*" ~ (!"*/" ~ ANY)* ~ "*/") }
+
+program = { SOI ~ declaration* ~ EOI }
+
+declaration = {
+    import_decl |
+    type_decl |
+    struct_decl |
+    enum_decl |
+    behavior_decl |
+    impl_decl |
+    flow_decl |
+    func_decl |
+    property_decl
+}
+
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+int_literal = @{ ASCII_DIGIT+ }
+float_literal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+string_literal = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+bool_literal = { "true" | "false" }
+literal = { float_literal | int_literal | string_literal | bool_literal }
+
+// Keywords
+k_type = { "Type" }
+k_struct = { "Struct" }
+k_enum = { "Enum" }
+k_behavior = { "Behavior" }
+k_impl = { "Implementation" }
+k_flow = { "Flow" }
+k_fn = { "fn" }
+k_property = { "Property" }
+k_derives = { "derives" }
+k_implements = { "implements" }
+k_where = { "where" }
+k_is = { "is" }
+k_return = { "return" }
+k_import = { "import" }
+
+import_decl = { k_import ~ string_literal }
+
+property_decl = { k_property ~ identifier }
+
+type_decl = { k_type ~ identifier ~ ":" ~ identifier ~ k_derives ~ "{" ~ property_list? ~ "}" }
+property_list = { identifier ~ ("," ~ identifier)* }
+
+struct_decl = { k_struct ~ identifier ~ "{" ~ field_list ~ "}" }
+field_list = { (identifier ~ ":" ~ type_ref ~ comma?)* }
+comma = _{ "," }
+
+type_ref = { identifier } // Placeholder
+
+enum_decl = { k_enum ~ identifier ~ "{" ~ enum_variant_list ~ "}" }
+enum_variant_list = { identifier ~ (comma ~ identifier)* ~ comma? }
+
+behavior_decl = { k_behavior ~ identifier ~ "(" ~ arg_list ~ ")" ~ "->" ~ identifier }
+arg_list = { (identifier ~ (comma ~ identifier)*)? }
+
+impl_decl = { k_impl ~ identifier ~ k_implements ~ identifier ~ "(" ~ arg_list ~ ")" ~ where_clause? ~ "{" ~ block ~ "}" }
+where_clause = { k_where ~ expr }
+block = { statement* }
+
+func_decl = { k_fn ~ identifier ~ "(" ~ param_list ~ ")" ~ "->" ~ identifier ~ constraint_list? ~ "{" ~ block ~ "}" }
+param_list = { (param ~ (comma ~ param)*)? }
+param = { identifier ~ ":" ~ type_ref }
+constraint_list = { where_clause }
+
+flow_decl = { k_flow ~ identifier ~ "{" ~ flow_stmt* ~ "}" }
+flow_stmt = {
+    generator_stmt |
+    assignment_stmt |
+    return_stmt
+}
+
+generator_stmt = { identifier ~ "<-" ~ expr ~ where_clause? }
+assignment_stmt = { identifier ~ "=" ~ expr ~ where_clause? }
+return_stmt = { k_return ~ expr }
+
+statement = { flow_stmt } // TODO: Add other statements if needed
+
+// Expressions
+expr = { or_expr }
+or_expr = { and_expr ~ (op_or ~ and_expr)* }
+and_expr = { eq_expr ~ (op_and ~ eq_expr)* }
+eq_expr = { rel_expr ~ (op_eq ~ rel_expr)* }
+rel_expr = { add_expr ~ (
+    (op_rel ~ add_expr) |
+    (k_is ~ identifier)
+)* }
+add_expr = { mul_expr ~ (op_add ~ mul_expr)* }
+mul_expr = { unary_expr ~ (op_mul ~ unary_expr)* }
+unary_expr = { op_unary? ~ atom } // unary_operator is optional
+
+op_or = { "||" }
+op_and = { "&&" }
+op_eq = { "==" | "!=" }
+op_rel = { "<=" | ">=" | "<" | ">" }
+op_add = { "+" | "-" }
+op_mul = { "*" | "/" }
+op_unary = { "-" | "!" }
+
+atom = { primary ~ postfix* }
+postfix = { call_suffix | member_suffix }
+call_suffix = { "(" ~ arg_values ~ ")" }
+member_suffix = { "." ~ identifier }
+
+primary = {
+    literal |
+    path |
+    paren_expr |
+    list_literal
+}
+
+path = ${ identifier ~ ("::" ~ identifier)* } 
+paren_expr = { "(" ~ expr ~ ")" }
+list_literal = { "[" ~ (expr ~ ("," ~ expr)*)? ~ "]" }
+arg_values = { (expr ~ ("," ~ expr)*)? }

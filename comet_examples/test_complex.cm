@@ -1,0 +1,55 @@
+// test_complex.cm
+// Complex strategy: Daily financial ratio data triggered by minutely volume spike.
+// Condition: normalized(compare(volume, historical(volume))) > 0.8
+
+import "stdlib.cm"
+import "data/universe.cm"
+
+// Define Combinations (Semantic Types)
+Type PERatio : Instrument derives { Monetary }
+
+// Define missing Behaviors
+Behavior Comparator(a, b) -> DataFrame
+Behavior Historical(x) -> TimeSeries
+
+// 1. Historical Implementation
+Implementation MovingAverage implements Historical(x) {
+    return x 
+}
+
+// 2. Comparator Implementation
+Implementation Ratio implements Comparator(a, b) where b is NonZero {
+    return a / b
+}
+
+// 3. Normalizer Implementation
+// Normalizer in stdlib: Behavior Normalizer(T) -> T
+Implementation ZScore implements Normalizer(x) {
+    return zscore(x) // stdlib zscore might need update if x is TimeSeries, relying on flexible stdlib for now
+}
+
+Flow Strategy {
+    // Load Data
+    daily_pe <- Universe(PERatio) 
+    min_vol  <- Universe_Series(Volume) // Returns TimeSeries
+
+    // Calculate Historical Volume
+    hist_vol <- Historical(min_vol)
+
+    // Compare Current vs Historical
+    // Comparator needs to handle TimeSeries inputs now if we want that
+    // Or we assume automatic promotion/alignment?
+    // Let's assume Comparator works on compatible types.
+    vol_ratio <- Comparator(min_vol, hist_vol)
+
+    // Normalize the ratio (Spike Score)
+    spike_score <- Normalizer(vol_ratio)
+
+    // Output: updated when condition met
+    // NEW LOGIC: apply_filter creating a mask
+    masked_spike <- apply_filter(spike_score, 0.8)
+    
+    result = update_when(daily_pe, masked_spike)
+    
+    return result
+}

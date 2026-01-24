@@ -1,0 +1,67 @@
+// test_basic.cm
+// Defines combinations of binary, ternary, and unary logics
+
+import "stdlib.cm"
+import "data/universe.cm"
+
+// 1. Unary Logic (Normalization)
+// Behavior Normalizer(x) -> Series // Defined in stdlib.cm
+
+Implementation ZScore implements Normalizer(x) {
+    return zscore(x)
+}
+
+Implementation Rank implements Normalizer(x) {
+    return rank(x)
+}
+
+Implementation Keep implements Normalizer(x) {
+    return x
+}
+
+// 2. Binary Logic (Comparison)
+Behavior Comparator(a, b) -> Series
+
+Implementation Ratio implements Comparator(a, b) where b is NonZero {
+    return a / b
+}
+
+Implementation Spread implements Comparator(a, b) { // Logic for Unit check handled where? 
+    // where a.Unit == b.Unit -- grammar supports complex exprs in where?
+    // Expr -> Or -> ... -> Atom -> MemberExpr.
+    // Yes.
+    // But `a.Unit` assumes fields.
+    // For now skipping implicit constraint or assuming it passes.
+    return a - b
+}
+
+// 3. Ternary Logic (Condition/Trigger)
+Behavior SignalGen(x, high, low) -> Series
+
+Implementation BandTrigger implements SignalGen(x, high, low) {
+     // trim_ternary not in stdlib yet? assuming it exists or defined
+     return trim_ternary(x, high, low)
+}
+
+Flow Examples {
+    // Inputs
+    price <- Universe(Price) 
+    vol   <- Universe(Volume)
+
+    // 1. Unary combinations
+    norm_price <- Normalizer(price) // Behavior call? 
+    // Grammar: 
+    // GeneratorStmt ::= Identifier "<-" Expr
+    // Expr -> CallExpr -> Path "(" Args ")"
+    // Normalizer is Behavior. Can we call Behavior?
+    // Docs `transform.md`: "When encountering `spike <- Comparator(x, y)`: ... Resolve ... Impl"
+    // So yes, we call the Behavior name.
+    
+    // 2. Binary combinations
+    diff <- Comparator(price, norm_price)
+
+    // 3. Ternary combinations
+    sig <- SignalGen(diff, 2.0, -2.0)
+    
+    return sig
+}

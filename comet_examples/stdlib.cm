@@ -1,0 +1,59 @@
+// Standard Library
+
+Type Any : Root derives {}
+Type Void : Any derives {}
+
+Type Integer : Any derives { Constant }
+Type Float : Any derives { Constant }
+Type Boolean : Any derives { Constant }
+Type String : Any derives { Constant }
+
+// Structures
+Type Series : Any derives {}
+Type TimeSeries : Any derives {}
+Type DataFrame : Any derives {}
+Type Matrix : Any derives {}
+
+Property NonZero
+Property Monetary
+Property Ranged
+Property Masked
+Property Constant
+
+// Mathematical
+Behavior Arithmetic(A, B) -> T
+Behavior Statistical(T) -> Series
+
+// Normalization
+Behavior Normalizer(T) -> T
+
+fn zscore(x: Series) -> Series {
+    return x
+}
+
+fn rank(x: Series) -> Series {
+    return x
+}
+
+fn trim_ternary(x: Series, h: Float, l: Float) -> Series {
+    return x
+}
+
+// Conditionals
+fn enter_when(data: DataFrame, signal: DataFrame) -> DataFrame where signal is Masked {
+    return data
+}
+
+fn update_when(data: DataFrame, signal: DataFrame) -> DataFrame where signal is Masked {
+    return data
+}
+
+// Logic to create a mask
+fn apply_filter(data: DataFrame, threshold: Float) -> DataFrame {
+    // Ideally this attaches 'Masked' property
+    return data
+}
+
+fn greater_than(val: Float) -> Float {
+    return val 
+}

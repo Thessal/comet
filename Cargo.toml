@@ -1,0 +1,9 @@
+[package]
+name = "comet"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+pest = "2.6"
+pest_derive = "2.6"
+thiserror = "1.0"
