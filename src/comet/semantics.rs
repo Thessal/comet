@@ -104,24 +104,26 @@ impl SemanticAnalyzer {
                  // Usually Impls are anonymous or named uniquely?
                  // Comet `Impl Name("Ratio") ...` -> Identifier is "Ratio".
                  self.symbol_table.implementations.push(ImplInfo {
-                     name: d.name.clone(),
-                     behavior: d.behavior.clone(),
-                     args: d.args.clone(),
-                     constraints: d.constraints.clone(),
-                     ensures: d.ensures.clone(),
-                     body: d.body.stmts.clone(),
-                 });
+                    name: d.name.clone(),
+                    behavior: d.behavior.clone(),
+                    args: d.args.clone(),
+                    constraints: d.constraints.clone(),
+                    ensures: d.ensures.clone(),
+                    body: d.body.stmts.clone(),
+                });
             }
             Declaration::Function(d) => {
                  let params = d.params.iter().map(|p| ParamInfo {
                      name: p.name.clone(),
                      ty: p.ty.clone(),
                  }).collect();
-                 self.symbol_table.functions.insert(d.name.clone(), FuncInfo {
-                     name: d.name.clone(),
-                     params,
-                     return_type: d.return_type.clone(),
-                 });
+                 self.symbol_table.functions.insert(d.name.clone(), crate::comet::symbols::FuncInfo {
+                    name: d.name.clone(),
+                    params: params,
+                    return_type: d.return_type.clone(),
+                    constraints: d.constraints.clone(),
+                    ensures: d.ensures.clone(),
+                });
             }
             Declaration::Flow(d) => {
                 self.symbol_table.flows.insert(d.name.clone(), FlowInfo {

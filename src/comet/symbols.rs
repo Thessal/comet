@@ -70,7 +70,8 @@ pub struct FuncInfo {
     pub name: Ident,
     pub params: Vec<ParamInfo>,
     pub return_type: Ident,
-    // constraints?
+    pub constraints: Option<Expr>,
+    pub ensures: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]

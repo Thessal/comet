@@ -101,7 +101,8 @@ impl Codegen {
                         OperatorOp::ZScore => format!("comet::functions::zscore({})", arg_vars.join(", ")),
                         OperatorOp::Filter => format!("comet::functions::filter({})", arg_vars.join(", ")),
                         OperatorOp::UpdateWhen => format!("comet::functions::update_when({})", arg_vars.join(", ")),
-                         _ => format!("todo!(\"{:?}\")", op),
+                        OperatorOp::FunctionCall(func_name) => format!("comet::functions::{}({})", func_name.to_lowercase(), arg_vars.join(", ")),
+                        _ => format!("todo!(\"{:?}\")", op),
                      };
                      code.push_str(&format!("    let var_{} = {};\n", node_id, call));
                 }

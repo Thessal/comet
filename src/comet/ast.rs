@@ -106,6 +106,8 @@ pub struct Block {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Flow(FlowStmt),
+    Return(Expr),
+    Expr(Expr),
     // ... other stmts
 }
 

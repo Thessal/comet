@@ -58,11 +58,19 @@ fn update_when(data: DataFrame, signal: DataFrame) -> DataFrame where signal is 
 }
 
 // Logic to create a mask
-fn apply_filter(data: DataFrame, threshold: Float) -> DataFrame where data is Ranged ensures { Ranged } {
+fn apply_filter(data: DataFrame, threshold: Float) -> DataFrame where data is Ranged ensures { Masked } {
     // Ideally this attaches 'Masked' property
     return data
 }
 
 fn greater_than(val: Float) -> Float {
     return val 
+}
+
+fn subtract(x: Series, y: Series) -> Series {
+    return x
+}
+
+fn clip(x: Series, min: Float, max: Float) -> Series {
+    return x
 }

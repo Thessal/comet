@@ -129,17 +129,6 @@ impl<'a> Synthesizer<'a> {
                         }
                         
                         // Normal execution (no branching or not Universe)
-                        // If we are here, context has NOT been consumed by single universe branch above because that branch pushes and stops (or we need to be careful).
-                        // Ah, the single universe branch 'else' block consumed 'context' via push.
-                        // So if expanded=true, 'context' is gone.
-                        // But wait, if I did 'expanded = true', I continue. 
-                        // The 'else' block for single universe set expanded=true? No, I logic-ed that wrong in previous block.
-                        // The previous block handled both branching and single.
-                        // So if expanded is true, we already pushed contexts.
-                        
-                        // However, the `source` is accessed again below? No.
-                        
-                        // Normal execution (no branching or not Universe)
                         match self.evaluate_expr(source, context) {
                             Ok(results) => {
                                 for (mut ctx, type_name, props, node_id) in results {
@@ -222,71 +211,19 @@ impl<'a> Synthesizer<'a> {
 
                 
                 // Function Handlers
-                if func_name == "update_when" {
-                    use crate::comet::functions::FunctionHandler;
-                    return crate::comet::functions::update_when::UpdateWhen.handle(self, args, context);
-                }
-
+                // 'divide' handler is required because the SymbolTable (HashMap) does not support function overloading.
+                // Generic dispatch can't disambiguate multiple 'divide' definitions in stdlib.cm based on argument types.
                 if func_name == "divide" {
-                    use crate::comet::functions::FunctionHandler;
+                     use crate::comet::functions::FunctionHandler;
                     return crate::comet::functions::divide::Divide.handle(self, args, context);
                 }
-
-                if func_name == "apply_filter" {
-                   if let Some(arg0) = args.get(0) {
-                       // Evaluate arg0
-                       let results0 = self.evaluate_expr(arg0, context)?;
-                       let mut final_results = Vec::new();
-
-                       for (mut ctx, t, mut props, id) in results0 {
-                           props.push("Masked".to_string());
-                           
-                           let mut input_nodes = vec![id];
-                           // Check arg1
-                           if let Some(arg1) = args.get(1) {
-                                // Evaluate arg1 in this ctx. 
-                                // Caution: evaluate_expr consumes ctx.
-                                let results1 = self.evaluate_expr(arg1, ctx)?;
-                                for (mut ctx2, _, _, id2) in results1 {
-                                    // Clone input_nodes for each arg1 branch (though naive vec clone is cheap)
-                                    let mut nodes = input_nodes.clone();
-                                    nodes.push(id2);
-                                    
-                                    let op_node = ExecutionNode::Operation {
-                                       op: OperatorOp::Filter,
-                                       args: nodes,
-                                   };
-                                   let new_id = ctx2.add_node(op_node);
-                                   final_results.push((ctx2, t.clone(), props.clone(), new_id));
-                                }
-                           } else {
-                               // No arg1
-                               let op_node = ExecutionNode::Operation {
-                                   op: OperatorOp::Filter,
-                                   args: input_nodes,
-                               };
-                                let new_id = ctx.add_node(op_node);
-                               final_results.push((ctx, t, props, new_id));
-                           }
-                       }
-                       return Ok(final_results);
-                   }
-                }
+                
+                // Other functions (update_when, apply_filter) are handled by Generic Dispatch below.
 
                 // Generic Behavior / Function Dispatch
                 // 1. Evaluate arguments first to get types
                 // Since each arg evaluation can branch, we have a combinatorial explosion of argument contexts.
                 // Simplified: Evaluate args sequentially across branched contexts.
-                
-                // Logic:
-                // Start with [context]
-                // For each arg:
-                //   For each ctx in list:
-                //      evaluate arg -> valid next contexts
-                // Collect all valid next contexts with their arg resolved
-                
-                // This is complex. For now, assume single context flow for args, OR implement the loop.
-                // Let's implement the loop for args.
                 
                 #[derive(Clone, Debug)]
                 struct ArgResult {
@@ -294,11 +231,6 @@ impl<'a> Synthesizer<'a> {
                     type_name: String,
                     properties: Vec<String>,
                 }
-                
-                // Helper to evaluate args recursively
-                // Input: Vec<Context>. Output: Vec<(Context, Vec<ArgResult>)>
-                // Since this recursion is manual, let's just support 1 or 2 args for now or strictly generic?
-                // Generic is needed.
                 
                 let mut current_states: Vec<(Context, Vec<ArgResult>)> = vec![(context.clone(), Vec::new())];
                 
@@ -315,111 +247,139 @@ impl<'a> Synthesizer<'a> {
                     current_states = next_states;
                 }
                 
-                // Now we have contexts with all args evaluated.
                 // Dispatch logic.
                 let mut results = Vec::new();
                 
                 for (mut ctx, arg_results) in current_states {
                      // Look for Impls matching func_name
-                     // Iterate self.symbol_table.implementations
-                     // Matching behavior == func_name
                      
                      let mut found = false;
                      for impl_info in &self.symbol_table.implementations {
-                         if impl_info.behavior == *func_name {
-                             // Match?
-                             // Constraints? "where b is NonZero"
-                             // Assume args match by position.
-                             // Check constraints.
-                             // impl_info.constraints: Option<Expr>
-                             // We need to evaluate the constraint expr against the arg properties?
-                             // Or simpler: Symbol table has `args: ["A", "B"]`
-                             // Constraints check properties of A or B.
-                             // Currently we don't have a constraint evaluator.
-                             // But we can do simple property check if constraint is `PropertyCheck`.
-                             
-                             let mut matched = true;
-                             if let Some(c) = &impl_info.constraints {
-                                 // Check simplified constraint: `is NonZero`
-                                 // We need to bind params to args.
-                                 // impl_info.args ["a", "b"] correspond to arg_results[0], arg_results[1]
-                                 
-                                 // Hacky check for now: manual traversal of constraint expr
-                                 if let Expr::PropertyCheck { target, property } = c {
-                                     if let Expr::Identifier(id) = target.as_ref() {
-                                         // Find index of `id` in impl_info.args
-                                         if let Some(idx) = impl_info.args.iter().position(|x| x == id) {
-                                              if let Some(arg_res) = arg_results.get(idx) {
-                                                   if !arg_res.properties.contains(property) {
-                                                       matched = false;
+                          if impl_info.behavior == *func_name {
+                              let mut matched = true;
+                              if let Some(c) = &impl_info.constraints {
+                                  if let Expr::PropertyCheck { target, property } = c {
+                                      if let Expr::Identifier(id) = target.as_ref() {
+                                          if let Some(idx) = impl_info.args.iter().position(|x| x == id) {
+                                               if let Some(arg_res) = arg_results.get(idx) {
+                                                    if !arg_res.properties.contains(property) {
+                                                        matched = false;
+                                                    }
+                                               }
+                                          }
+                                      }
+                                  }
+                              }
+                              
+                              if matched {
+                                  found = true;
+                                  
+                                  // Inline the implementation body!
+                                  let mut scope_ctx = ctx.clone();
+                                  
+                                  // Bind params to args
+                                  for (i, param_name) in impl_info.args.iter().enumerate() {
+                                      if let Some(arg_res) = arg_results.get(i) {
+                                          scope_ctx.variables.insert(param_name.clone(), VariableState {
+                                              name: param_name.clone(),
+                                              type_name: arg_res.type_name.clone(),
+                                              properties: arg_res.properties.clone(),
+                                              node_id: arg_res.node_id,
+                                          });
+                                      }
+                                  }
+                                  
+                                  // Synthesize body (Assume Return stmt for now)
+                                  let mut block_contexts = vec![scope_ctx];
+                                  let mut final_returns = Vec::new();
+                                  
+                                  for stmt in &impl_info.body {
+                                      let mut next_block_ctx = Vec::new();
+                                      for b_ctx in block_contexts {
+                                           match stmt {
+                                               crate::comet::ast::Stmt::Return(e) | 
+                                               crate::comet::ast::Stmt::Flow(crate::comet::ast::FlowStmt::Return(e)) => {
+                                                   if let Ok(res) = self.evaluate_expr(e, b_ctx) {
+                                                       for (res_ctx, t, props, id) in res {
+                                                           final_returns.push((res_ctx, t, props, id));
+                                                       }
                                                    }
-                                              }
-                                         }
-                                     }
-                                 }
-                             }
-                             
-                             if matched {
-                                 found = true;
-                                 // This implementation is valid!
-                                 // Branch context?
-                                 // Yes, if we have multiple valid impls, we branch.
-                                 
-                                 let mut branch_ctx = ctx.clone();
-                                 let arg_ids: Vec<usize> = arg_results.iter().map(|a| a.node_id).collect();
-                                 
-                                 // Record Function Call in IR
-                                 // Node: FunctionCall(impl_name)
-                                 let node = ExecutionNode::Operation {
-                                     op: OperatorOp::FunctionCall(impl_info.name.clone()),
-                                     args: arg_ids,
-                                 };
-                                 let new_id = branch_ctx.add_node(node);
-                                 
-                                 // Return Type?
-                                 // Look up behavior return type
-                                 let behavior = self.symbol_table.behaviors.get(func_name).unwrap();
-                                 // Only simple return type support for now
-                                 let ret_type = behavior.return_type.clone().unwrap_or("Unknown".to_string());
-                                 
-                                 // Properties? 
-                                 // Heuristic: Propagate properties from 1st arg if return type matches
-                                 let mut ret_props = Vec::new();
-                                 if let Some(arg0) = arg_results.get(0) {
-                                     if arg0.type_name == ret_type {
-                                         ret_props = arg0.properties.clone();
-                                     }
-                                 }
-
-                                 // Add explicit ensures properties
-                                 if let Some(ensures) = &impl_info.ensures {
-                                     for prop in ensures {
-                                         if !ret_props.contains(prop) {
-                                             ret_props.push(prop.clone());
-                                         }
-                                     }
-                                 }
-                                 
-                                 results.push((branch_ctx, ret_type, ret_props, new_id));
-                             }
-                         }
+                                               },
+                                               _ => {}
+                                           }
+                                      }
+                                      block_contexts = next_block_ctx; 
+                                  }
+                                  
+                                  // Apply ensures properties
+                                  for (res_ctx, t, mut props, id) in final_returns {
+                                      if let Some(ensures) = &impl_info.ensures {
+                                           for prop in ensures {
+                                               if !props.contains(prop) {
+                                                   props.push(prop.clone());
+                                               }
+                                           }
+                                      }
+                                      results.push((res_ctx, t, props, id));
+                                  }
+                              }
+                          }
                      }
                      
                      if !found {
-                          // Fallback or error?
-                          // For recursion default, maybe we should return Unknown
-                          // Or recursive single arg?
+                          // Try looking up in functions
+                          if let Some(func_info) = self.symbol_table.functions.get(func_name) {
+                               let mut matched = true;
+                               // Constraints check
+                               if let Some(vals) = &func_info.constraints {
+                                   if let Expr::PropertyCheck { target, property } = vals {
+                                       if let Expr::Identifier(id) = target.as_ref() {
+                                           if let Some(idx) = func_info.params.iter().position(|p| p.name == *id) {
+                                                if let Some(arg_res) = arg_results.get(idx) {
+                                                     if !arg_res.properties.contains(&property) {
+                                                         matched = false;
+                                                     }
+                                                }
+                                           }
+                                       }
+                                   }
+                               }
+                               
+                               if matched {
+                                   found = true;
+                                   let mut branch_ctx = ctx.clone();
+                                   let arg_ids: Vec<usize> = arg_results.iter().map(|a| a.node_id).collect();
+                                   
+                                   let node = ExecutionNode::Operation {
+                                       op: OperatorOp::FunctionCall(func_info.name.clone()),
+                                       args: arg_ids,
+                                   };
+                                   let new_id = branch_ctx.add_node(node);
+                                   
+                                   let ret_type = func_info.return_type.clone();
+                                   
+                                   // Properties
+                                   let mut ret_props = Vec::new(); // No heuristic
+
+                                   if let Some(ensures) = &func_info.ensures {
+                                       for prop in ensures {
+                                           if !ret_props.contains(prop) {
+                                               ret_props.push(prop.clone());
+                                           }
+                                       }
+                                   }
+                                   results.push((branch_ctx, ret_type, ret_props, new_id));
+                               }
+                          }
                      }
                 }
                 
                 if results.is_empty() {
-                    // Fallback to recursion if 1 arg?
-                     if let Some(arg0) = args.get(0) {
-                         return self.evaluate_expr(arg0, context);
-                     }
-                     Ok(vec![ (context, "Unknown".to_string(), vec![], 0) ])
+                     // No valid implementation/function found (or constraints failed).
+                     // Prune this branch.
+                     Ok(vec![]) 
                 } else {
-                    Ok(results)
+                     Ok(results)
                 }
             },
             Expr::BinaryOp { left, op, right } => {

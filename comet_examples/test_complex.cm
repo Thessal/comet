@@ -10,7 +10,7 @@ Behavior Comparator(a, b) -> DataFrame
 Behavior Historical(x) -> TimeSeries
 
 // 1. Historical Implementation
-Implementation MovingAverage implements Historical(x) {
+Implementation NonzeroMovingAverage implements Historical(x) where x is NonZero ensures { NonZero } {
     return x 
 }
 
@@ -18,21 +18,22 @@ Implementation MovingAverage implements Historical(x) {
 Implementation Ratio implements Comparator(a, b) where b is NonZero {
     return divide(a, b) 
 }
-Implementation RankDiff implements Comparator(a, b) {
-    return rank(a) - rank(b)
+Implementation RankDiff implements Comparator(a, b) ensures { Ranged } {
+    return subtract(rank(a), rank(b))
 }
 
 // 3. Normalizer Implementation
 Behavior UnboundNormalizer(T) -> T
-Implementation UnBoundNormalizer implements Normalizer(x) {
-    return UnboundNormalizer(x) // Added to check nested Behavior
-}
 Implementation ZScore implements UnboundNormalizer(x) {
     return zscore(x) 
 }
+
 // Normalizer in stdlib: Behavior Normalizer(T) -> T
+Implementation UnBoundNormalizer implements Normalizer(x) {
+    return UnboundNormalizer(x) // Does not ensure Ranged
+}
 Implementation Clipped implements Normalizer(x) ensures { Ranged } {
-    return clip(UnboundNormalizer(x), 0,1)
+    return clip(UnboundNormalizer(x), 0,1) // Added to check nested Behavior
 }
 Implementation Rank implements Normalizer(x) ensures { Ranged } {
     return rank(x)

@@ -192,9 +192,23 @@ fn parse_impl_decl(pair: Pair<Rule>) -> Result<ImplDecl, ParserError> {
     let behavior = parse_identifier(inner.next().unwrap());
     let args = parse_arg_list(inner.next().unwrap())?;
     
+
     let mut next = inner.next().unwrap();
     let mut constraints = None;
-    if next.as_rule() == Rule::where_clause {
+    if next.as_rule() == Rule::k_where {
+        // consumes k_where
+        let cb = inner.next().unwrap(); // constraint_block
+        let mut cb_inner = cb.into_inner();
+        let target = parse_identifier(cb_inner.next().unwrap());
+        let _k_is = cb_inner.next().unwrap();
+        let prop = parse_identifier(cb_inner.next().unwrap());
+        
+        let expr = Expr::PropertyCheck { target: Box::new(Expr::Identifier(target)), property: prop };
+        constraints = Some(expr);
+        
+        next = inner.next().unwrap();
+    } else if next.as_rule() == Rule::where_clause {
+         // Fallback if grammar changed back or reused where_clause
         constraints = Some(parse_where_clause(next)?);
         next = inner.next().unwrap();
     }
