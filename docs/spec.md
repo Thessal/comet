@@ -1,12 +1,77 @@
 # Comet Language Specification
 
-Comet is a domain-specific language for defining **Semantic Logical Flows** in quantitative finance. It focuses on **Meaning** (Properties, Relationships) rather than **Representation** (Structs, Pointers).
+Comet is a domain-specific language for synthesize set of **functions** in quantitative finance. 
+It formalizes logical structures.
 
 ## Design Philosophy
 
--   **Logical Typing**: Types represent *what* data is (e.g., `Volume`), not just how it's stored.
--   **Semantic Properties**: Data carries properties (`NonZero`, `Stationary`, `USD`) that determine valid operations.
--   **Context-Driven Synthesis**: Operations are generated only when the semantic context (properties of inputs) allows it.
+-   **Types** 
+    - Kewords that represent data formats or semantic properties
+    - Notation : `Series`, `DataFrame`, `Indicator`, `None`
+    - Combination : `Series NonZero`
+-   **Constraints**
+    - Constraints is an expression that represents space of types.
+    - Constraints can be expanded to a list of types. 
+    - Constraints can be matched to determine valid types
+    - Single type is a valid constraint.
+    - Addition : (LHS) (RHS) 
+        - When addition is expanded, RHS is appended to each type that matches LHS.
+        - `Series Monetary` can be expanded to `[Series Monetary]`
+        - `( Series | DataFrame NonZero | Monetary)` can be expanded to `[Series, DataFrame NonZero, Monetary]`
+        - `( Series | DataFrame ) ( NonZero | Monetary)` can be expanded to `[Series NonZero, DataFrame NonZero, Series Monetary, DataFrame Monetary]`
+        - None Type : Adding None type have no effect and removed when expanded.
+            - `Series (None | NonZero) == Series | (Series NonZero)`
+    - Union : (LHS) | (RHS)
+        - When union is expanded, All type that matches RHS is appended to each type that matches LHS.
+        - `( A | B ) | ( C | D )` can be expanded to `[A, B, C, D]`
+    - Subtract : (LHS) - (RHS) 
+        - When subtraction is expanded, patterns that matches RHS is removed from LHS.
+        - `( Series | DataFrame ) - DataFrame` can be expanded to `[Series]`
+        - `( Series | DataFrame ) - (DataFrame NonZero)` can be expanded to `[Series, DataFrame]` because `DataFrame` is not matched by `DataFrame NonZero`.
+        - `( Series | DataFrame ) NonZero - ( Series NonZero )` can be expanded to `[DataFrame NonZero]`.
+    - Matching : 
+        - Single type can be matched to a constraint, when expansion of the constraint includes the type.
+            - type `Series NonZero` matches constraint `Series`, `NonZero`, `Series NonZero`  
+        - Constraints can be matched to a constraint, when expansion of the constraint includes the constraint.
+            - constraint `Series NonZero | DataFrame NonZero` matches constraint `NonZero`
+            - constraint `Series NonZero | DataFrame NonZero | DataFrame` does not matches constraint `Nonzero` because "DataFrame" is not matched by `Nonzero`.
+    - Assignment : 
+        - Constraint variable '(symbol) can capture a constraints e.g. 'a , 'b  etc. 
+        - Constraint can be stored to the constraint variable and recovered from the variable.
+
+-   **Behaviors**
+    - Behavior is a **Type Class** that maps input type constraints to output type constraints.
+    - `Behavior Compare (dividend: (DataFrame | Series) 'a, divisor: (DataFrame | Series) Finite Positive) -> ('a Finite)`
+        - Constraint variable 'a or 'b etc can be used to capture a type.
+        - It means that Compare is a mapping from A, B into (a Finite). If A is DataFrame, the result is also DataFrame.
+        - Behavior can be fully expanded into the following list : 
+            - `Compare(dividend=DataFrame, divisor=DataFrame Finite Positive) -> DataFrame Finite`
+            - `Compare(dividend=Series, divisor=Series Finite Positive) -> Series Finite`
+        - These example functions with following types are valid for Compare:
+            - fn divide(dividend:DataFrame, divisor:DataFrame Finite Positive) -> DataFrame Finite 
+            - fn diff(dividend:DataFrame Finite Positive SomeOtherType, divisor:DataFrame Finite Positive SomeOtherType) -> DataFrame Finite 
+            - fn divide_1d(dividend:Series, divisor:Series Finite Positive) -> Series Finite 
+    - Behaviors can be chained and assigned to a concept.
+    - Example: \
+      `Behavior RemoveNegative (A: (DataFrame | Series) a) -> (a Positive)` \
+      `Behavior RemoveZero (A: (DataFrame | Series) a) -> (a Positive)` \
+      `price_safe = RemoveZero(A=RemoveNegative(A=price)) // assignment of chained behavior into a concept.` \
+      `price_safe_2 = RemoveZero(A=RemoveNegative(A=price))` \
+      `comparison_result = Compare(dividend=price_safe, divisor=price_safe_2) // Using saved concept.`    
+
+-   **Functions**
+    - Functions map that receives a list of concepts and returns a concept.
+    - `fn Ratio ( dividend: DataFrame, divisor: DataFrame Positive ) -> (DataFrame Finite) { return A / B }`
+        - Input and output type with code segments. 
+        - Type can be used define functions, but constraint cannot be used. 
+    - Function can be matched to a behavior all of the following conditions are met: 
+        - Input keywords are valid for the behavior.
+        - Input types are valid for the behavior.
+        - Output type is valid for the behavior.
+    - Example: 
+        - `fn Ratio ( dividend: DataFrame, divisor: DataFrame Positive ) -> (DataFrame Finite) { return A / B }` can be matched to a behavior `Behavior Compare (dividend: (DataFrame | Series) 'a, divisor: (DataFrame | Series) 'b Finite Positive) -> ('a Finite)`
+
+
 
 ## Syntax Overview
 
@@ -14,11 +79,12 @@ Comet is a domain-specific language for defining **Semantic Logical Flows** in q
 
 To align with the "Semantic" design philosophy, we use specific terms:
 
-| Concept | Replaces (CS Term) | Description |
+<!-- | Concept | Replaces (CS Term) | Description |
 | :--- | :--- | :--- |
-| **Behavior** | `Trait` | Defines an abstract logical capability (e.g., `Comparator`). It is about *what* makes sense to do with data, not just what methods exist. |
-| **Implementation** | `Impl` | A specific, grounded logic for a Behavior (e.g., `Ratio`, `Spread`). It represents a *valid hypothesis* or *model* for that behavior. |
+| **Type** | `Constraint` / `Marker` | A semantic label (e.g., `NonZero`, `USD`). It describes the *meaning* of the data, enforcing categorical consistency. |
 | **Property** | `Constraint` / `Marker` | A semantic label (e.g., `NonZero`, `USD`). It describes the *meaning* of the data, enforcing categorical consistency. |
+| **Behavior** | `Class` | Defines an abstract logical capability (e.g., `Comparator`). It is about *what* makes sense to do with data, not just what methods exist. |
+| **Logic** | `Instance` | A specific, grounded logic for a Behavior (e.g., `Ratio`, `Spread`). It represents a *valid hypothesis* or *model* for that behavior. | -->
 
 ### 2. File Structure
 
@@ -28,7 +94,7 @@ Comet supports modularity via imports.
 import "stdlib.cm"
 import "data/universe.cm"
 ```
-
+<!-- 
 ### 3. Semantic Attributes (Properties)
 
 We define logic properties that can be attached to data.
@@ -131,4 +197,4 @@ If we tried to compare `Volume` and `0` using `Ratio`:
 -   Condition `B is NonZero` fails.
 -> **Ratio** is not generated.
 
-This ensures that the generated strategies are **Categorically Consistent**.
+This ensures that the generated strategies are **Categorically Consistent**. -->
