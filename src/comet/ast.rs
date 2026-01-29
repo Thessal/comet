@@ -1,6 +1,6 @@
 
 // Abstract Syntax Tree Definitions
-// Based on docs/ast.md
+// Based on docs/ast.md & docs/spec.md
 
 pub type Ident = String;
 
@@ -13,13 +13,9 @@ pub struct Program {
 pub enum Declaration {
     Import(ImportDecl),
     Type(TypeDecl),
-    Struct(StructDecl),
-    Enum(EnumDecl),
     Behavior(BehaviorDecl),
-    Impl(ImplDecl),
     Function(FuncDecl),
     Flow(FlowDecl),
-    Property(PropertyDecl),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -32,75 +28,54 @@ pub struct ImportDecl {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeDecl {
     pub name: Ident,
-    pub parent: Ident,
+    // Spec: type A : B C
+    pub parent_constraint: Option<Constraint>, 
+    // Spec: type A { prop, ... }
     pub properties: Vec<Ident>,
     pub components: Option<Vec<Ident>>,
     pub structure: Option<Ident>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct StructDecl {
-    pub name: Ident,
-    pub fields: Vec<Field>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct EnumDecl {
-    pub name: Ident,
-    pub variants: Vec<Ident>, // Simplified for now, docs just said EnumVariantList
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Field {
-    pub name: Ident,
-    pub ty: TypeRef,
-}
-
-pub type TypeRef = String; // Placeholder for now, docs used TypeRef but didn't define it fully in the snippet.
-
-// 3. Logic Definitions (Behaviors & Impls)
+// 3. Logic Definitions (Behaviors & Functions)
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BehaviorDecl {
     pub name: Ident,
-    pub args: Vec<Ident>,
-    pub return_type: Option<Ident>, // -> Identifier is optional in some languages, but here it looks required? Docs: "-> Identifier"
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ImplDecl {
-    pub name: Ident, // Unique name (e.g., "Ratio")
-    pub behavior: Ident,
-    pub args: Vec<Ident>, // e.g., ["A", "B"]
-    pub constraints: Option<Expr>, // "where B is NonZero"
-    pub ensures: Option<Vec<Ident>>,
-    pub body: Block,
+    // Spec: behavior Name(arg: Constraint, ...) -> Constraint
+    pub args: Vec<TypedArg>,
+    pub return_type: Constraint, 
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FuncDecl {
     pub name: Ident,
-    pub params: Vec<Param>, // ParamList
-    pub return_type: Ident,
-    pub constraints: Option<Expr>, 
-    pub ensures: Option<Vec<Ident>>,
+    pub params: Vec<TypedArg>, 
+    pub return_type: Constraint,
     pub body: Block,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Param {
+pub struct TypedArg {
     pub name: Ident,
-    pub ty: TypeRef,
+    pub constraint: Constraint,
 }
 
+// Spec: Constraints
+// Addition: (A B)
+// Union: (A | B)
+// Subtraction: (A - B)
 #[derive(Debug, Clone, PartialEq)]
-pub struct Constraint {
-    pub expr: Expr,
+pub enum Constraint {
+    Atom(Ident),           // "Series", "NonZero", "'a"
+    Addition(Vec<Constraint>), // Intersection / Composition
+    Union(Vec<Constraint>),    // Or
+    Subtraction(Box<Constraint>, Box<Constraint>), // A - B
+    None, // Empty constraint
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
-    pub stmts: Vec<Stmt>, // Block not fully defined in ast.md snippet, assuming Stmt list
+    pub stmts: Vec<Stmt>, 
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -108,13 +83,6 @@ pub enum Stmt {
     Flow(FlowStmt),
     Return(Expr),
     Expr(Expr),
-    // ... other stmts
-}
-
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct PropertyDecl {
-    pub name: Ident,
 }
 
 // 4. Flow Logic
@@ -127,11 +95,7 @@ pub struct FlowDecl {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FlowStmt {
-    Generator {
-        target: Ident,
-        source: Expr, // e.g. "Universe(Earnings)" or "Comparator(x, y)"
-        constraints: Option<Expr>,
-    },
+    // x = expr
     Assignment {
         target: Ident,
         expr: Expr,
@@ -147,9 +111,8 @@ pub enum Expr {
     Identifier(Ident),
     BinaryOp { left: Box<Expr>, op: Op, right: Box<Expr> },
     UnaryOp { op: Op, target: Box<Expr> },
-    Call { path: Path, args: Vec<Expr> },
+    Call { path: Path, args: Vec<ArgValue> },
     MemberAccess { target: Box<Expr>, field: Ident },
-    PropertyCheck { target: Box<Expr>, property: Ident }, // "is NonZero"
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -159,7 +122,7 @@ pub enum Op {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Path {
-    pub segments: Vec<Ident>, // e.g., ["Comparator", "compare"]
+    pub segments: Vec<Ident>, 
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -168,4 +131,10 @@ pub enum Literal {
     Float(f64),
     String(String),
     Boolean(bool),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ArgValue {
+    pub name: Option<Ident>,
+    pub value: Expr,
 }

@@ -18,34 +18,32 @@ fn main() {
              println!("Parsed successfully!");
              // println!("{:#?}", program);
              
-             let mut analyzer = comet::semantics::SemanticAnalyzer::new();
-             match analyzer.analyze(&program, filename) {
-                 Ok(_) => {
+             // let mut analyzer = comet::semantics::SemanticAnalyzer::new();
+             // match analyzer.analyze(&program, filename) {
+             match comet::semantics::analyze(&program) {
+                 Ok(symbol_table) => {
                      println!("Semantic analysis passed!");
                      println!("Symbol Table Stats:");
-                     println!("Types: {}", analyzer.symbol_table.types.len());
-                     println!("Behaviors: {}", analyzer.symbol_table.behaviors.len());
-                     println!("Impls: {}", analyzer.symbol_table.implementations.len());
-                     println!("Functions: {}", analyzer.symbol_table.functions.len());
-                     println!("Flows: {}", analyzer.symbol_table.flows.len());
+                     println!("Types: {}", symbol_table.types.len());
+                     println!("Behaviors: {}", symbol_table.behaviors.len());
+                     println!("Functions: {}", symbol_table.functions.len());
+                     println!("Flows: {}", symbol_table.flows.len());
                      
                      // Synthesis Step
-                     let synthesizer = comet::synthesis::Synthesizer::new(&analyzer.symbol_table);
-                     // Assuming 'Strategy' flow exists for now, or we can iterate
-                     if let Some(_) = analyzer.symbol_table.flows.get("Strategy") {
-                         match synthesizer.synthesize("Strategy") {
+                     let synthesizer = comet::synthesis::Synthesizer::new(&symbol_table);
+                     for (flow_name, _) in &symbol_table.flows {
+                        println!("Synthesizing flow: {}", flow_name);
+                         match synthesizer.synthesize(flow_name) {
                              Ok(contexts) => {
-                                 println!("Synthesis successful!");
-                                 let codegen = comet::codegen::Codegen::new();
-                                 let rust_code = codegen.generate_library(&contexts);
-                                 println!("--- Generated Rust Library ---");
-                                 println!("{}", rust_code);
-                                 println!("------------------------------");
+                                 println!("Synthesis successful for {}! Count: {}", flow_name, contexts.len());
+                                 // let codegen = comet::codegen::Codegen::new();
+                                 // let rust_code = codegen.generate_library(&contexts);
+                                 // println!("--- Generated Rust Library ---");
+                                 // println!("{}", rust_code);
+                                 // println!("------------------------------");
                              },
-                             Err(e) => eprintln!("Synthesis error: {:?}", e),
+                             Err(e) => eprintln!("Synthesis error for {}: {:?}", flow_name, e),
                          }
-                     } else {
-                         println!("No 'Strategy' flow found to synthesize.");
                      }
                  },
                  Err(e) => {

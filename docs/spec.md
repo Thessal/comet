@@ -47,32 +47,36 @@ It formalizes logical structures.
 -   **Behaviors**
     - Behavior is a mapping from input type constraints to output type constraints.
     - To prevent infinite loop, behaviors are not allowed to be recursive, and only one function can be matched for each behavior.
-    - `behavior Compare (dividend: (DataFrame | Series) 'a, divisor: (DataFrame | Series) Finite Positive) -> ('a Finite)`
+    - `behavior Compare (signal: (DataFrame | Series) 'a, reference: (DataFrame | Series) Finite Positive) -> ('a Finite)`
         - Constraint variable 'a or 'b etc can be used to capture a type.
         - It means that Compare is a mapping from A, B into (a Finite). If A is DataFrame, the result is also DataFrame.
         - Behavior can be fully expanded into the following list : 
-            - `Compare(dividend=DataFrame, divisor=DataFrame Finite Positive) -> DataFrame Finite`
-            - `Compare(dividend=Series, divisor=Series Finite Positive) -> Series Finite`
+            - `Compare(signal=DataFrame, reference=DataFrame Finite Positive) -> DataFrame Finite`
+            - `Compare(signal=Series, reference=Series Finite Positive) -> Series Finite`
         - These example functions with following types are valid for Compare:
-            - fn divide(dividend:DataFrame, divisor:DataFrame Finite Positive) -> DataFrame Finite 
-            - fn diff(dividend:DataFrame Finite Positive SomeOtherType, divisor:DataFrame Finite Positive SomeOtherType) -> DataFrame Finite 
-            - fn divide_1d(dividend:Series, divisor:Series Finite Positive) -> Series Finite 
+            - `fn divide(signal:DataFrame, reference:DataFrame Finite Positive) -> DataFrame Finite `
+            - `fn diff(signal:DataFrame Finite Positive SomeOtherType, reference:DataFrame Finite Positive SomeOtherType) -> DataFrame Finite `
+            - `fn divide_1d(signal:Series, reference:Series Finite Positive) -> Series Finite `
 
 -   **Flows**
     - Flow is a path of transformations from input type constraints to output type constraints.
-    - Flow can be defined by chaining behaviors or other flows.
-        - `flow volume_spike = Compare(dividend=Volume, divisor=HistoricalVolume)`
+        - Behavior with its parameters can be used to define a flow.
+    - Flow can be defined by chaining functions, behaviors, other flows.
+        - `flow volume_spike = Compare(signal=Volume, reference=HistoricalVolume(signal=Volume, lookback=days()))`
+            - Given that `behavior days() -> Days ("21" | "63")` 
+            - Volume is a flow, so parenthesis is not added.
+            - Compare, HistoricalVolume, days are behaviors or functions, so parenthesis is added.
         - Flow can be matched to a chain of functions.
-            - rank_diff(data("volume"), ts_mean(data("volume"),21))
-            - rank_diff(data("volume"), ts_mean(data("volume"),63))
-            - divide(data("volume"), ts_mean(data("volume"),21))
-            - divide(data("volume"), ts_mean(data("volume"),63))
+            - `rank_diff(signal=data("volume"), reference=ts_mean(signal=data("volume"), lookback=21))`
+            - `rank_diff(signal=data("volume"), reference=ts_mean(signal=data("volume"), lookback=63))`
+            - `divide(signal=data("volume"), reference=ts_mean(signal=data("volume"), lookback=21))`
+            - `divide(signal=data("volume"), reference=ts_mean(signal=data("volume"), lookback=63))`
         - Each functions match each elements of chains, and keeps the composition structure of the chained behavior. 
 
 -   **Functions**
     - Functions map that receives a list of concepts and returns a concept.
     - A function is a valid behavior.
-    - `fn Ratio ( dividend: DataFrame, divisor: DataFrame Positive ) -> (DataFrame Finite) { return A / B }`
+    - `fn Ratio ( signal: DataFrame, reference: DataFrame Positive ) -> (DataFrame Finite) { return A / B }`
         - Input and output type with code segments. 
         - Type can be used define functions, but constraint cannot be used. 
     - Function can be matched to a behavior all of the following conditions are met: 
@@ -80,7 +84,7 @@ It formalizes logical structures.
         - Input types are valid for the behavior.
         - Output type is valid for the behavior.
     - Example: 
-        - `fn Ratio ( dividend: DataFrame, divisor: DataFrame Positive ) -> (DataFrame Finite) { return A / B }` can be matched to a behavior `behavior Compare (dividend: (DataFrame | Series) 'a, divisor: (DataFrame | Series) 'b Finite Positive) -> ('a Finite)`
+        - `fn Ratio ( signal: DataFrame, reference: DataFrame Positive ) -> (DataFrame Finite) { return A / B }` can be matched to a behavior `behavior Compare (signal: (DataFrame | Series) 'a, reference: (DataFrame | Series) 'b Finite Positive) -> ('a Finite)`
     - data/data.cm contains functions that returns data
         - `fn load_ebit() -> (DataFrame "EBIT"){ return ... }` \
         `fn load_ebitda() -> (DataFrame "EBITDA"){ return ... }`
@@ -144,8 +148,8 @@ behavior Comparator(A: DataFrame, B: DataFrame) -> Indicator
 
 // Function: Ratio
 // Logic: A / B. Valid only if B is NonZero (to avoid division by zero).
-fn ratio(dividend: DataFrame, divisor: DataFrame NonZero) -> Indicator {
-    return dividend / divisor
+fn ratio(signal: DataFrame, reference: DataFrame NonZero) -> Indicator {
+    return signal / reference
 }
 
 // Function: Spread
@@ -170,11 +174,11 @@ behavior days () -> Const NonZero Count Days ("21", "63")
 behavior levels () -> Const("0.1", "0.2")
 
 // 2. Transformations
-behavior HistoricalVolume(A: DataFrame Volume, B: Const Days) -> DataFrame
+behavior HistoricalVolume(signal: DataFrame Volume, lookback: Const Days) -> DataFrame
 fn ts_mean(x: DataFrame, days: Const Days) -> DataFrame { ... }
 fn ts_delay(x: DataFrame, days: Const Days) -> DataFrame { ... }
 
-flow volume_spike = Comparator(vol(), HistoricalVolume(vol(), days()))
+flow volume_spike = Comparator(signal=vol(), reference=HistoricalVolume(signal=vol(), lookback=days()))
 
 // 3. Trigger
 fn trigger(signal: DataFrame, trigger: DataFrame, levels: Const) -> DataFrame Trigger {
@@ -182,14 +186,14 @@ fn trigger(signal: DataFrame, trigger: DataFrame, levels: Const) -> DataFrame Tr
     return signal 
 }
 
-flow result = trigger(signal=earnings(), trigger=volume_spike, levels())
+flow result = trigger(signal=earnings(), trigger=volume_spike, levels=levels())
 ```
 
 ### Guarding Against Nonsense
 
 If we tried to compare `Volume` and `0` using `Ratio`:
 -   `0` does not generally have the `NonZero` property (unless explicitly typed).
--   Function `Ratio` requires `divisor` to be `NonZero`.
+-   Function `Ratio` requires `reference` to be `NonZero`.
 -   Constraint violation -> **Ratio** is not generated.
 
 This ensures that the generated strategies are **Categorically Consistent**.

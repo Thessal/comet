@@ -1,0 +1,71 @@
+// Data Formats
+type Series
+type DataFrame
+
+// Semantic Properties
+type NonZero
+type Monetary
+type Stationary
+
+// Dummy data
+fn data_close() -> DataFrame "close" { return 0 }
+fn data_open() -> DataFrame "open" { return 0 }
+fn data_EBIT() -> DataFrame "EBIT" { return 0 }
+fn data_EBITDA() -> DataFrame "EBITDA" { return 0 }
+fn data_volume() -> DataFrame "volume" { return 0 }
+
+// Derived Concepts
+type Indicator : DataFrame Stationary
+type Volume : DataFrame NonZero   // Volume is a Series that is NonZero
+type Price  : DataFrame Monetary  // Price is a Series that is Monetary
+type Profit : DataFrame Monetary
+type Days : Const NonZero Count
+
+// Abstract Behavior
+// Maps inputs A and B to an Indicator. B must be valid for the operations expected.
+behavior Comparator(signal: DataFrame, reference: DataFrame) -> DataFrame Indicator
+
+behavior price () -> DataFrame Monetary ("close"|"open")
+behavior earnings () -> DataFrame Monetary ("EBIT"|"EBITDA")
+behavior vol () -> DataFrame NonZero Count Volume ("volume")
+behavior days () -> Const NonZero Count Days ("21" | "63")
+behavior levels () -> Const ("0.1" | "0.2")
+
+// Transformations
+behavior HistoricalVolume(signal: DataFrame Volume, lookback: Const Days) -> DataFrame
+
+// Function: Ratio
+fn ratio(signal: DataFrame, reference: DataFrame NonZero) -> Indicator {
+    return 0
+}
+
+// Function: Spread
+fn spread(signal: DataFrame, reference: DataFrame) -> Indicator {
+    return 0
+}
+
+fn ts_mean(signal: DataFrame, lookback: Const Days) -> DataFrame {
+    return signal
+}
+
+fn ts_delay(signal: DataFrame, lookback: Const Days) -> DataFrame {
+    return signal
+}
+
+// 3. Trigger
+fn trigger_fn(signal: DataFrame, trigger: DataFrame, levels: Const) -> DataFrame {
+    return signal 
+}
+
+behavior Trigger(signal: DataFrame, trigger: DataFrame, levels: Const) -> DataFrame
+
+// Must throw error 
+// flow volume_spike = Comparator(signal=vol(), reference=HistoricalVolume(signal=vol(), lookback_test=days()))
+// Valid
+flow volume_spike = Comparator(signal=vol(), reference=HistoricalVolume(signal=vol(), lookback=days()))
+
+// volume_spike is a flow, so parenthesis is not required. 
+// trigger, earnings, levels are functions or behaviors, so parenthesis is required.
+flow Strategy = Trigger(signal=earnings(), trigger=volume_spike, levels=levels())
+// direct function calls using behaviors are also allowed
+// flow Strategy = trigger_fn(signal=earnings(), trigger=volume_spike, levels=levels())
