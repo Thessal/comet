@@ -1,83 +1,70 @@
 # Abstract Syntax Tree (`ast.md`)
 
-This document defines the internal representation (Rust types) for the Comet AST.
+This document defines the internal representation (Rust types) for the Comet AST (Clean-like).
 
 ## 1. Top Level
 
 ```rust
 pub struct Program {
+    pub module_name: Ident,
+    pub imports: Vec<Import>,
     pub declarations: Vec<Declaration>,
 }
 
 pub enum Declaration {
-    Type(TypeDecl),
-    Struct(StructDecl),
-    Enum(EnumDecl),
-    Behavior(BehaviorDecl),
-    Impl(ImplDecl),
-    Function(FuncDecl),
-    Flow(FlowDecl),
-    Property(PropertyDecl),
+    Adt(AdtDecl),           // Algebraic Data Type (:: Type = ...)
+    TypeSynonym(TypeSynDecl), // Type Synonym (:: Type :== ...)
+    Class(ClassDecl),       // Type Class (class Name a ...)
+    Instance(InstanceDecl), // Instance (instance Name Type ...)
+    Function(FuncDecl),     // Function (name :: Type -> Type)
 }
 ```
 
 ## 2. Type Definitions
 
 ```rust
-pub struct TypeDecl {
+pub struct AdtDecl {
     pub name: Ident,
-    pub parent: Ident,
-    pub properties: Vec<Ident>,
+    pub type_vars: Vec<Ident>,
+    pub constructors: Vec<Constructor>,
 }
 
-pub struct StructDecl {
+pub struct Constructor {
     pub name: Ident,
-    pub fields: Vec<Field>,
-}
-
-pub struct Field {
-    pub name: Ident,
-    pub ty: TypeRef,
+    pub index: Option<u32>, // For numbered fields
+    pub args: Vec<TypeRef>,
 }
 ```
 
-## 3. Logic Definitions (Behaviors & Impls)
+## 3. Logic Definitions (Classes & Instances)
 
 ```rust
-pub struct BehaviorDecl {
+pub struct ClassDecl {
     pub name: Ident,
-    pub args: Vec<Ident>,
-    pub return_type: Ident,
+    pub type_vars: Vec<Ident>, // e.g. ["a", "b"]
+    pub signature: TypeRef,    // :: a b -> c
 }
 
-pub struct ImplDecl {
-    pub name: Ident, // Unique name (e.g., "Ratio")
-    pub behavior: Ident,
-    pub args: Vec<Ident>, // e.g., ["A", "B"]
-    pub constraints: Option<Expr>, // "where B is NonZero"
-    pub body: Block,
+pub struct InstanceDecl {
+    pub class_name: Ident,
+    pub types: Vec<TypeRef>,   // e.g. [Volume, Volume, Series]
+    pub constraints: Vec<Constraint>, // | SameUnit a b
+    pub members: Vec<FuncDecl>, // where compare a b = ...
+}
+
+pub struct Constraint {
+    pub class_name: Ident,
+    pub type_args: Vec<Ident>, // e.g. ["a", "b"] for SameUnit a b
 }
 ```
 
-## 4. Flow Logic
+## 4. Function Logic
 
 ```rust
-pub struct FlowDecl {
+pub struct FuncDecl {
     pub name: Ident,
-    pub body: Vec<FlowStmt>,
-}
-
-pub enum FlowStmt {
-    Generator {
-        target: Ident,
-        source: Expr, // e.g. "Universe(Earnings)" or "Comparator(x, y)"
-        constraints: Option<Expr>,
-    },
-    Assignment {
-        target: Ident,
-        expr: Expr,
-    },
-    Return(Expr),
+    pub body: Expr,
+    pub where_block: Option<Vec<FuncDecl>>, // Local definitions
 }
 ```
 
@@ -87,17 +74,20 @@ pub enum FlowStmt {
 pub enum Expr {
     Literal(Literal),
     Identifier(Ident),
-    BinaryOp { left: Box<Expr>, op: Op, right: Box<Expr> },
-    Call { path: Path, args: Vec<Expr> },
-    MemberAccess { target: Box<Expr>, field: Ident },
-    PropertyCheck { target: Box<Expr>, property: Ident }, // "is NonZero"
+    Application { func: Box<Expr>, args: Vec<Expr> }, // Function application (f x y)
+    Let { bindings: Vec<Binding>, body: Box<Expr> },
+    Case { target: Box<Expr>, arms: Vec<CaseArm> },
+    Lambda { args: Vec<Ident>, body: Box<Expr> },
 }
+```
 
-pub enum Op {
-    Add, Sub, Mul, Div, Eq, Neq, Lt, Gt, And, Or
-}
+## 6. Types
 
-pub struct Path {
-    pub segments: Vec<Ident>, // e.g., ["Comparator", "compare"]
+```rust
+pub enum TypeRef {
+    Concrete(Ident),
+    Variable(Ident),
+    Application(Box<TypeRef>, Vec<TypeRef>), // List a, Tree (Int, a)
+    Function(Vec<TypeRef>, Box<TypeRef>),    // a -> b -> c
 }
 ```

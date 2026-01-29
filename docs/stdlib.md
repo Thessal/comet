@@ -1,30 +1,63 @@
-# Standard Library & Built-in Operators
+# Standard Library (Clean-like)
 
-## Built-in Synthesis Logic
+## Core Behaviors (Type Classes)
 
-Some operators and behaviors are synthesized directly by the compiler engine without explicit `Implementation` blocks in the user code. This allows for complex type interactions (like broadcasting) that are difficult to express in the `Implementation` syntax.
+### Comparator
+Defines binary comparison logic.
 
-### Binary Operators
+```clean
+class Comparator a b c :: a b -> c
+```
 
-#### Division (`/`)
+**Standard Instances**:
+*   `Ratio`: `a / b` (Requires `SameRepresentation a b` and `NonZero b`)
+*   `Spread`: `a - b` (Requires `SameRepresentation a b` and `SameUnit a b`)
 
-The division operator is synthesized with strict type checking based on the operands' structural types and properties.
+### Normalizer
+Defines unary normalization logic.
 
-**Type Matrix:**
+```clean
+class Normalizer a b :: a -> b
+```
 
-| Left Hand Side | Right Hand Side | Result Type | Notes |
-| :--- | :--- | :--- | :--- |
-| `DataFrame` | `DataFrame` | `DataFrame` | Element-wise division |
-| `DataFrame` | `TimeSeries` | `DataFrame` | Broadcasting / Alignment |
-| `DataFrame` | `Constant` | `DataFrame` | Scalar division |
-| `TimeSeries` | `TimeSeries` | `TimeSeries` | Sparse alignment |
-| `TimeSeries` | `Constant` | `TimeSeries` | Scalar division |
-| `Constant` | `Constant` | `Constant` | Scalar calculation |
+## Meta-Properties (Multi-Param Classes)
 
-A type is considered `Constant` if it has the `Constant` property (e.g., `Integer`, `Float`).
+These classes enforce relationships between types.
 
-**Example:**
+```clean
+// Skeleton: Checks if 'a' and 'b' are physically compatible
+class SameRepresentation a b
 
-```comet
-vol_ratio = min_vol / hist_vol // TimeSeries / TimeSeries -> TimeSeries
+// Skeleton: Checks if 'a' and 'b' share the same semantic unit (e.g. USD)
+class SameUnit a b
+```
+
+## Core Properties (Type Classes)
+
+```clean
+class NonZero a
+class Stationary a
+class Ranged a
+class Count a
+class Monetary a
+```
+
+## Built-in Operators
+
+Binary operators with broadcasting support.
+
+```clean
+class Div a b c :: a b -> c
+
+// Scalar Division
+instance Div (Constant Real) (Constant Real) (Constant Real)
+instance Div (Constant Int) (Constant Int) (Constant Int)
+
+// Series Division (Broadcasting)
+instance Div (Series a) (Constant a) (Series a)
+instance Div (Series a) (Series a) (Series a)
+
+// DataFrame Division
+instance Div (DataFrame a) (DataFrame a) (DataFrame a)
+instance Div (DataFrame a) (Series a) (DataFrame a) // Axis alignment implied
 ```

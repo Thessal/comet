@@ -1,39 +1,59 @@
-# Synthesis & Property Propagation
+# Synthesis & Type Class Instance Resolution
 
-The Comet synthesizer transforms a semantic flow definition into an execution graph, resolving types, selecting implementations, and verifying constraints.
+The Comet synthesizer transforms a functional flow definition into an execution graph by resolving **Type Class Instances**. Unlike standard compilers that expect a single unique instance for a function call, Comet **iterates** through all valid instances to generate multiple strategy branches.
 
-## 1. Property Propagation system
+## 1. Type Class Constraints (Properties)
 
-Properties (e.g., `NonZero`, `Ranged`, `Masked`) are metadata attached to types or variables in the symbol table.
+Properties (e.g., `NonZero`, `Stationary`) are now defined as **Type Classes**.
 
-### 1.1 Source Generation
-Variables derived from `Type` definitions inherit properties from the logical type.
-```comet
-Type Volume_Universe : Instrument derives { NonZero } ...
-min_vol <- Volume_Universe // min_vol has { NonZero }
+### 1.1 Sources
+Instances ("Facts") are derived from the Type definitions and explicitly declared in the module.
+
+```clean
+// "Type Volume derives { NonZero }" becomes:
+instance NonZero Volume
 ```
 
-### 1.2 Strict Pruning
-If a function or behavior call has no valid implementations (e.g. all candidates fail constraints), the synthesis branch is **pruned**. The synthesizer does not fallback to identity or recursion for failed ops.
+### 1.2 Constraint Checking (Pruning)
+Functions (Behaviors) impose constraints on their type variables. Strategies are pruned if no instance satisfies the constraints.
 
-### 1.3 Explicit Attachment (`ensures`)
-Implementations and Functions can explicitly attach properties using the `ensures` clause.
-```comet
-Implementation ZScore ... ensures { Unbound, Ranged } { ... }
+*Example*: `compare :: a b -> c | NonZero a`
+
+If `a` is a `Price` (which might not be `NonZero` in some contexts), and no `instance NonZero Price` exists, this path is rejected.
+
+### 1.3 Newtype Wrapping (Ensures)
+Functions that "ensure" a property now return a **Newtype Wrapper**.
+
+```clean
+// "ensures { Stationary }" becomes:
+:: Stationary a = Stationary a
+instance Stationary (Stationary a)
+
+diff :: a -> Stationary a
 ```
-These properties are appended to the propagated properties.
 
-## 2. Constraint Checking
+## 2. Synthesis via Instance Resolution
 
-`where` clauses on Functions and Implementations are verified against the properties of arguments during synthesis.
-*Example*: `fn apply_filter(...) where data is Ranged`.
-If the argument `data` does not have the `Ranged` property, the synthesis branch is rejected.
+The core synthesis loop happens at function application sites (nodes in the flow graph).
 
-## 3. Multiple Implementation Expansion
+### The Algorithm
+When encountering a function application `f a b`:
+1.  Identify the Type Class associated with `f` (e.g., `Comparator`).
+2.  Find **ALL** matching instances for the concrete types of `a` and `b`.
+    *   *Note*: In standard Clean/Haskell, overlapping instances are an error or require specific selection. In Comet, **all** valid overlaps are distinct branches.
+3.  Filter instances where constraints (e.g., `| NonZero a`) are not satisfied.
+4.  For each remaining instance, fork the synthesis graph.
 
-The synthesizer explores all valid implementations of a Behavior.
-*Example*: `Comparator` might have `Ratio` and `RankDiff`. Both are explored (context branching) if their constraints are satisfied.
-```comet
-Implementation Ratio ... where b is NonZero
+### Example
+
+```clean
+// User Code
+ratio = compare vol1 vol2
+
+// Available Instances
+instance Comparator vol1 vol2 ... | NonZero vol2  // (Ratio Logic)
+instance Comparator vol1 vol2 ... | SameUnit vol1 vol2 // (Spread Logic)
 ```
-If `b` lacks `NonZero`, `Ratio` variant is dropped.
+
+If `vol2` is `NonZero` AND they share units, **BOTH** branches are generated.
+The `ratio` variable effectively becomes a superposition of `[RatioNode, SpreadNode]`.

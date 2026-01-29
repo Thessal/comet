@@ -1,42 +1,32 @@
 # Transformation & Synthesis Logic (`transform.md`)
 
-This document defines the **Semantic Synthesis** process, which transforms a `Flow` into a set of combinatorial execution trees.
+This document defines the **Semantic Synthesis** process, which transforms a functional `Flow` into a set of combinatorial execution trees.
 
 ## 1. The Synthesis Loop
 
-The compiler iterates through the `Flow` statements, maintaining a **Combinatorial State**.
+The compiler iterates through the function definitions, performing **Type Class Instance Resolution**.
 
-**State**: `List<Context>`
-Where `Context` is a map of `Variable -> Value`.
+### Step 1: Generators / Sources
+When checking `x = universe Earnings`:
+1.  Look up the `Earnings` type.
+2.  Load all associated Type Class Instances (`NonZero`, `Monetary`, etc.).
 
-### Step 1: Generators (`x <- Source`)
+### Step 2: Function Resolution (`compare a b`)
+When encountering `ratio = compare vol1 vol2`:
+1.  Identify the Type Class: `Comparator`.
+2.  **Instance Search**: Find ALL instances of `Comparator` matching the types of `vol1` and `vol2`.
+    *   *Match 1*: `Ratio` (Requires `NonZero vol2`)
+    *   *Match 2*: `Spread` (Requires `SameUnit vol1 vol2`)
+3.  **Constraint Check**: Verify constraints against the known instances of variables.
+    *   If `vol2` has `instance NonZero`, then `Ratio` is valid.
+    *   If `vol1` and `vol2` share unit tag, then `Spread` is valid.
+4.  **Branching**: Create a separate execution path (Tree Node) for each passed instance.
 
-When checking `x <- Universe(Earnings)`, the compiler:
-1.  Queries the Symbol Table for all Types deriving `Earnings`.
-2.  Creates a new Context branch for each match.
-    -   Context 1: `{ x: EBIT (USD, NonZero) }`
-    -   Context 2: `{ x: EBITDA (USD, NonZero) }`
-
-### Step 2: Behavior Resolution (`Comparator(x, y)`)
-
-When encountering `spike <- Comparator(x, y)`:
-1.  For each active Context:
-    -   Resolve the types of `x` and `y`.
-    -   Query the Symbol Table for all `Implementation` blocks of `Comparator` matching these types.
-    -   **Constraint Check**: Evaluate the `where` clause of each Implementation.
-        -   Evaluation is done against the **Semantic Properties** of the types in the current Context.
-2.  Branch the Context for each valid Implementation.
-    -   If `Context 1` matches both "Ratio" and "Spread", it splits into `Context 1.A (Ratio)` and `Context 1.B (Spread)`.
-    -   If `Context 1` matches none, this branch is **Pruned** (dead end).
-
-### Step 3: Filtering (`where ...`)
-
-Explicit `where` clauses in the Flow act as filters.
--   Evaluate the condition against the current Context.
--   If `False`, prune the branch.
+### Step 3: Filtering (Constraints)
+Explicit constraints in valid function signatures (`| Condition a`) act as pruners.
+If a branch allows a datatype that violates a downstream constraint, that entire branch is pruned eagerly.
 
 ## 2. Output Generation
+The result is a forest of "Expression Trees", where each node is a specific, concrete Instance implementation (e.g., `Ratio_Impl` call).
 
-At the end of the Flow, the compiler has a list of valid Contexts. Each Context represents a fully resolved "Call Graph" or "Expression Tree".
-
-These trees are then passed to the Code Generator (Python/Rust backend) to emit the actual source code.
+These trees are passed to the Code Generator to emit Rust code.

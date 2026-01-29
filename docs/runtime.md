@@ -4,47 +4,28 @@ This document describes the runtime capabilities required to execute the code ge
 
 ## 1. Type Erasure vs. Preservation
 
-Comet is a **Generative** language. The rich semantic types (`EBIT`, `NonZero`) exist primarily at compile-time to guide synthesis. The generated code (Target Code) typically operates on "Physical Types".
+Comet is a **Generative** language with a rich Compile-Time Type System.
+-   **Compile-Time**: Types like `Volume` (with properties `NonZero`, `Count`) guide synthesis.
+-   **Run-Time**: Types are erased to their physical representation (e.g., `Arc<DataFrame>`).
 
--   **Comet Type**: `Volume (Series, Count, NonZero)`
--   **Target Type (Python)**: `pandas.DataFrame` or `polars.DataFrame`
--   **Target Type (Rust)**: `Arc<DataFrame>`
+## 2. Generated Code Structure (Rust)
 
-## 2. Generated Code Structure
+The output is a Rust library containing the combinatorial strategy variants.
 
-The output of the compiler is likely a **Dependency Graph** or a **Script** that orchestrates the data pipeline.
+### Example Output
 
-### Example Output (Python Target)
+```rust
+// Strategy Variant 1 (Ratio Logic)
+pub fn strategy_1(volume: &DataFrame, ebit: &DataFrame) -> Result<Signal> {
+    // 1. Check constraints (runtime assertions if needed, though mostly static)
+    // 2. Compute
+    let ratio = volume / volume.rolling(21).mean(); // Synthesis chose Ratio
+    // ...
+}
 
-```python
-# Strategy Variant 1 (Ratio)
-def strategy_1(ebit, volume):
-    # derived: avg_vol
-    avg_vol = volume.rolling(21).mean()
-    # derived: spike (Ratio impl)
-    if not (volume > 0).all(): raise ValueError("NonZero constraint violation")
-    spike = volume / avg_vol
-    return trigger(ebit, spike, ...)
-
-# Strategy Variant 2 (Spread)
-def strategy_2(ebit, volume):
-    # derived: avg_vol
-    avg_vol = volume.rolling(21).mean()
-    # derived: spike (Spread impl)
-    spike = volume - avg_vol 
-    return trigger(ebit, spike, ...)
+// Strategy Variant 2 (Spread Logic)
+pub fn strategy_2(volume: &DataFrame, ebit: &DataFrame) -> Result<Signal> {
+    let spread = volume - volume.rolling(21).mean(); // Synthesis chose Spread
+    // ...
+}
 ```
-
-## 3. Runtime Library
-
-Comet relies on a host library to perform the actual computations (`internal_trigger`, `ts_mean`, etc.).
-
--   **Primitives**: The DSL functions (`ts_mean`) maps 1:1 to host library functions.
--   **Semantic Checks**: Some properties (like `NonZero`) might generate runtime assertions (as shown above) if the compiler cannot statically guarantee them from the data source.
-
-## 4. Execution Engine
-
-The standard execution mode is to run all generated variants.
-1.  **Loader**: Loads the generated scripts/graphs.
-2.  **Scheduler**: Executes the DAG (Directed Acyclic Graph) of operations.
-3.  **Aggregator**: Collects results (Signals) from all variants for analysis.
