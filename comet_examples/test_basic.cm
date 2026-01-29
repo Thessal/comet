@@ -1,67 +1,45 @@
-// test_basic.cm
-// Defines combinations of binary, ternary, and unary logics
+module TestBasic
 
-import "stdlib.cm"
-import "data/data.cm"
+import StdLib
+import Data.Universe
 
 // 1. Unary Logic (Normalization)
-// Behavior Normalizer(x) -> Series // Defined in stdlib.cm
+// In Clean/Comet, we define these as functions if we have multiple behaviors for the same types.
 
-Implementation ZScore implements Normalizer(x) {
-    return zscore(x)
-}
+zscore_impl :: Series a -> Series a
+zscore_impl x = zscore x
 
-Implementation Rank implements Normalizer(x) {
-    return rank(x)
-}
+rank_impl :: Series a -> Series a
+rank_impl x = rank x
 
-Implementation Keep implements Normalizer(x) {
-    return x
-}
+keep_impl :: Series a -> Series a
+keep_impl x = x
 
 // 2. Binary Logic (Comparison)
-Behavior Comparator(a, b) -> Series
 
-Implementation Ratio implements Comparator(a, b) where b is NonZero {
-    return divide(a, b)
-}
+ratio_impl :: Series a -> Series a -> Series a
+ratio_impl a b = a / b
 
-Implementation Spread implements Comparator(a, b) { // Logic for Unit check handled where? 
-    // where a.Unit == b.Unit -- grammar supports complex exprs in where?
-    // Expr -> Or -> ... -> Atom -> MemberExpr.
-    // Yes.
-    // But `a.Unit` assumes fields.
-    // For now skipping implicit constraint or assuming it passes.
-    return a - b
-}
+spread_impl :: Series a -> Series a -> Series a
+spread_impl a b = a - b
 
-// 3. Ternary Logic (Condition/Trigger)
-Behavior SignalGen(x, high, low) -> Series
+// 3. Ternary Logic
 
-Implementation BandTrigger implements SignalGen(x, high, low) {
-     // trim_ternary not in stdlib yet? assuming it exists or defined
-     return trim_ternary(x, high, low)
-}
+band_trigger :: Series a -> Real -> Real -> Series a
+band_trigger x high low = trim_ternary x high low
 
-Flow Examples {
-    // Inputs
-    price <- Universe(Price) 
-    vol   <- Universe(Volume)
-
-    // 1. Unary combinations
-    norm_price <- Normalizer(price) // Behavior call? 
-    // Grammar: 
-    // GeneratorStmt ::= Identifier "<-" Expr
-    // Expr -> CallExpr -> Path "(" Args ")"
-    // Normalizer is Behavior. Can we call Behavior?
-    // Docs `transform.md`: "When encountering `spike <- Comparator(x, y)`: ... Resolve ... Impl"
-    // So yes, we call the Behavior name.
-    
-    // 2. Binary combinations
-    diff <- Comparator(price, norm_price)
-
-    // 3. Ternary combinations
-    sig <- SignalGen(diff, 2.0, -2.0)
-    
-    return sig
-}
+// Flow Example
+// Converted to a main function or strategy function
+examples :: Series a -> Series a -> Series a
+examples price vol =
+    let
+        // 1. Unary
+        norm_price = zscore_impl price
+        
+        // 2. Binary
+        diff = ratio_impl price norm_price
+        
+        // 3. Ternary
+        sig = band_trigger diff 2.0 -2.0
+    in
+        sig

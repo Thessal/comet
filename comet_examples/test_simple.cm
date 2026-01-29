@@ -1,0 +1,8 @@
+module TestSimple
+
+x :: Int
+x =
+    let
+        s = 5
+    in
+        s

@@ -1,0 +1,11 @@
+module TestGrammar
+
+import StdLib
+
+// Fixed signature: Added return type and fixed constraint syntax
+fn_normalize :: DataFrame a -> DataFrame a | Normalized a
+fn_normalize x =
+    let
+        score = normalize x
+    in
+        score

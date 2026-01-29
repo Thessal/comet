@@ -23,19 +23,19 @@ fn main() {
                  Ok(_) => {
                      println!("Semantic analysis passed!");
                      println!("Symbol Table Stats:");
-                     println!("Types: {}", analyzer.symbol_table.types.len());
-                     println!("Behaviors: {}", analyzer.symbol_table.behaviors.len());
-                     println!("Impls: {}", analyzer.symbol_table.implementations.len());
+                     println!("ADTs: {}", analyzer.symbol_table.adts.len());
+                     println!("Classes: {}", analyzer.symbol_table.classes.len());
+                     println!("Instances: {}", analyzer.symbol_table.instances.len());
                      println!("Functions: {}", analyzer.symbol_table.functions.len());
-                     println!("Flows: {}", analyzer.symbol_table.flows.len());
                      
                      // Synthesis Step
                      let synthesizer = comet::synthesis::Synthesizer::new(&analyzer.symbol_table);
-                     // Assuming 'Strategy' flow exists for now, or we can iterate
-                     if let Some(_) = analyzer.symbol_table.flows.get("Strategy") {
-                         match synthesizer.synthesize("Strategy") {
+                     // Look for a 'strategy' function or similar entry point.
+                     let entry_point = "strategy";
+                     if analyzer.symbol_table.functions.contains_key(entry_point) {
+                         match synthesizer.synthesize(entry_point) {
                              Ok(contexts) => {
-                                 println!("Synthesis successful!");
+                                 println!("Synthesis successful! Generated {} variants.", contexts.len());
                                  let codegen = comet::codegen::Codegen::new();
                                  let rust_code = codegen.generate_library(&contexts);
                                  println!("--- Generated Rust Library ---");
@@ -45,7 +45,7 @@ fn main() {
                              Err(e) => eprintln!("Synthesis error: {:?}", e),
                          }
                      } else {
-                         println!("No 'Strategy' flow found to synthesize.");
+                         println!("No '{}' function found to synthesize.", entry_point);
                      }
                  },
                  Err(e) => {

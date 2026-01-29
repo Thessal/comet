@@ -1,11 +1,13 @@
-Behavior Comparator(a, b) -> Series
+module TestMinimal
 
-Implementation Ratio implements Comparator(a, b) where b is NonZero {
-    return divide(a, b)
-}
+import StdLib
 
-Flow Test {
-    x <- Price
-    res <- Comparator(x, 2)
-    return res
-}
+ratio :: Series a -> Series a -> Series a
+ratio a b = a / b
+
+test :: Series a -> Series a
+test x = 
+    let
+        res = ratio x 2.0
+    in
+        res

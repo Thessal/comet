@@ -7,12 +7,13 @@ This document defines the **Semantic Synthesis** process, which transforms a fun
 The compiler iterates through the function definitions, performing **Type Class Instance Resolution**.
 
 ### Step 1: Generators / Sources
-When checking `x = universe Earnings`:
+### Step 1: Generators / Sources
+When checking `x = universe(Earnings)`:
 1.  Look up the `Earnings` type.
 2.  Load all associated Type Class Instances (`NonZero`, `Monetary`, etc.).
 
-### Step 2: Function Resolution (`compare a b`)
-When encountering `ratio = compare vol1 vol2`:
+### Step 2: Function Resolution (`compare(a, b)`)
+When encountering `ratio = compare(vol1, vol2)`:
 1.  Identify the Type Class: `Comparator`.
 2.  **Instance Search**: Find ALL instances of `Comparator` matching the types of `vol1` and `vol2`.
     *   *Match 1*: `Ratio` (Requires `NonZero vol2`)

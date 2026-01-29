@@ -6,68 +6,43 @@ import "data/universe.cm"
 
 // 1. Unary Logic (Normalization)
 // Search Space: ZScore vs Rank vs Identity
-Trait Normalizer {
-    fn normalize(x: Series) -> Series
-}
 
-Impl Name("ZScore") Normalizer for Series {
-    fn normalize(x) -> Series { zscore(x) }
-}
-Impl Name("Rank") Normalizer for Series {
-    fn normalize(x) -> Series { rank(x) }
-}
-Impl Name("Keep") Normalizer for Series {
-    fn normalize(x) -> Series { x }
-}
+// We define strategies as functions
+zscore_norm(x: Series) -> Series
+zscore_norm(x) = zscore(x)
+
+rank_norm(x: Series) -> Series
+rank_norm(x) = rank(x)
+
+keep_norm(x: Series) -> Series
+keep_norm(x) = x
 
 // 2. Binary Logic (Comparison)
-// Search Space: Ratio vs Spread
-Trait Comparator {
-    fn compare(a: Series, b: Series) -> Series
-}
 
-Impl Name("Ratio") Comparator for Series {
-    fn compare(a, b) -> Series where b is NonZero {
-        a / b
-    }
-}
-Impl Name("Spread") Comparator for Series {
-    fn compare(a, b) -> Series where a.Unit == b.Unit {
-        a - b
-    }
-}
+ratio_cmp(a: Series, b: Series) -> Series
+ratio_cmp(a, b) = a / b
+
+spread_cmp(a: Series, b: Series) -> Series
+spread_cmp(a, b) = a - b
 
 // 3. Ternary Logic (Condition/Trigger)
-// Search Space: Trigger Logic
-Trait SignalGen {
-    fn generate(x: Series, high: Float, low: Float) -> Series
-}
 
-Impl Name("BandTrigger") SignalGen for Series {
-    fn generate(x, high, low) -> Series {
-        // 1 if > high, -1 if < low, 0 otherwise
-        trim_ternary(x, high, low)
-    }
-}
+band_trigger(x: Series, high: Float, low: Float) -> Series
+band_trigger(x, high, low) = trim_ternary(x, high, low)
 
-Flow Examples {
-    // Inputs
-    price <- Universe(Price) // Monetary, NonZero
-    vol   <- Universe(Volume) // Count, NonZero
+// Main Flow
+examples(price: Series, vol: Series) -> Series
+examples(price, vol) =
+    let
+        // 1. Unary combinations (3 variants)
+        norm_price = zscore_norm(price)
 
-    // 1. Unary combinations (3 variants)
-    norm_price <- Normalizer::normalize(price)
+        // 2. Binary combinations
+        // Price vs Price (Same Unit) -> Spread valid, Ratio valid.
+        // Generates [Spread(price, norm_price), Ratio(price, norm_price)]
+        diff = ratio_cmp(price, norm_price)
 
-    // 2. Binary combinations
-    // Price vs Price (Same Unit) -> Spread valid, Ratio valid.
-    // Price vs Vol (Diff Unit) -> Spread invalid, Ratio valid.
-    
-    // Generates [Spread(price, norm_price), Ratio(price, norm_price)]
-    // (Note: norm_price might lose Monetary unit if Rank is used, filtering Spread)
-    diff <- Comparator::compare(price, norm_price)
-
-    // 3. Ternary combinations
-    sig <- SignalGen::generate(diff, 2.0, -2.0)
-    
-    return sig
-}
+        // 3. Ternary combinations
+        sig = band_trigger(diff, 2.0, -2.0)
+    in
+        sig

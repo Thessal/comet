@@ -1,76 +1,52 @@
-// Standard Library
+module StdLib
 
-Type Any : Root derives {}
-Type Void : Any derives {}
+// 1. Concrete Representation Types (ADTs)
 
-Type Integer : Any derives { Constant }
-Type Float : Any derives { Constant }
-Type Boolean : Any derives { Constant }
-Type String : Any derives { Constant }
+:: Real = Real
+:: Int = Int
+:: Constant a  = Constant a
+:: Series a    = Series (Array Int a)
+:: DataFrame a = DataFrame (Array Int (Array Int a))
+:: Matrix a    = Matrix (Array Int (Array Int (Array Int a)))
 
-// Structures
-Type Series : Any derives {}
-Type TimeSeries : Any derives {}
-Type DataFrame : Any derives {}
-Type Matrix : Any derives {}
+// 2. Semantic Properties (Classes)
 
-Property NonZero
-Property Monetary
-Property Ranged
-Property Masked
-Property Constant
+class NonZero a
+class Stationary a
+class Ranged a
+class Count a
+class Monetary a
+class Normalized a // Added Normalized property
 
-// Mathematical
-Behavior Arithmetic(A, B) -> T
-Behavior Statistical(T) -> Series
+// 3. Behaviors (Type Classes)
 
-fn divide(x: DataFrame, y: DataFrame) -> DataFrame { return x }
-fn divide(x: DataFrame, y: TimeSeries) -> DataFrame { return x }
-fn divide(x: DataFrame, y: Constant) -> DataFrame { return x }
-fn divide(x: TimeSeries, y: TimeSeries) -> TimeSeries { return x }
-fn divide(x: TimeSeries, y: Constant) -> TimeSeries { return x }
-fn divide(x: Constant, y: Constant) -> Constant { return x }
+// Binary Comparator
+class Comparator a b c :: a b -> c
 
-// Normalization
+// Unary Normalizer
+class Normalizer a b :: a -> b
 
-// Normalization
-Behavior Normalizer(T) -> T
+// 4. Meta-Properties for Constraints
 
-fn zscore(x: Series) -> Series {
-    return x
-}
+class SameUnit a b
+class SameRepresentation a b
 
-fn rank(x: Series) -> Series {
-    return x
-}
+// 5. Standard Implementations
 
-fn trim_ternary(x: Series, h: Float, l: Float) -> Series {
-    return x
-}
+// Ratio: Valid if b is NonZero and same repr
+instance Comparator a b c | SameRepresentation a b & NonZero b
+    where compare x y = x / y
 
-// Conditionals
-fn enter_when(data: DataFrame, signal: DataFrame) -> DataFrame where signal is Masked {
-    return data
-}
+// Spread: Valid if same unit, same repr
+instance Comparator a b c | SameRepresentation a b & SameUnit a b
+    where compare x y = x - y
 
-fn update_when(data: DataFrame, signal: DataFrame) -> DataFrame where signal is Masked {
-    return data
-}
+// ZScore: Normalizes DataFrame to Stationary Series
+instance Normalizer (DataFrame a) (DataFrame a)
+    where normalize x = (x - mean x) / std x
 
-// Logic to create a mask
-fn apply_filter(data: DataFrame, threshold: Float) -> DataFrame where data is Ranged ensures { Masked } {
-    // Ideally this attaches 'Masked' property
-    return data
-}
+// 6. Built-in Operators
 
-fn greater_than(val: Float) -> Float {
-    return val 
-}
-
-fn subtract(x: Series, y: Series) -> Series {
-    return x
-}
-
-fn clip(x: Series, min: Float, max: Float) -> Series {
-    return x
-}
+class Div a b c :: a b -> c
+instance Div (Series a) (Series a) (Series a)
+    where div a b = a / b

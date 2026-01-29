@@ -1,0 +1,192 @@
+    Checking comet v0.1.0 (/home/jongkook90/antigravity/comet)
+warning: unused import: `OperatorOp`
+  --> src/comet/synthesis.rs:18:55
+   |
+18 | use crate::comet::ir::{ExecutionGraph, ExecutionNode, OperatorOp};
+   |                                                       ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crate::comet::ast::Ident`
+ --> src/comet/ir.rs:1:5
+  |
+1 | use crate::comet::ast::Ident;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `OperatorOp`
+ --> src/comet/codegen.rs:1:55
+  |
+1 | use crate::comet::ir::{ExecutionGraph, ExecutionNode, OperatorOp};
+  |                                                       ^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+ --> src/comet/codegen.rs:2:5
+  |
+2 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0599]: no variant or associated item named `ConstraintFailed` found for enum `SynthesisError` in the current scope
+  --> src/comet/behaviors/normalizer.rs:12:40
+   |
+12 |             return Err(SynthesisError::ConstraintFailed("Normalizer requires 1 argument".to_string()));
+   |                                        ^^^^^^^^^^^^^^^^ variant or associated item not found in `SynthesisError`
+   |
+  ::: src/comet/synthesis.rs:7:1
+   |
+ 7 | pub enum SynthesisError {
+   | ----------------------- variant or associated item `ConstraintFailed` not found for this enum
+
+error[E0308]: mismatched types
+  --> src/comet/behaviors/normalizer.rs:17:13
+   |
+17 |         for (mut ctx, ty, mut props, id) in results {
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^    ------- this is an iterator with items of type `synthesis::Context`
+   |             |
+   |             expected `Context`, found `(_, _, _, _)`
+   |
+   = note: expected struct `synthesis::Context`
+               found tuple `(_, _, _, _)`
+
+error[E0308]: mismatched types
+  --> src/comet/functions/update_when.rs:23:18
+   |
+23 |              for (ctx, t, props, id0) in results0 {
+   |                  ^^^^^^^^^^^^^^^^^^^^    -------- this is an iterator with items of type `synthesis::Context`
+   |                  |
+   |                  expected `Context`, found `(_, _, _, _)`
+   |
+   = note: expected struct `synthesis::Context`
+               found tuple `(_, _, _, _)`
+
+error[E0308]: mismatched types
+  --> src/comet/functions/update_when.rs:27:27
+   |
+27 |                       for (mut ctx2, _, signal_props, id1) in results1 {
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^    -------- this is an iterator with items of type `synthesis::Context`
+   |                           |
+   |                           expected `Context`, found `(_, _, _, _)`
+   |
+   = note: expected struct `synthesis::Context`
+               found tuple `(_, _, _, _)`
+
+error[E0599]: no variant or associated item named `ConstraintFailed` found for enum `SynthesisError` in the current scope
+  --> src/comet/functions/update_when.rs:29:58
+   |
+29 | ...                   return Err(SynthesisError::ConstraintFailed("Signal in update_when must be Ranged".to_string()));
+   |                                                  ^^^^^^^^^^^^^^^^ variant or associated item not found in `SynthesisError`
+   |
+  ::: src/comet/synthesis.rs:7:1
+   |
+ 7 | pub enum SynthesisError {
+   | ----------------------- variant or associated item `ConstraintFailed` not found for this enum
+
+error[E0599]: no variant or associated item named `ConstraintFailed` found for enum `SynthesisError` in the current scope
+  --> src/comet/functions/update_when.rs:46:34
+   |
+46 |              Err(SynthesisError::ConstraintFailed("update_when missing arguments".to_string()))
+   |                                  ^^^^^^^^^^^^^^^^ variant or associated item not found in `SynthesisError`
+   |
+  ::: src/comet/synthesis.rs:7:1
+   |
+ 7 | pub enum SynthesisError {
+   | ----------------------- variant or associated item `ConstraintFailed` not found for this enum
+
+error[E0599]: no variant or associated item named `ConstraintFailed` found for enum `SynthesisError` in the current scope
+  --> src/comet/functions/divide.rs:11:40
+   |
+11 |             return Err(SynthesisError::ConstraintFailed("divide requires exactly 2 arguments".to_string()));
+   |                                        ^^^^^^^^^^^^^^^^ variant or associated item not found in `SynthesisError`
+   |
+  ::: src/comet/synthesis.rs:7:1
+   |
+ 7 | pub enum SynthesisError {
+   | ----------------------- variant or associated item `ConstraintFailed` not found for this enum
+
+error[E0308]: mismatched types
+  --> src/comet/functions/divide.rs:18:13
+   |
+18 |         for (ctx, lhs_type, _, lhs_id) in left_results {
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^    ------------ this is an iterator with items of type `synthesis::Context`
+   |             |
+   |             expected `Context`, found `(_, _, _, _)`
+   |
+   = note: expected struct `synthesis::Context`
+               found tuple `(_, _, _, _)`
+
+error[E0308]: mismatched types
+  --> src/comet/functions/divide.rs:21:17
+   |
+21 |             for (mut ctx2, rhs_type, _, rhs_id) in right_results {
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^    ------------- this is an iterator with items of type `synthesis::Context`
+   |                 |
+   |                 expected `Context`, found `(_, _, _, _)`
+   |
+   = note: expected struct `synthesis::Context`
+               found tuple `(_, _, _, _)`
+
+error[E0609]: no field `types` on type `&SymbolTable`
+  --> src/comet/functions/divide.rs:23:67
+   |
+23 |                      if let Some(info) = synthesizer.symbol_table.types.get(ty_name) {
+   |                                                                   ^^^^^ unknown field
+   |
+   = note: available fields are: `adts`, `classes`, `instances`, `functions`
+
+warning: unused variable: `base_path`
+  --> src/comet/semantics.rs:40:54
+   |
+40 |     fn process_program(&mut self, program: &Program, base_path: &std::path::Path) -> Result<(), SemanticError> {
+   |                                                      ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_base_path`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `d`
+  --> src/comet/semantics.rs:58:38
+   |
+58 |             Declaration::TypeSynonym(d) => {
+   |                                      ^ help: if this is intentional, prefix it with an underscore: `_d`
+
+warning: variable does not need to be mutable
+  --> src/comet/synthesis.rs:61:13
+   |
+61 |         let mut contexts = vec![Context::new()];
+   |             ----^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `func`
+  --> src/comet/synthesis.rs:78:33
+   |
+78 |             Expr::Application { func, args } => {
+   |                                 ^^^^ help: try ignoring the field: `func: _`
+
+warning: unused variable: `args`
+  --> src/comet/synthesis.rs:78:39
+   |
+78 |             Expr::Application { func, args } => {
+   |                                       ^^^^ help: try ignoring the field: `args: _`
+
+warning: unused variable: `bindings`
+  --> src/comet/synthesis.rs:84:25
+   |
+84 |             Expr::Let { bindings, body } => {
+   |                         ^^^^^^^^ help: try ignoring the field: `bindings: _`
+
+warning: unused variable: `body`
+  --> src/comet/synthesis.rs:84:35
+   |
+84 |             Expr::Let { bindings, body } => {
+   |                                   ^^^^ help: try ignoring the field: `body: _`
+
+warning: unused variable: `name`
+  --> src/comet/synthesis.rs:89:30
+   |
+89 |             Expr::Identifier(name) => {
+   |                              ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+
+Some errors have detailed explanations: E0308, E0599, E0609.
+For more information about an error, try `rustc --explain E0308`.
+warning: `comet` (bin "comet") generated 12 warnings
+error: could not compile `comet` (bin "comet") due to 10 previous errors; 12 warnings emitted

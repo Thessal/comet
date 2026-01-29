@@ -1,73 +1,34 @@
-// test_complex.cm
-// Complex strategy: Daily financial ratio data triggered by minutely volume spike.
-// Condition: normalized(compare(volume, historical(volume))) > 0.8
+module TestComplex
 
-import "stdlib.cm"
-import "data/data.cm"
+import StdLib
+import Data.Universe
 
-// Define missing Behaviors
-Behavior Comparator(a, b) -> DataFrame
-Behavior Historical(x) -> TimeSeries
+// Strategy Definition
+strategy :: Series Real -> Series Real
+strategy vol =
+    let
+        // Synthesis Point 1: Historical transform
+        avg_vol = moving_average(vol, 21)
 
-// 1. Historical Implementation
-Implementation NonzeroMovingAverage implements Historical(x) where x is NonZero ensures { NonZero } {
-    return x 
-}
+        // Synthesis Point 2: Comparator
+        // Assuming 'compare' is brought in by StdLib or we use the operator
+        // If we use the class instance from StdLib:
+        spike = vol / avg_vol 
 
-// 2. Comparator Implementation
-Implementation Ratio implements Comparator(a, b) where b is NonZero {
-    return divide(a, b) 
-}
-Implementation RankDiff implements Comparator(a, b) ensures { Ranged } {
-    return subtract(rank(a), rank(b))
-}
+        // Synthesis Point 3: Normalizer
+        score = normalize(spike)
 
-// 3. Normalizer Implementation
-Behavior UnboundNormalizer(T) -> T
-Implementation ZScore implements UnboundNormalizer(x) {
-    return zscore(x) 
-}
+        // Trigger logic
+        sig = trigger(vol, score, 4.0)
+    in
+        sig
 
-// Normalizer in stdlib: Behavior Normalizer(T) -> T
-Implementation UnBoundNormalizer implements Normalizer(x) {
-    return UnboundNormalizer(x) // Does not ensure Ranged
-}
-Implementation Clipped implements Normalizer(x) ensures { Ranged } {
-    return clip(UnboundNormalizer(x), 0,1) // Added to check nested Behavior
-}
-Implementation Rank implements Normalizer(x) ensures { Ranged } {
-    return rank(x)
-}
-Implementation Clip implements Normalizer(x) ensures { Ranged } {
-    return clip(x, 0, 1)
-}
-Implementation ZScore implements Normalizer(x) ensures {} {
-    return zscore(x) //Tests duplicate impl name, and nonhomogeneous ensures
-}
+// 3. Helper Functions
 
+// Simple moving average
+moving_average(s: Series a, w: Int) -> Series Real
+moving_average(s, w) = mean(rolling(s, w))
 
-Flow Strategy {
-    // Load Data
-    daily_pe <- PE_Universe
-    min_vol  <- Volume_Universe // Returns TimeSeries
-
-    // Calculate Historical Volume
-    hist_vol <- Historical(min_vol)
-
-    // Compare Current vs Historical
-    // Comparator needs to handle TimeSeries inputs now if we want that
-    // Or we assume automatic promotion/alignment?
-    // Let's assume Comparator works on compatible types.
-    vol_ratio <- Comparator(min_vol, hist_vol)
-
-    // Normalize the ratio (Spike Score)
-    spike_score <- Normalizer(vol_ratio)
-
-    // Output: updated when condition met
-    // NEW LOGIC: apply_filter creating a mask
-    masked_spike <- apply_filter(spike_score, 0.8)
-    
-    result = update_when(daily_pe, masked_spike)
-    
-    return result
-}
+// Trigger
+trigger(target: DataFrame a, score: DataFrame b, thresh: Real) -> DataFrame a | Normalized b
+trigger(target, score, thresh) = update_when(target, score > thresh)

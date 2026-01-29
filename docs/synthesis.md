@@ -37,7 +37,7 @@ diff :: a -> Stationary a
 The core synthesis loop happens at function application sites (nodes in the flow graph).
 
 ### The Algorithm
-When encountering a function application `f a b`:
+When encountering a function application `f(a, b)`:
 1.  Identify the Type Class associated with `f` (e.g., `Comparator`).
 2.  Find **ALL** matching instances for the concrete types of `a` and `b`.
     *   *Note*: In standard Clean/Haskell, overlapping instances are an error or require specific selection. In Comet, **all** valid overlaps are distinct branches.
@@ -48,7 +48,7 @@ When encountering a function application `f a b`:
 
 ```clean
 // User Code
-ratio = compare vol1 vol2
+ratio = compare(vol1, vol2)
 
 // Available Instances
 instance Comparator vol1 vol2 ... | NonZero vol2  // (Ratio Logic)

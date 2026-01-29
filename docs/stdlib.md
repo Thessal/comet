@@ -51,13 +51,22 @@ class Div a b c :: a b -> c
 
 // Scalar Division
 instance Div (Constant Real) (Constant Real) (Constant Real)
+    where div(a, b) = a / b
+
 instance Div (Constant Int) (Constant Int) (Constant Int)
+    where div(a, b) = a / b
 
 // Series Division (Broadcasting)
 instance Div (Series a) (Constant a) (Series a)
+    where div(a, b) = a / b
+
 instance Div (Series a) (Series a) (Series a)
+    where div(a, b) = a / b
 
 // DataFrame Division
 instance Div (DataFrame a) (DataFrame a) (DataFrame a)
+    where div(a, b) = a / b
+
 instance Div (DataFrame a) (Series a) (DataFrame a) // Axis alignment implied
+    where div(a, b) = a / b
 ```

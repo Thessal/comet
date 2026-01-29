@@ -3,7 +3,5 @@ pub mod parser;
 pub mod semantics;
 pub mod symbols;
 pub mod synthesis;
-pub mod behaviors;
-pub mod functions;
 pub mod ir;
 pub mod codegen;

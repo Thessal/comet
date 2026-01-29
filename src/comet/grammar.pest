@@ -1,120 +1,122 @@
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 COMMENT = _{ ("//" ~ (!"\n" ~ ANY)*) | ("/*" ~ (!"*/" ~ ANY)* ~ "*/") }
 
-program = { SOI ~ declaration* ~ EOI }
+program = { SOI ~ module_decl ~ import_decl* ~ declaration* ~ EOI }
+
+module_decl = { "module" ~ identifier }
+import_decl = { "import" ~ path_ident }
 
 declaration = {
-    import_decl |
-    type_decl |
-    struct_decl |
-    enum_decl |
-    behavior_decl |
-    impl_decl |
-    flow_decl |
-    func_decl |
-    property_decl
+    adt_decl |
+    synonym_decl |
+    class_decl |
+    instance_decl |
+    func_decl
 }
 
-identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+// Identifiers
+keyword = { "module" | "import" | "class" | "instance" | "where" | "let" | "in" | "case" | "of" | "true" | "false" }
+identifier = @{ !keyword ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+path_ident = @{ identifier ~ ("." ~ identifier)* } // Data.Universe
+
+// Types
+type_ref = { function_type }
+function_type = { app_type ~ ("->" ~ app_type)* } // a -> b -> c
+app_type = { atom_type+ } // List a (List applied to a)
+atom_type = {
+    type_var |
+    concrete_type |
+    "(" ~ type_ref ~ ")"
+}
+concrete_type = @{ ASCII_ALPHA_UPPER ~ (ASCII_ALPHANUMERIC | "_")* }
+type_var = @{ !assignment_check ~ !keyword ~ ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "_")* }
+ws = _{ " " | "\t" | "\n" | "\r" }
+assignment_check = @{ identifier ~ ws* ~ ("=" | "::") }
+
+// ADTs: :: List a = Cons a (List a) | Nil
+adt_decl = { "::" ~ concrete_type ~ type_var* ~ "=" ~ constructors }
+constructors = { constructor ~ ("|" ~ constructor)* }
+constructor = { concrete_type ~ atom_type* }
+
+// Synonyms: :: Volume :== Series Real
+synonym_decl = { "::" ~ concrete_type ~ type_var* ~ ":==" ~ type_ref }
+
+// Classes: class Comparator a b c :: a b -> c
+class_decl = { 
+    "class" ~ concrete_type ~ type_var* ~ "::" ~ type_ref |
+    "class" ~ concrete_type ~ type_var*
+}
+
+// Instances: instance Comparator Volume Volume Series | NonZero b where ...
+instance_decl = { 
+    "instance" ~ concrete_type ~ atom_type* ~ ("|" ~ constraints)? ~ 
+    ("where" ~ func_def+)? 
+}
+constraints = { constraint ~ ("&" ~ constraint)* }
+constraint = { concrete_type ~ type_var* } // NonZero a
+
+// Functions
+// Signature: name :: Type -> Type OR name(arg: Type, ...) -> Type
+// Definition: name args = expr OR name(args) = expr
+func_decl = { func_sig? ~ func_def }
+
+func_sig = { 
+    (identifier ~ "::" ~ type_ref ~ ("|" ~ constraints)?) |
+    (identifier ~ "(" ~ typed_args? ~ ")" ~ "->" ~ type_ref ~ ("|" ~ constraints)?)
+}
+
+typed_args = { typed_arg ~ ("," ~ typed_arg)* }
+typed_arg = { identifier ~ ":" ~ type_ref }
+
+func_def = { 
+    (identifier ~ identifier* ~ "=" ~ expr ~ ("where" ~ func_def+)? ) |
+    (identifier ~ "(" ~ param_list? ~ ")" ~ "=" ~ expr ~ ("where" ~ func_def+)? )
+}
+param_list = { identifier ~ ("," ~ identifier)* }
+
+// Expressions
+expr = { let_expr | case_expr | logic_expr }
+
+let_expr = { "let" ~ func_def+ ~ "in" ~ expr }
+case_expr = { "case" ~ expr ~ "of" ~ case_arm+ }
+case_arm = { pattern ~ "=" ~ expr }
+
+pattern = {
+    adt_pattern |
+    var_pattern |
+    wildcard_pattern
+}
+adt_pattern = { concrete_type ~ identifier* } // Still curried for ADT match for now
+var_pattern = { identifier }
+wildcard_pattern = { "_" }
+
+logic_expr = { term ~ (op_logic ~ term)* }
+term = { factor ~ (op_compare ~ factor)* }
+factor = { atom ~ (op_arith ~ atom)* }
+
+atom = {
+    literal |
+    call_expr |
+    app_expr |
+    identifier |
+    "(" ~ expr ~ ")"
+}
+
+// f(x, y)
+call_expr = { identifier ~ "(" ~ expr_list? ~ ")" }
+expr_list = { expr ~ ("," ~ expr)* }
+
+// Legacy curried: f x y
+app_expr = { identifier ~ app_arg+ }
+app_arg = { !assignment_check ~ atom }
+
+// Operators
+op_logic = { "&&" | "||" }
+op_compare = { "==" | "!=" | "<=" | ">=" | "<" | ">" }
+op_arith = { "+" | "-" | "*" | "/" }
+
+literal = { float_literal | int_literal | string_literal | bool_literal }
 int_literal = @{ ASCII_DIGIT+ }
 float_literal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 string_literal = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 bool_literal = { "true" | "false" }
-literal = { float_literal | int_literal | string_literal | bool_literal }
-
-// Keywords
-k_type = { "Type" }
-k_struct = { "Struct" }
-k_enum = { "Enum" }
-k_behavior = { "Behavior" }
-k_impl = { "Implementation" }
-k_flow = { "Flow" }
-k_fn = { "fn" }
-k_property = { "Property" }
-k_derives = { "derives" }
-k_implements = { "implements" }
-k_where = { "where" }
-k_is = { "is" }
-k_return = { "return" }
-k_import = { "import" }
-k_ensures = { "ensures" }
-
-import_decl = { k_import ~ string_literal }
-
-property_decl = { k_property ~ identifier }
-
-type_decl = { k_type ~ identifier ~ ":" ~ identifier ~ ("<" ~ identifier ~ ">")? ~ k_derives ~ "{" ~ property_list? ~ "}" ~ ( "[" ~ component_list ~ "]" )? }
-property_list = { identifier ~ ("," ~ identifier)* }
-component_list = { identifier ~ ("," ~ identifier)* }
-
-struct_decl = { k_struct ~ identifier ~ "{" ~ field_list ~ "}" }
-field_list = { (identifier ~ ":" ~ type_ref ~ comma?)* }
-comma = _{ "," }
-
-type_ref = { identifier } // Placeholder
-
-enum_decl = { k_enum ~ identifier ~ "{" ~ enum_variant_list ~ "}" }
-enum_variant_list = { identifier ~ (comma ~ identifier)* ~ comma? }
-
-behavior_decl = { k_behavior ~ identifier ~ "(" ~ arg_list ~ ")" ~ "->" ~ identifier }
-arg_list = { (identifier ~ (comma ~ identifier)*)? }
-
-impl_decl = { k_impl ~ identifier ~ k_implements ~ identifier ~ "(" ~ arg_list? ~ ")" ~ (k_where ~ constraint_block)? ~ (k_ensures ~ "{" ~ property_list? ~ "}")? ~ block }
-where_clause = { k_where ~ expr } // This rule is now only used by generator_stmt and assignment_stmt
-block = { "{" ~ statement* ~ "}" }
-
-func_decl = { k_fn ~ identifier ~ "(" ~ param_list? ~ ")" ~ "->" ~ identifier ~ (k_where ~ constraint_block)? ~ (k_ensures ~ "{" ~ property_list? ~ "}")? ~ block }
-param_list = { param ~ ("," ~ param)* }
-param = { identifier ~ ":" ~ identifier }
-constraint_block = { identifier ~ k_is ~ identifier }
-
-flow_decl = { k_flow ~ identifier ~ "{" ~ flow_stmt* ~ "}" }
-flow_stmt = {
-    generator_stmt |
-    assignment_stmt |
-    return_stmt
-}
-
-generator_stmt = { identifier ~ "<-" ~ expr ~ where_clause? }
-assignment_stmt = { identifier ~ "=" ~ expr ~ where_clause? }
-return_stmt = { k_return ~ expr }
-
-statement = { flow_stmt } // TODO: Add other statements if needed
-
-// Expressions
-expr = { or_expr }
-or_expr = { and_expr ~ (op_or ~ and_expr)* }
-and_expr = { eq_expr ~ (op_and ~ eq_expr)* }
-eq_expr = { rel_expr ~ (op_eq ~ rel_expr)* }
-rel_expr = { add_expr ~ (
-    (op_rel ~ add_expr) |
-    (k_is ~ identifier)
-)* }
-add_expr = { mul_expr ~ (op_add ~ mul_expr)* }
-mul_expr = { unary_expr ~ (op_mul ~ unary_expr)* }
-unary_expr = { op_unary? ~ atom } // unary_operator is optional
-
-op_or = { "||" }
-op_and = { "&&" }
-op_eq = { "==" | "!=" }
-op_rel = { "<=" | ">=" | "<" | ">" }
-op_add = { "+" | "-" }
-op_mul = { "*" | "/" }
-op_unary = { "-" | "!" }
-
-atom = { primary ~ postfix* }
-postfix = { call_suffix | member_suffix }
-call_suffix = { "(" ~ arg_values ~ ")" }
-member_suffix = { "." ~ identifier }
-
-primary = {
-    literal |
-    path |
-    paren_expr |
-    list_literal
-}
-
-path = ${ identifier ~ ("::" ~ identifier)* } 
-paren_expr = { "(" ~ expr ~ ")" }
-list_literal = { "[" ~ (expr ~ ("," ~ expr)*)? ~ "]" }
-arg_values = { (expr ~ ("," ~ expr)*)? }

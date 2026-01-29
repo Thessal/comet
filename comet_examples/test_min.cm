@@ -1,0 +1,3 @@
+module TestMin
+
+class Comparator a b c :: a b -> c
