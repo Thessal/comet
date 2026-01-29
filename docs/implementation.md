@@ -19,20 +19,19 @@ This document outlines the plan to build the Comet compiler, orchestrating the d
 ### 2. Semantic Analysis (Type Checking)
 -   **Goal**: Validate the Logic and populate the Symbol Table.
 -   **Process**:
-    -   Register all `Type` definitions and their properties.
-    -   Register all `Behavior` (Trait) signatures.
-    -   Register all `Implementation` blocks.
-    -   **Constraint Verification**: Validate that `where` clauses used in definitions are semantically valid (e.g., checking properties that exist).
+    -   Register all `type` definitions and their constraints.
+    -   Register all `behavior` signatures.
+    -   Register all `fn` (Function) definitions.
+    -   **Constraint Verification**: Validate that type constraints used in definitions are semantically valid (e.g., checking properties that exist).
 
 ### 3. Synthesis Engine (The Core)
 -   **Goal**: Expand `Flow` definitions into concrete Execution Trees.
 -   **Reference**: `transform.md`.
 -   **Key Logic**:
     -   **Context Management**: Tracking active `Variable -> Value` bindings and their Semantic Properties.
-    -   **Branching**: Splitting contexts when multiple Implementations match.
-    -   **Pruning**: Dropping contexts where Constraints (`where`) fail.
+    -   **Branching**: Splitting contexts when multiple Functions match a Behavior.
+    -   **Pruning**: Dropping contexts where Constraints fail.
     -   **Built-in Logic**:
-        -   **Binary Operators**: Strict type matrix enforcement (e.g., `TimeSeries / TimeSeries -> TimeSeries`) implemented in `evaluate_binary_op`.
         -   **Functions**: Modular handlers (e.g., `src/comet/functions/divide.rs`) for complex logic like `divide(DataFrame, TimeSeries)`.
 
 ### 4. Backend (Code Generation)
@@ -54,7 +53,7 @@ This document outlines the plan to build the Comet compiler, orchestrating the d
     -   Implement structs from `ast.md`.
     -   Implement grammar from `parse.md` using `pest`.
 3.  **Symbol Table**:
-    -   Structs to hold `TypeInfo`, `BehaviorInfo`, `ImplInfo`.
+    -   Structs to hold `TypeInfo`, `BehaviorInfo`, `FunctionInfo`.
 4.  **Synthesis Prototype**:
     -   Implement the "Context Branching" loop described in `transform.md` for a simple case (e.g., the Ratio vs Spread example).
 5.  **Codegen**:

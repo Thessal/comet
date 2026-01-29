@@ -21,7 +21,7 @@ The output of the compiler is likely a **Dependency Graph** or a **Script** that
 def strategy_1(ebit, volume):
     # derived: avg_vol
     avg_vol = volume.rolling(21).mean()
-    # derived: spike (Ratio impl)
+    # derived: spike (Ratio fn)
     if not (volume > 0).all(): raise ValueError("NonZero constraint violation")
     spike = volume / avg_vol
     return trigger(ebit, spike, ...)
@@ -30,7 +30,7 @@ def strategy_1(ebit, volume):
 def strategy_2(ebit, volume):
     # derived: avg_vol
     avg_vol = volume.rolling(21).mean()
-    # derived: spike (Spread impl)
+    # derived: spike (Spread fn)
     spike = volume - avg_vol 
     return trigger(ebit, spike, ...)
 ```

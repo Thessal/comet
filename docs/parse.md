@@ -6,55 +6,35 @@ This document defines the EBNF grammar for Comet.
 
 ```ebnf
 Program         ::= (Declaration)*
-Declaration     ::= ImportDecl | TypeDecl | StructDecl | EnumDecl | BehaviorDecl | ImplDecl | FlowDecl | FuncDecl | PropertyDecl
+Declaration     ::= ImportDecl | TypeDecl | BehaviorDecl | FlowDecl | FuncDecl
 ```
 
 ## 2. Declarations
 
 ```ebnf
-PropertyDecl    ::= "Property" Identifier
+TypeDecl        ::= "type" Identifier (":" TypeRef*)?
+BehaviorDecl    ::= "behavior" Identifier "(" ParamList ")" "->" TypeRef
+FuncDecl        ::= "fn" Identifier "(" ParamList ")" "->" TypeRef "{" Block "}"
+FlowDecl        ::= "flow" Identifier "=" Expr
 
-TypeDecl        ::= "Type" Identifier ":" Identifier "derives" "{" PropertyList "}"
-StructDecl      ::= "Struct" Identifier "{" FieldList "}"
-EnumDecl        ::= "Enum" Identifier "{" EnumVariantList "}"
-
-BehaviorDecl    ::= "Behavior" Identifier "(" ArgList ")" "->" Identifier
-ImplDecl        ::= "Implementation" Identifier "implements" Identifier "(" ArgList ")" (WhereClause)? "{" Block "}"
-
-FuncDecl        ::= "fn" Identifier "(" ParamList ")" "->" Identifier (ConstraintList)? "{" Block "}"
-
-FlowDecl        ::= "Flow" Identifier "{" FlowStmtList "}"
+TypeRef         ::= Identifier
+ParamList       ::= (Param ("," Param)*)?
+Param           ::= Identifier ":" TypeList
+TypeList        ::= Identifier (Identifier)*
 ```
 
-## 3. Flow Statements
-
-```ebnf
-FlowStmtList    ::= (FlowStmt)*
-FlowStmt        ::= GeneratorStmt | AssignmentStmt | ExprStmt | ReturnStmt
-
-GeneratorStmt   ::= Identifier "<-" Expr (WhereClause)?
-AssignmentStmt  ::= Identifier "=" Expr (WhereClause)?
-ReturnStmt      ::= "return" Expr
-```
 
 ## 4. Expressions
 
 ```ebnf
-Expr            ::= OrExpr
-OrExpr          ::= AndExpr ("||" AndExpr)*
-AndExpr         ::= EqExpr ("&&" EqExpr)*
-EqExpr          ::= RelExpr (("==" | "!=") RelExpr)*
-RelExpr         ::= AddExpr (("<" | ">" | "<=" | ">=") AddExpr)*
-AddExpr         ::= MulExpr (("+" | "-") MulExpr)*
-MulExpr         ::= UnaryExpr (("*" | "/") UnaryExpr)*
-UnaryExpr       ::= ("-" | "!")? Atom
-Atom            ::= Literal | Identifier | CallExpr | MemberExpr | ParenExpr | ListLiteral
+Expr            ::= Atom | CallExpr
+Atom            ::= Literal | Identifier | ParenExpr
 
-CallExpr        ::= Path "(" ArgValues ")"
-Path            ::= Identifier ("::" Identifier)*
-MemberExpr      ::= Atom "." Identifier
+CallExpr        ::= Identifier "(" ArgValues ")"
+ArgValues       ::= (Arg ("," Arg)*)?
+Arg             ::= (Identifier "=")? Expr
+
 ParenExpr       ::= "(" Expr ")"
-ListLiteral     ::= "[" (Expr ("," Expr)*)? "]"
 ```
 
 ## 5. Primitives

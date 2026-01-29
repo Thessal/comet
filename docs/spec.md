@@ -6,9 +6,12 @@ It formalizes logical structures.
 ## Design Philosophy
 
 -   **Types** 
-    - Kewords that represent data formats or semantic properties
-    - Notation : `Series`, `DataFrame`, `Indicator`, `None`
+    - Keywords that represent data formats or semantic properties
+    - Notation : `Series`, `DataFrame`, `Indicator`, `None`, `"EBIT"`, `"close"`
+        - Quoted string is a data name.
     - Combination : `Series NonZero`
+    - Assignment `type A : Series NonZero`
+
 -   **Constraints**
     - Constraints is an expression that represents space of types.
     - Constraints can be expanded to a list of types. 
@@ -21,9 +24,11 @@ It formalizes logical structures.
         - `( Series | DataFrame ) ( NonZero | Monetary)` can be expanded to `[Series NonZero, DataFrame NonZero, Series Monetary, DataFrame Monetary]`
         - None Type : Adding None type have no effect and removed when expanded.
             - `Series (None | NonZero) == Series | (Series NonZero)`
+        - Same type added is removed when expanded : `( A A ) == A`
     - Union : (LHS) | (RHS)
-        - When union is expanded, All type that matches RHS is appended to each type that matches LHS.
+        - When union is expanded, All type that matches RHS is appended to each type that matches LHS. Duplicates are removed.
         - `( A | B ) | ( C | D )` can be expanded to `[A, B, C, D]`
+        - `A C | A C | A D` can be expanded to `[A C, A D]`
     - Subtract : (LHS) - (RHS) 
         - When subtraction is expanded, patterns that matches RHS is removed from LHS.
         - `( Series | DataFrame ) - DataFrame` can be expanded to `[Series]`
@@ -40,8 +45,9 @@ It formalizes logical structures.
         - Constraint can be stored to the constraint variable and recovered from the variable.
 
 -   **Behaviors**
-    - Behavior is a **Type Class** that maps input type constraints to output type constraints.
-    - `Behavior Compare (dividend: (DataFrame | Series) 'a, divisor: (DataFrame | Series) Finite Positive) -> ('a Finite)`
+    - Behavior is a mapping from input type constraints to output type constraints.
+    - To prevent infinite loop, behaviors are not allowed to be recursive, and only one function can be matched for each behavior.
+    - `behavior Compare (dividend: (DataFrame | Series) 'a, divisor: (DataFrame | Series) Finite Positive) -> ('a Finite)`
         - Constraint variable 'a or 'b etc can be used to capture a type.
         - It means that Compare is a mapping from A, B into (a Finite). If A is DataFrame, the result is also DataFrame.
         - Behavior can be fully expanded into the following list : 
@@ -51,16 +57,21 @@ It formalizes logical structures.
             - fn divide(dividend:DataFrame, divisor:DataFrame Finite Positive) -> DataFrame Finite 
             - fn diff(dividend:DataFrame Finite Positive SomeOtherType, divisor:DataFrame Finite Positive SomeOtherType) -> DataFrame Finite 
             - fn divide_1d(dividend:Series, divisor:Series Finite Positive) -> Series Finite 
-    - Behaviors can be chained and assigned to a concept.
-    - Example: \
-      `Behavior RemoveNegative (A: (DataFrame | Series) a) -> (a Positive)` \
-      `Behavior RemoveZero (A: (DataFrame | Series) a) -> (a Positive)` \
-      `price_safe = RemoveZero(A=RemoveNegative(A=price)) // assignment of chained behavior into a concept.` \
-      `price_safe_2 = RemoveZero(A=RemoveNegative(A=price))` \
-      `comparison_result = Compare(dividend=price_safe, divisor=price_safe_2) // Using saved concept.`    
+
+-   **Flows**
+    - Flow is a path of transformations from input type constraints to output type constraints.
+    - Flow can be defined by chaining behaviors or other flows.
+        - `flow volume_spike = Compare(dividend=Volume, divisor=HistoricalVolume)`
+        - Flow can be matched to a chain of functions.
+            - rank_diff(data("volume"), ts_mean(data("volume"),21))
+            - rank_diff(data("volume"), ts_mean(data("volume"),63))
+            - divide(data("volume"), ts_mean(data("volume"),21))
+            - divide(data("volume"), ts_mean(data("volume"),63))
+        - Each functions match each elements of chains, and keeps the composition structure of the chained behavior. 
 
 -   **Functions**
     - Functions map that receives a list of concepts and returns a concept.
+    - A function is a valid behavior.
     - `fn Ratio ( dividend: DataFrame, divisor: DataFrame Positive ) -> (DataFrame Finite) { return A / B }`
         - Input and output type with code segments. 
         - Type can be used define functions, but constraint cannot be used. 
@@ -69,22 +80,26 @@ It formalizes logical structures.
         - Input types are valid for the behavior.
         - Output type is valid for the behavior.
     - Example: 
-        - `fn Ratio ( dividend: DataFrame, divisor: DataFrame Positive ) -> (DataFrame Finite) { return A / B }` can be matched to a behavior `Behavior Compare (dividend: (DataFrame | Series) 'a, divisor: (DataFrame | Series) 'b Finite Positive) -> ('a Finite)`
+        - `fn Ratio ( dividend: DataFrame, divisor: DataFrame Positive ) -> (DataFrame Finite) { return A / B }` can be matched to a behavior `behavior Compare (dividend: (DataFrame | Series) 'a, divisor: (DataFrame | Series) 'b Finite Positive) -> ('a Finite)`
+    - data/data.cm contains functions that returns data
+        - `fn load_ebit() -> (DataFrame "EBIT"){ return ... }` \
+        `fn load_ebitda() -> (DataFrame "EBITDA"){ return ... }`
+        - These functions can be matched to a behavior `behavior earnings () -> DataFrame ("EBIT"|"EBITDA")`
 
 
 
 ## Syntax Overview
 
-### 1. Terminology: Quant vs. Code
+### 1. Terminology
 
 To align with the "Semantic" design philosophy, we use specific terms:
 
-<!-- | Concept | Replaces (CS Term) | Description |
-| :--- | :--- | :--- |
-| **Type** | `Constraint` / `Marker` | A semantic label (e.g., `NonZero`, `USD`). It describes the *meaning* of the data, enforcing categorical consistency. |
-| **Property** | `Constraint` / `Marker` | A semantic label (e.g., `NonZero`, `USD`). It describes the *meaning* of the data, enforcing categorical consistency. |
-| **Behavior** | `Class` | Defines an abstract logical capability (e.g., `Comparator`). It is about *what* makes sense to do with data, not just what methods exist. |
-| **Logic** | `Instance` | A specific, grounded logic for a Behavior (e.g., `Ratio`, `Spread`). It represents a *valid hypothesis* or *model* for that behavior. | -->
+| Concept | Description |
+| :--- | :--- |
+| **Type** | A label representing data format (`Series`) or semantic property (`NonZero`). |
+| **Constraint** | An expression (Addition, Union, Subtraction) matching a valid set of Types. |
+| **Behavior** | Abstract capability mapping input types to output types using constraints. |
+| **Function** | A concrete logical implementation that can be synthesized if it matches a Behavior. |
 
 ### 2. File Structure
 
@@ -94,54 +109,48 @@ Comet supports modularity via imports.
 import "stdlib.cm"
 import "data/universe.cm"
 ```
-<!-- 
-### 3. Semantic Attributes (Properties)
 
-We define logic properties that can be attached to data.
+### 3. Type Definitions
 
-```comet
-// Logical Markers
-Property NonZero
-Property Stationary
-Property Count
-Property Monetary
-```
-
-### 2. Domain Types
-
-Types are defined by their structure AND their semantic properties.
+Types include data structures and semantic properties.
 
 ```comet
-// Basic Representation (The "Container")
-Struct Series {}
+// Data Formats
+type Series
+type DataFrame
 
-// Domain Concepts (The "Meaning")
-Type Volume : Series derives { NonZero, Count }
-Type Price  : Series derives { NonZero, Monetary }
-Type Return : Series derives { Stationary }
+// Semantic Properties
+type NonZero
+type Monetary
+type Stationary
+
+// Derived Concepts
+// (Using 'type' keyword for definition, although strictly 'Series NonZero' is a constraint)
+type Indicator : DataFrame Stationary
+type Volume : DataFrame NonZero   // Volume is a Series that is NonZero
+type Price  : DataFrame Monetary  // Price is a Series that is Monetary
+type Profit : DataFrame Monetary
+type Days : Const NonZero Count
 ```
 
-### 3. Behaviors (Traits) & Logic
+### 4. Behaviors & Functions
 
-Behaviors are defined on **abstract concepts**, not just specific structs.
+Behaviors define the "Interface" or "Trait" of an operation. Functions provide the "Implementation".
 
 ```comet
 // Abstract Behavior
-Behavior Comparator(A, B) -> Indicator
+// Maps inputs A and B to an Indicator. B must be valid for the operations expected.
+behavior Comparator(A: DataFrame, B: DataFrame) -> Indicator
 
-// Logic: Ratio
-// "A Ratio comparison is valid if B is physically capable of being a denominator (NonZero)"
-Implementation Ratio implements Comparator(A, B) 
-where B is NonZero 
-{
-    return A / B
+// Function: Ratio
+// Logic: A / B. Valid only if B is NonZero (to avoid division by zero).
+fn ratio(dividend: DataFrame, divisor: DataFrame NonZero) -> Indicator {
+    return dividend / divisor
 }
 
-// Logic: Spread
-// "A Spread comparison is valid if A and B share the same Unit"
-Implementation Spread implements Comparator(A, B)
-where A.Unit == B.Unit
-{
+// Function: Spread
+// Logic: A - B. Valid generally for Series/DataFrames.
+fn spread(A: DataFrame, B: DataFrame) -> Indicator {
     return A - B
 }
 ```
@@ -153,48 +162,40 @@ The core of Comet is the **Flow**, where users describe a high-level intent, and
 ### Complex Example: Event Driven Strategy
 
 ```comet
-Flow EventDrivenStrategy {
-    // 1. Inputs (Semantic Definition)
-    // "Get me US Earnings and Volume data"
-    ebit <- Universe(Earnings) where Unit is USD
-    vol  <- Universe(Volume)   // inherently NonZero, Count
-    
-    // 2. Transformations
-    days <- [21, 63]
-    avg_vol <- MovingAverage(vol, days) // Inherits 'Count' and 'NonZero' from vol? Yes.
+// 1. Inputs (Semantic Definition)
+behavior price () -> DataFrame Monetary ("close"|"open")
+behavior earnings () -> DataFrame Monetary ("EBIT"|"EBITDA")
+behavior vol () -> DataFrame NonZero Count Volume ("volume")
+behavior days () -> Const NonZero Count Days ("21", "63")
+behavior levels () -> Const("0.1", "0.2")
 
-    // 3. Synthesis (The "Quant" Logic)
-    // We request a Comparison. The compiler checks available Implementations.
-    
-    // Check: Can we use "Ratio"?
-    // Logic: Is 'avg_vol' NonZero? 
-    // Yes (derived from Volume). -> Valid.
-    
-    // Check: Can we use "Spread"?
-    // Logic: Do 'vol' and 'avg_vol' share units?
-    // Yes (both are Count). -> Valid.
-    
-    // Result: Both Ratio and Spread are generated.
-    spike <- Comparator(vol, avg_vol)
+// 2. Transformations
+behavior HistoricalVolume(A: DataFrame Volume, B: Const Days) -> DataFrame
+fn ts_mean(x: DataFrame, days: Const Days) -> DataFrame { ... }
+fn ts_delay(x: DataFrame, days: Const Days) -> DataFrame { ... }
 
-    // 4. Trigger
-    signal <- Trigger(ebit, spike, Condition.GreaterThan, 4.0)
-    
-    return signal
+flow volume_spike = Comparator(vol(), HistoricalVolume(vol(), days()))
+
+// 3. Trigger
+fn trigger(signal: DataFrame, trigger: DataFrame, levels: Const) -> DataFrame Trigger {
+    ...
+    return signal 
 }
+
+flow result = trigger(signal=earnings(), trigger=volume_spike, levels())
 ```
 
 ### Guarding Against Nonsense
 
-If we tried to compare `Volume` and `Price` using `Spread`:
--   `Volume` is `Count`
--   `Price` is `Monetary`
--   Condition `A.Unit == B.Unit` fails.
--> **Spread** is not generated.
-
 If we tried to compare `Volume` and `0` using `Ratio`:
--   `0` is not `NonZero`.
--   Condition `B is NonZero` fails.
--> **Ratio** is not generated.
+-   `0` does not generally have the `NonZero` property (unless explicitly typed).
+-   Function `Ratio` requires `divisor` to be `NonZero`.
+-   Constraint violation -> **Ratio** is not generated.
 
-This ensures that the generated strategies are **Categorically Consistent**. -->
+This ensures that the generated strategies are **Categorically Consistent**.
+
+
+### Synthesis 
+- flow result is expanded.
+- All possible combinations of implementation of behaviors are iterated. 
+- Function types are checked and all valid combinations are synthesized. 

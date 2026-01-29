@@ -7,39 +7,24 @@ This document defines the lexical structure of the Comet language.
 Keywords are reserved identifiers.
 
 ### Structural Keywords
--   `Type`
--   `Struct`
--   `Enum`
--   `Flow`
--   `Behavior` (replaces Trait)
--   `Implementation` (replaces Impl)
--   `Property`
+-   `type`
+-   `behavior`
+-   `flow`
 -   `fn`
-
-### Semantic Keywords
--   `derives` (used in Type definitions)
--   `implements` (used in Behavior definitions)
--   `where` (constraints)
--   `is` (property check: `where B is NonZero`)
 
 ### Logic/Control Flow
 -   `return`
--   `let` (standard binding, though discouraged in Flow for combinatorial vars)
 
 ## 2. Operators & Punctuation
 
--   `<-` : Generator assignment (in Flow)
 -   `::` : Path separator (e.g., `Comparator::compare`)
 -   `->` : Return type arrow
 -   `=>` : Match arrow (if used in expressions)
 -   `.` : Member access
 -   `:` : Type annotation
 -   `=` : Assignment (Expression)
--   `==`, `!=`, `<`, `>`, `<=`, `>=` : Comparison
--   `+`, `-`, `*`, `/` : Arithmetic
 -   `{`, `}` : Block delimiters
 -   `(`, `)` : Parentheses
--   `[`, `]` : List literals
 -   `,` : Separator
 
 ## 3. Literals

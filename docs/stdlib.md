@@ -2,7 +2,7 @@
 
 ## Built-in Synthesis Logic
 
-Some operators and behaviors are synthesized directly by the compiler engine without explicit `Implementation` blocks in the user code. This allows for complex type interactions (like broadcasting) that are difficult to express in the `Implementation` syntax.
+Some operators and behaviors are synthesized directly by the compiler engine without explicit `fn` blocks or behavior definitions in the user code. This allows for complex type interactions (like broadcasting) that are difficult to express in the `fn` syntax.
 
 ### Binary Operators
 

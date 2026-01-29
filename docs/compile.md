@@ -16,8 +16,8 @@ Comet acts as a **Generator** of Rust code.
 ### Workflow
 1.  **Source**: `example.cm`
 2.  **Comet Compiler**:
-    -   Parses and resolves Type/Trait/Imple logic.
-    -   Expands the `Flow` into a "Product Space" of concrete execution trees.
+    -   Parses and resolves Type/Behavior/Function logic.
+    -   Expands the `flow` into a "Product Space" of concrete execution trees.
     -   Prunes invalid trees using Semantic Properties.
 3.  **Codegen**:
     -   For each valid Tree in the Product Space, generate a unique Rust struct/function (e.g., `Strategy_Variant_142`).
