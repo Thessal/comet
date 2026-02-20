@@ -37,4 +37,4 @@ Explicit `where` clauses in the Flow act as filters.
 
 At the end of the Flow, the compiler has a list of valid Contexts. Each Context represents a fully resolved "Call Graph" or "Expression Tree".
 
-These trees are then passed to the Code Generator (Python/Rust backend) to emit the actual source code.
+These trees are then passed to the Code Generator to emit the actual LLVM IR.

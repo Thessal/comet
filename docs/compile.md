@@ -59,6 +59,7 @@ The interface is stateless at the library level; state is passed in/out.
     -   `State`: Serialized byte blob representing internal state (e.g., rolling window buffers) at the end of history.
 
 #### `generate(variant_id: u32, new_data: DataFrame, state: State) -> (Signal, State)`
+-   NOTE: we need to think about how to do the memory management. There are states for each operator, so passing it as a single blob might be tricky. Maybe we can use a hashmap to store the states of each operator.
 -   **Purpose**: Live trading / Incremental update.
 -   **Input**:
     -   `variant_id`: Strategy logic.

@@ -12,8 +12,6 @@ The following operators from `operators-example.py` still need to be translated 
 - `ts_decay_exp`
 - `ts_std`
 - `ts_mae`
-- `ts_zscore`
-- `ts_rank`
 - `ts_min`
 - `ts_max`
 - `ts_argmin`

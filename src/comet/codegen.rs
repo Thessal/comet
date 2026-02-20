@@ -85,34 +85,83 @@ impl Codegen {
     fn generate_variant_executor(&self, id: usize, graph: &ExecutionGraph) -> String {
         let mut code = String::new();
         code.push_str(&format!("fn execute_variant_{}(inputs: &Inputs) -> DataFrame {{\n", id));
+        code.push_str("    let len = inputs.len();\n");
+        code.push_str("    let num_timesteps = inputs.timesteps();\n\n");
         
+        code.push_str("    // 1. Initialization Phase\n");
         for (node_id, node) in graph.nodes.iter().enumerate() {
             match node {
-                ExecutionNode::Source { name, type_name } => {
-                    code.push_str(&format!("    let var_{} = inputs.get(\"{}\"); // {}\n", node_id, name, type_name));
+                ExecutionNode::Source { name, .. } => {
+                    code.push_str(&format!("    let var_{}_ptr = inputs.get_ptr(\"{}\");\n", node_id, name));
                 },
-                ExecutionNode::Constant { value, type_name } => {
-                    code.push_str(&format!("    let var_{} = {}; // {}\n", node_id, value, type_name));
+                ExecutionNode::Constant { value, .. } => {
+                    code.push_str(&format!("    let var_{}_val = {};\n", node_id, value));
                 },
-                ExecutionNode::Operation { op, args } => {
-                     let arg_vars: Vec<String> = args.iter().map(|a| format!("&var_{}", a)).collect();
-                     let call = match op {
-                        OperatorOp::Divide => format!("comet::functions::divide({})", arg_vars.join(", ")),
-                        OperatorOp::ZScore => format!("comet::functions::zscore({})", arg_vars.join(", ")),
-                        OperatorOp::Filter => format!("comet::functions::filter({})", arg_vars.join(", ")),
-                        OperatorOp::UpdateWhen => format!("comet::functions::update_when({})", arg_vars.join(", ")),
-                        OperatorOp::FunctionCall(func_name) => format!("comet::functions::{}({})", func_name.to_lowercase(), arg_vars.join(", ")),
-                        _ => format!("todo!(\"{:?}\")", op),
-                     };
-                     code.push_str(&format!("    let var_{} = {};\n", node_id, call));
+                ExecutionNode::Operation { op, .. } => {
+                    code.push_str(&format!("    let mut var_{}_out = vec![0.0f64; len];\n", node_id));
+                    code.push_str(&format!("    let var_{}_out_ptr = var_{}_out.as_mut_ptr();\n", node_id, node_id));
+                    
+                    let func_name = match op {
+                        OperatorOp::ZScore => "cs_zscore",
+                        OperatorOp::Divide => "divide",
+                        OperatorOp::Filter => "filter",
+                        OperatorOp::UpdateWhen => "update_when",
+                        OperatorOp::FunctionCall(f) => f.as_str(),
+                        _ => "unknown",
+                    }.to_lowercase();
+                    
+                    code.push_str(&format!("    let period = 10; // TODO: extract from AST constraints\n"));
+                    code.push_str(&format!("    let state_{} = unsafe {{ comet_{}_init(period, len) }};\n", node_id, func_name));
                 }
             }
         }
         
-       if !graph.nodes.is_empty() {
-             code.push_str(&format!("    var_{}\n", graph.nodes.len() - 1));
+        code.push_str("\n    // 2. Event Loop Phase\n");
+        code.push_str("    for t in 0..num_timesteps {\n");
+        for (node_id, node) in graph.nodes.iter().enumerate() {
+            if let ExecutionNode::Operation { op, args } = node {
+                let func_name = match op {
+                    OperatorOp::ZScore => "cs_zscore",
+                    OperatorOp::Divide => "divide",
+                    OperatorOp::FunctionCall(f) => f.as_str(),
+                    _ => "unknown",
+                }.to_lowercase();
+                
+                let mut arg_ptrs = Vec::new();
+                for &arg_id in args {
+                    // Rough mapping to pointers for the current timestep
+                    arg_ptrs.push(format!("var_{}_ptr.add(t * len)", arg_id));
+                }
+                
+                let args_str = arg_ptrs.join(", ");
+                if args.len() == 1 {
+                    code.push_str(&format!("        unsafe {{ comet_{}_step(state_{}, {}, var_{}_out_ptr, len) }};\n", func_name, node_id, args_str, node_id));
+                } else if args.len() == 2 {
+                    code.push_str(&format!("        unsafe {{ comet_{}_step(state_{}, {}, var_{}_out_ptr, len) }};\n", func_name, node_id, args_str, node_id));
+                }
+            }
+        }
+        code.push_str("    }\n\n");
+        
+        code.push_str("    // 3. Cleanup Phase\n");
+        for (node_id, node) in graph.nodes.iter().enumerate() {
+            if let ExecutionNode::Operation { op, .. } = node {
+                let func_name = match op {
+                    OperatorOp::ZScore => "cs_zscore",
+                    OperatorOp::Divide => "divide",
+                    OperatorOp::FunctionCall(f) => f.as_str(),
+                    _ => "unknown",
+                }.to_lowercase();
+                code.push_str(&format!("    unsafe {{ comet_{}_free(state_{}) }};\n", func_name, node_id));
+            }
+        }
+        
+        if !graph.nodes.is_empty() {
+             let last_id = graph.nodes.len() - 1;
+             code.push_str(&format!("\n    // TODO: Convert var_{}_out to DataFrame\n", last_id));
+             code.push_str("    DataFrame::default()\n");
         } else {
-            code.push_str("    DataFrame::default()\n");
+             code.push_str("    DataFrame::default()\n");
         }
         
         code.push_str("}\n\n");

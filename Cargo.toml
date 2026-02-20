@@ -13,6 +13,7 @@ pest = "2.6"
 pest_derive = "2.6"
 thiserror = "1.0"
 paste = "1.0"
+inkwell = { version = "0.8.0", features = ["llvm15-0"] }
 
 [dev-dependencies]
 polars = { version = "0.53.0", features = ["dtype-datetime", "lazy", "rolling_window", "temporal"] }

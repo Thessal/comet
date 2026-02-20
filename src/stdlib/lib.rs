@@ -2,6 +2,8 @@
 
 pub mod add;
 pub mod ts_mean;
+pub mod cs_rank;
+pub mod cs_zscore;
 
 #[cfg(test)]
 mod test_ts_mean;

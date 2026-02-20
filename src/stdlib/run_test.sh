@@ -13,7 +13,13 @@ echo "[2/2] Running src/stdlib/test_ts_mean.ll with lli..."
 # The -load argument links our freshly baked stdlib .so
 lli -load=target/release/libstdlib.so src/stdlib/test_ts_mean.ll
 
-echo "[3/3] Running src/stdlib/test_add.ll with lli..."
+echo "[3/5] Running src/stdlib/test_add.ll with lli..."
 lli -load=target/release/libstdlib.so src/stdlib/test_add.ll
+
+echo "[4/5] Running src/stdlib/test_cs_rank.ll with lli..."
+lli -load=target/release/libstdlib.so src/stdlib/test_cs_rank.ll
+
+echo "[5/5] Running src/stdlib/test_cs_zscore.ll with lli..."
+lli -load=target/release/libstdlib.so src/stdlib/test_cs_zscore.ll
 
 echo "Success!"
