@@ -32,16 +32,16 @@ This document outlines the plan to build the Comet compiler, orchestrating the d
     -   **Branching**: Splitting contexts when multiple Functions match a Behavior.
     -   **Pruning**: Dropping contexts where Constraints fail.
     -   **Built-in Logic**:
-        -   **Functions**: Modular handlers (e.g., `src/comet/functions/divide.rs`) for complex logic like `divide(DataFrame, TimeSeries)`.
+        -   **Functions**: Modular, stateful kernel handlers implemented in the `stdlib` (compiled as a `.so` file) for evaluating complex logic like `divide(DataFrame, TimeSeries)`.
 
 ### 4. Backend (Code Generation)
 -   **Goal**: Emit executable code for the Target Runtime.
--   **Strategy**: **Transpilation to Rust** (Selected Strategy).
+-   **Strategy**: **LLVM IR Generation** (Selected Strategy).
 -   **Reference**: `compile.md`, `runtime.md`.
 -   **Process**:
-    1.  **Expansion**: The Synthesis Engine produces a "Product Space" of valid execution trees.
-    2.  **Codegen**: For each valid tree, generate a unique Rust struct/function (e.g., `Strategy_Variant_142`).
-    3.  **Compilation**: Use `cargo` to compile the generated Rust code into a high-performance library (`.so` / `.dll`).
+    1.  **Expansion**: The Synthesis Engine produces a "Product Space" of valid execution trees, finding all compatible combinations.
+    2.  **Codegen**: For each valid tree, generate corresponding LLVM IR (or bitcode).
+    3.  **Compilation**: Link the generated LLVM code with the `stdlib` library (`.so`) to form the final executable.
 -   **Generated Interface**:
     -   Stateless logic functions: `generate(variant_id, new_data, state)`.
     -   Metadata structures for describing strategy inputs/outputs.

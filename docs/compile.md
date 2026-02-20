@@ -7,23 +7,22 @@ This document defines the compilation strategy for Comet.
 We evaluated three options:
 1.  **List of Expressions (Python Runtime)**: Easy but slow. Valid for prototyping.
 2.  **Bytecode (VM)**: Good for portability, but complex to implement a performant VM for combinatorial logic.
-3.  **Rust Source (Transpilation)**: **SELECTED STRATEGY**.
+3.  **LLVM IR Generation**: **SELECTED STRATEGY**.
 
-## 2. Transpilation to Rust
+## 2. LLVM IR Generation
 
-Comet acts as a **Generator** of Rust code.
+The main Comet compiler codebase (the "parser") acts as a generator of LLVM IR (or bitcode).
 
 ### Workflow
 1.  **Source**: `example.cm`
 2.  **Comet Compiler**:
     -   Parses and resolves Type/Behavior/Function logic.
-    -   Expands the `flow` into a "Product Space" of concrete execution trees.
+    -   Expands the `flow` into a "Product Space" of concrete execution trees, finding all compatible combinations.
     -   Prunes invalid trees using Semantic Properties.
 3.  **Codegen**:
-    -   For each valid Tree in the Product Space, generate a unique Rust struct/function (e.g., `Strategy_Variant_142`).
-    -   Generate a `lib.rs` that exposes the standard API.
-4.  **Rust Compiler (`cargo`)**:
-    -   Compiles the generated Rust code into a high-performance library (`.so` / `.dll` / `.rlib`).
+    -   For each valid Tree in the Product Space, generate corresponding LLVM IR (or bitcode).
+4.  **Compilation (`llvm` / linker)**:
+    -   Compiles and links the generated LLVM code with the `stdlib` dynamic library (`.so`) into a high-performance executable strategy.
 
 ## 3. Generated Library API
 
@@ -69,7 +68,7 @@ The interface is stateless at the library level; state is passed in/out.
     -   `Signal`: Signal for the new data points.
     -   `State`: Updated serialized state.
 
-### Why Rust?
--   **Type Safety**: The generated code is statically checked by `rustc`.
--   **Performance**: Combinatorial explosion requires native speed.
--   **Parallelism**: Rust's `Rayon` or `Tokio` can easily run independent strategy variants in parallel.
+### Why LLVM?
+-   **Type Safety**: The LLVM IR generator enforces valid memory access and strict type passing with the `stdlib` components.
+-   **Performance**: Combinatorial explosion requires native speed. LLVM's advanced optimization passes generate highly efficient machine code.
+-   **Compatibility**: Direct linking with the Rust-generated `stdlib` `.so` library allows reusing complex stateful kernels easily without incurring FFI overhead during dynamic execution.
