@@ -3,7 +3,7 @@ use crate::comet::ast::{FlowStmt, Expr, Ident, Stmt, Constraint};
 use crate::comet::symbols::{SymbolTable};
 use crate::comet::constraints::{expand, matches_chain, Atom, ConstraintSet};
 use thiserror::Error;
-use crate::comet::ir::{ExecutionGraph, ExecutionNode, OperatorOp};
+use crate::comet::ir::{ExecutionGraph, ExecutionNode};
 
 #[derive(Error, Debug)]
 pub enum SynthesisError {
@@ -194,7 +194,7 @@ impl<'a> Synthesizer<'a> {
                                      
                                      if compatible {
                                          let node = ExecutionNode::Operation {
-                                             op: OperatorOp::FunctionCall(fn_name.clone()),
+                                             op: fn_name.clone(),
                                              args: arg_ids.clone(),
                                          };
                                          let new_id = ctx.add_node(node);
@@ -244,7 +244,7 @@ impl<'a> Synthesizer<'a> {
                              if results.is_empty() {
                                   // Fallback to abstract
                                   let node = ExecutionNode::Operation {
-                                      op: OperatorOp::FunctionCall(beh_info.name.clone()),
+                                      op: beh_info.name.clone(),
                                       args: arg_ids,
                                   };
                                   let new_id = ctx.add_node(node);
@@ -266,7 +266,7 @@ impl<'a> Synthesizer<'a> {
                                  found = true;
                                  let arg_ids: Vec<usize> = arg_results.iter().map(|a| a.node_id).collect();
                                  let node = ExecutionNode::Operation {
-                                     op: OperatorOp::FunctionCall(func_info.name.clone()),
+                                     op: func_info.name.clone(),
                                      args: arg_ids,
                                  };
                                  let new_id = ctx.add_node(node);

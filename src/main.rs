@@ -36,11 +36,20 @@ fn main() {
                          match synthesizer.synthesize(flow_name) {
                              Ok(contexts) => {
                                  println!("Synthesis successful for {}! Count: {}", flow_name, contexts.len());
-                                 // let codegen = comet::codegen::Codegen::new();
-                                 // let rust_code = codegen.generate_library(&contexts);
-                                 // println!("--- Generated Rust Library ---");
-                                 // println!("{}", rust_code);
-                                 // println!("------------------------------");
+                                 
+                                 // Initialize the LLVM codegen context
+                                 let inkwell_ctx = inkwell::context::Context::create();
+                                 let codegen = comet::codegen::Codegen::new(&inkwell_ctx, flow_name);
+                                 
+                                 // Generate the internal LLVM IR structure
+                                 let _ir_string = codegen.generate_ir(&contexts);
+                                 println!("Generated LLVM IR for {}.", flow_name);
+                                 
+                                 // Export the generated module to a .so library artifact
+                                 match codegen.emit_library(flow_name) {
+                                     Ok(_) => println!("Successfully compiled {}.so library!", flow_name),
+                                     Err(e) => eprintln!("Failed to compile library: {}", e),
+                                 }
                              },
                              Err(e) => eprintln!("Synthesis error for {}: {:?}", flow_name, e),
                          }

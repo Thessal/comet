@@ -27,32 +27,7 @@ pub enum ExecutionNode {
         type_name: String,
     },
     Operation {
-        op: OperatorOp,
+        op: String,
         args: Vec<usize>, // Indices into nodes
     },
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum OperatorOp {
-    // Binary
-    Divide,
-    Multiply,
-    Add, 
-    Subtract,
-    
-    // Unary / Special
-    Delay,
-    Diff,
-    
-    // Rolling / Statistical
-    RollingMean,
-    RollingStd,
-    ZScore,
-    
-    // Logic
-    Filter,
-    UpdateWhen,
-    
-    // Custom / Function Call used in synthesis
-    FunctionCall(String), 
 }

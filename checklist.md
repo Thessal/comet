@@ -7,18 +7,18 @@
 - [x] Write a test code that generates LLVM IR, and make sure it compiles.
 
 ## Phase 2: Translation & Memory Allocation
-- [ ] Translate `ExecutionNode::Source` into inputs fetched from the function arguments (`double** inputs`).
-- [ ] Initialize operator states via their LLVM IR `init` declarations.
+- [x] Translate `ExecutionNode::Source` into inputs fetched from the function arguments (`double** inputs`).
+- [x] Initialize operator states via their LLVM IR `init` declarations.
 - [ ] Implement serialization and deserialization of operator states.
-- [ ] Allocate intermediate arrays (via `alloca` or `malloc`) to hold output references for each graph node.
+- [x] Allocate intermediate arrays (via `alloca` or `malloc`) to hold output references for each graph node.
 
 ## Phase 3: The Native Event Loop
-- [ ] Emit the loop construct block branching (`t = 0` up to `num_timesteps`).
-- [ ] Resolve graph dependencies efficiently, generating GEP (GetElementPtr) instructions into the respective memory strides.
-- [ ] Execute the corresponding `comet_*_step` call for each operation in topological order.
-- [ ] Write a test code that converts a call tree into LLVM IR and print it to the console.
+- [x] Emit the loop construct block branching (`t = 0` up to `num_timesteps`).
+- [x] Resolve graph dependencies efficiently, generating GEP (GetElementPtr) instructions into the respective memory strides.
+- [x] Execute the corresponding `comet_*_step` call for each operation in topological order.
+- [x] Write a test code that converts a call tree into LLVM IR and print it to the console.
 
 ## Phase 4: Cleanup & Export
-- [ ] Add the cleanup logic to deallocate all operator states via `comet_*_free`.
-- [ ] Wire the outputs to the main return array payload.
-- [ ] Update `main.rs` to configure an inkwell `Context` and output the compiled IR into a `.ll` testable artifact.
+- [x] Add the cleanup logic to deallocate all operator states via `comet_*_free`.
+- [x] Wire the outputs to the main return array payload.
+- [x] Update `main.rs` to configure an inkwell `Context` and output the compiled IR into a `.ll` testable artifact.
