@@ -18,6 +18,8 @@ in pkgs.mkShell.override { stdenv = pkgs.clangStdenv; } {
   buildInputs = with pkgs; [
     cmake
     libllvm
+    libffi
+    libxml2
   ];
   packages = [
     #pkgs.antigravity
