@@ -7,10 +7,10 @@ This document defines the lexical structure of the Comet language.
 Keywords are reserved identifiers.
 
 ### Structural Keywords
--   `type`
--   `behavior`
--   `flow`
--   `fn`
+-   `Type`
+-   `Behavior`
+-   `Flow`
+-   `Fn`
 
 ### Logic/Control Flow
 -   `return`

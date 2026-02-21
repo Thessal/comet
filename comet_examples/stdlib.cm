@@ -24,53 +24,57 @@ Property Constant
 Behavior Arithmetic(A, B) -> T
 Behavior Statistical(T) -> Series
 
-fn divide(x: DataFrame, y: DataFrame) -> DataFrame { return x }
-fn divide(x: DataFrame, y: TimeSeries) -> DataFrame { return x }
-fn divide(x: DataFrame, y: Constant) -> DataFrame { return x }
-fn divide(x: TimeSeries, y: TimeSeries) -> TimeSeries { return x }
-fn divide(x: TimeSeries, y: Constant) -> TimeSeries { return x }
-fn divide(x: Constant, y: Constant) -> Constant { return x }
+// To align with current Rust `stdlib` ABI capability (`*const f64`),
+// we condense all overloaded operations to a single array-compatible signature.
+Fn divide(x: Series, y: Series) -> Series { return x }
+Fn divide(x: DataFrame, y: Constant) -> DataFrame { return x }
+Fn divide(x: DataFrame, y: DataFrame) -> DataFrame { return x }
+Fn divide(x: TimeSeries, y: TimeSeries) -> TimeSeries { return x }
+Fn divide(x: TimeSeries, y: Constant) -> TimeSeries { return x }
+Fn divide(x: Constant, y: Constant) -> Constant { return x }
+
+Fn const(val: Constant) -> Constant { return val }
 
 // Normalization
 
 // Normalization
 Behavior Normalizer(T) -> T
 
-fn zscore(x: Series) -> Series {
+Fn zscore(x: Series) -> Series {
     return x
 }
 
-fn rank(x: Series) -> Series {
+Fn rank(x: Series) -> Series {
     return x
 }
 
-fn trim_ternary(x: Series, h: Float, l: Float) -> Series {
+Fn trim_ternary(x: Series, h: Float, l: Float) -> Series {
     return x
 }
 
 // Conditionals
-fn enter_when(data: DataFrame, signal: DataFrame) -> DataFrame where signal is Masked {
+Fn enter_when(data: DataFrame, signal: DataFrame) -> DataFrame where signal is Masked {
     return data
 }
 
-fn update_when(data: DataFrame, signal: DataFrame) -> DataFrame where signal is Masked {
+Fn update_when(data: DataFrame, signal: DataFrame) -> DataFrame where signal is Masked {
     return data
 }
 
 // Logic to create a mask
-fn apply_filter(data: DataFrame, threshold: Float) -> DataFrame where data is Ranged ensures { Masked } {
+Fn apply_filter(data: DataFrame, threshold: Float) -> DataFrame where data is Ranged ensures { Masked } {
     // Ideally this attaches 'Masked' property
     return data
 }
 
-fn greater_than(val: Float) -> Float {
+Fn greater_than(val: Float) -> Float {
     return val 
 }
 
-fn subtract(x: Series, y: Series) -> Series {
+Fn subtract(x: Series, y: Series) -> Series {
     return x
 }
 
-fn clip(x: Series, min: Float, max: Float) -> Series {
+Fn clip(x: Series, min: Float, max: Float) -> Series {
     return x
 }

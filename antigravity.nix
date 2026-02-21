@@ -2,7 +2,7 @@
 
 stdenv.mkDerivation rec {
   pname = "antigravity";
-  version = "1.18.3-4739469533380608";
+  version = "1.18.4-5780041996042240";
   src = fetchurl {
     url = "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/${version}/linux-x64/Antigravity.tar.gz";
     sha256 = "sha256-TH/kjJVOTSVcXT6kx08Wikpxh/0r7tsiNCPLV0gcljg=";

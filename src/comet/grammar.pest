@@ -24,10 +24,10 @@ literal = { float_literal | int_literal | string_literal | bool_literal }
 
 // Keywords
 // Keywords
-k_type = { "type" }
-k_behavior = { "behavior" }
-k_flow = { "flow" }
-k_fn = { "fn" }
+k_type = { "Type" }
+k_behavior = { "Behavior" }
+k_flow = { "Flow" }
+k_fn = { "Fn" }
 k_return = { "return" }
 k_import = { "import" }
 
@@ -56,7 +56,7 @@ func_decl = { k_fn ~ identifier ~ "(" ~ typed_arg_list? ~ ")" ~ "->" ~ constrain
 
 block = { "{" ~ statement* ~ "}" }
 
-flow_decl = { k_flow ~ identifier ~ "=" ~ expr }
+flow_decl = { k_flow ~ identifier ~ block }
 
 statement = {
     assignment_stmt |

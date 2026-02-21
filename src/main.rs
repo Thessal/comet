@@ -42,7 +42,7 @@ fn main() {
                                  let codegen = comet::codegen::Codegen::new(&inkwell_ctx, flow_name);
                                  
                                  // Generate the internal LLVM IR structure
-                                 let _ir_string = codegen.generate_ir(&contexts);
+                                 let _ir_string = codegen.generate_ir(&contexts, &symbol_table);
                                  println!("Generated LLVM IR for {}.", flow_name);
                                  
                                  // Export the generated module to a .so library artifact

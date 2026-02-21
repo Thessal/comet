@@ -1,0 +1,24 @@
+// test_divide.cm
+
+import "stdlib.cm"
+
+// Not anymore : flow test_divide_dispatch = { ... }
+Flow test_divide_dispatch {
+    // 1. Get DataFrame inputs
+    // p = data("price") // data operator is not implemented yet. 
+    // v = data("volume")
+    p = const(10.0) 
+    v = const(2.0)
+    
+    // 2. DF / DF -> DF (Element-wise)
+    // Implicitly calls divide(p, v) because / maps to divide if Arithmetic behavior logic applies, 
+    // or just directly test divide function.
+    ratio_df = divide(p, v)
+    
+    // 3. DF / Constant -> DF (Scalar broadcasting)
+    // 100.0 is a Float Constant.
+    ratio_const = divide(p, 100.0)
+
+    // Return the results
+    return ratio_const
+}

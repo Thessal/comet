@@ -49,8 +49,8 @@ impl<'ctx> Codegen<'ctx> {
         Ok(())
     }
 
-    pub fn generate_ir(&self, contexts: &Vec<crate::comet::synthesis::Context>) -> String {
-        self.declare_externals();
+    pub fn generate_ir(&self, contexts: &Vec<crate::comet::synthesis::Context>, symbol_table: &crate::comet::symbols::SymbolTable) -> String {
+        self.declare_externals(symbol_table);
 
         for (i, ctx) in contexts.iter().enumerate() {
             self.generate_variant_executor(i, &ctx.graph);
@@ -59,7 +59,7 @@ impl<'ctx> Codegen<'ctx> {
         self.module.print_to_string().to_string()
     }
 
-    fn declare_externals(&self) {
+    fn declare_externals(&self, symbol_table: &crate::comet::symbols::SymbolTable) {
         let void_type = self.context.void_type();
         let i64_type = self.context.i64_type();
         let f64_ptr_type = self.context.f64_type().ptr_type(AddressSpace::default());
@@ -72,41 +72,43 @@ impl<'ctx> Codegen<'ctx> {
         let free_type = void_type.fn_type(&[i8_ptr_type.into()], false);
         self.module.add_function("free", free_type, None);
 
-        // Example: cs_zscore
-        // declare %CsZscoreState* @comet_cs_zscore_init(i64, i64)
-        let init_type = opaque_ptr_type.fn_type(&[i64_type.into(), i64_type.into()], false);
-        self.module.add_function("comet_cs_zscore_init", init_type, None);
-
-        // declare void @comet_cs_zscore_step(%CsZscoreState*, double*, double*, i64)
-        let step_type = void_type.fn_type(&[
-            opaque_ptr_type.into(), 
-            f64_ptr_type.into(), 
-            f64_ptr_type.into(), 
-            i64_type.into()
+        // Define CometData LLVM struct globally: { i32, double* }
+        let comet_data_type = self.context.struct_type(&[
+            self.context.i32_type().into(), // dtype
+            f64_ptr_type.into()             // ptr
         ], false);
-        self.module.add_function("comet_cs_zscore_step", step_type, None);
 
-        // declare void @comet_cs_zscore_free(%CsZscoreState*)
-        let free_type = void_type.fn_type(&[opaque_ptr_type.into()], false);
-        self.module.add_function("comet_cs_zscore_free", free_type, None);
-
-        // Serialization Support
-        // declare i8* @comet_cs_zscore_serialize(%CsZscoreState*)
-        let serialize_type = i8_ptr_type.fn_type(&[opaque_ptr_type.into()], false);
-        self.module.add_function("comet_cs_zscore_serialize", serialize_type, None);
-        
-        // declare %CsZscoreState* @comet_cs_zscore_deserialize(i8*)
-        let deserialize_type = opaque_ptr_type.fn_type(&[i8_ptr_type.into()], false);
-        self.module.add_function("comet_cs_zscore_deserialize", deserialize_type, None);
-
-        // TODO: Declare external signatures for ALL other ops inside stdlib
+        for (func_name, func_info) in &symbol_table.functions {
+            let fn_name_lower = func_name.to_lowercase();
+            
+            let init_type = opaque_ptr_type.fn_type(&[i64_type.into(), i64_type.into()], false);
+            self.module.add_function(&format!("comet_{}_init", fn_name_lower), init_type, None);
+            
+            let mut step_args = vec![opaque_ptr_type.into()];
+            for _ in 0..func_info.params.len() {
+                step_args.push(comet_data_type.into());
+            }
+            step_args.push(f64_ptr_type.into()); // output ptr
+            step_args.push(i64_type.into());     // len
+            let step_type = void_type.fn_type(&step_args, false);
+            self.module.add_function(&format!("comet_{}_step", fn_name_lower), step_type, None);
+            
+            let free_type = void_type.fn_type(&[opaque_ptr_type.into()], false);
+            self.module.add_function(&format!("comet_{}_free", fn_name_lower), free_type, None);
+        }
     }
 
     fn generate_variant_executor(&self, id: usize, graph: &ExecutionGraph) {
         let void_type = self.context.void_type();
+        let i32_type = self.context.i32_type();
         let i64_type = self.context.i64_type();
         let f64_ptr_type = self.context.f64_type().ptr_type(AddressSpace::default());
         let f64_ptr_ptr_type = f64_ptr_type.ptr_type(AddressSpace::default());
+
+        let comet_data_type = self.context.struct_type(&[
+            i32_type.into(), // dtype
+            f64_ptr_type.into() // ptr
+        ], false);
 
         let fn_type = void_type.fn_type(&[
             f64_ptr_ptr_type.into(), // inputs
@@ -209,11 +211,22 @@ impl<'ctx> Codegen<'ctx> {
                     // Input Args
                     for &arg_id in args {
                         let mut arg_ptr = node_outputs[&arg_id];
+                        let mut node_dtype = 2; // Default to DataFrame=2
                         // If it's a Source node, we must offset its stream pointer
-                        if let ExecutionNode::Source { .. } = graph.nodes[arg_id] {
+                        if let ExecutionNode::Source { type_name, .. } = &graph.nodes[arg_id] {
                             arg_ptr = unsafe { self.builder.build_gep(f64_type, arg_ptr, &[offset], &format!("stream_in_{}", arg_id)).unwrap() };
+                            if type_name == "Constant" { node_dtype = 0; }
+                            else if type_name == "TimeSeries" { node_dtype = 1; }
+                        } else if let ExecutionNode::Constant { .. } = &graph.nodes[arg_id] {
+                            node_dtype = 0; // Constant=0
                         }
-                        call_args.push(arg_ptr.into());
+
+                        // Build CometData struct dynamically to pass to BinaryOp
+                        let mut struct_val = comet_data_type.get_undef();
+                        struct_val = self.builder.build_insert_value(struct_val, i32_type.const_int(node_dtype, false), 0, "insert_dtype").unwrap().into_struct_value();
+                        struct_val = self.builder.build_insert_value(struct_val, arg_ptr, 1, "insert_ptr").unwrap().into_struct_value();
+                        
+                        call_args.push(struct_val.into());
                     }
                     
                     // Output Ptr
@@ -294,7 +307,15 @@ mod tests {
             graph,
         };
 
-        let ir = codegen.generate_ir(&vec![synth_ctx]);
+        let mut st = crate::comet::symbols::SymbolTable::new();
+        st.functions.insert("cs_zscore".to_string(), crate::comet::symbols::FuncInfo {
+            name: "cs_zscore".to_string(),
+            params: vec![crate::comet::ast::TypedArg { name: "x".to_string(), constraint: crate::comet::ast::Constraint::None }],
+            return_type: crate::comet::ast::Constraint::None,
+            body: crate::comet::ast::Block { stmts: vec![] }
+        });
+
+        let ir = codegen.generate_ir(&vec![synth_ctx], &st);
         println!("Generated IR:\n{}", ir);
         assert!(ir.contains("comet_cs_zscore_step"));
     }

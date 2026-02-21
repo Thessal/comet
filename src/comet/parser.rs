@@ -244,16 +244,18 @@ fn parse_flow_decl(pair: Pair<Rule>) -> Result<FlowDecl, ParserError> {
     let mut inner = pair.into_inner();
     let _k_flow = inner.next().unwrap();
     let name = parse_identifier(inner.next().unwrap());
-    let expr = parse_expr(inner.next().unwrap())?;
+    let block = parse_block(inner.next().unwrap())?;
     
-    // Flow body is just one assignment "name = expr" effectively in new grammar
-    // grammar: flow_decl = { k_flow ~ identifier ~ "=" ~ expr }
-    // AST: FlowDecl { name, body: Vec<FlowStmt> }
-    // We convert this to Single Assignment Stmt
+    let mut body = Vec::new();
+    for stmt in block.stmts {
+        match stmt {
+            Stmt::Flow(f) => body.push(f),
+            Stmt::Return(e) => body.push(FlowStmt::Return(e)),
+            _ => continue,
+        }
+    }
     
-    let stmt = FlowStmt::Assignment { target: "result".to_string(), expr };
-    
-    Ok(FlowDecl { name, body: vec![stmt] })
+    Ok(FlowDecl { name, body })
 }
 
 fn parse_block(pair: Pair<Rule>) -> Result<Block, ParserError> {
