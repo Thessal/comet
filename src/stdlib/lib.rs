@@ -18,6 +18,7 @@ pub mod ts_mae;
 pub mod ts_zscore;
 pub mod mid;
 pub mod r#const;
+pub mod divide;
 
 #[cfg(test)]
 mod test_ts_mean;
@@ -53,6 +54,8 @@ mod test_ts_zscore;
 mod test_mid;
 #[cfg(test)]
 mod test_const;
+#[cfg(test)]
+mod test_divide;
 
 /// A generic-purpose 2D ring buffer specifically designed for C-ABI / LLVM compatibility.
 /// Rows = Time (capacity), Cols = Cross-section (len).
