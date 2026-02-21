@@ -145,6 +145,37 @@ impl RingBufferF64 {
     }
 }
 
+#[repr(u32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DataType {
+    Constant = 0,
+    TimeSeries = 1,
+    DataFrame = 2,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct CometData {
+    pub dtype: DataType,
+    pub ptr: *const f64,
+}
+
+impl CometData {
+    #[inline(always)]
+    pub unsafe fn as_slice(&self, len: usize) -> &[f64] {
+        if self.dtype == DataType::DataFrame {
+            std::slice::from_raw_parts(self.ptr, len)
+        } else {
+            std::slice::from_raw_parts(self.ptr, 1)
+        }
+    }
+
+    #[inline(always)]
+    pub unsafe fn get_scalar(&self) -> f64 {
+        *self.ptr
+    }
+}
+
 // In src/stdlib/lib.rs
 pub trait ConstOp {
     fn new(c: f64, len: usize) -> Self;
@@ -160,7 +191,7 @@ pub trait UnaryOp {
 
 pub trait BinaryOp {
     fn new(period: usize, len: usize) -> Self;
-    fn step(&mut self, a_ptr: *const f64, b_ptr: *const f64, out_ptr: *mut f64, len: usize);
+    fn step(&mut self, a: CometData, b: CometData, out_ptr: *mut f64, len: usize);
     fn drop_buffers(&mut self) {}
 }
 
@@ -217,13 +248,13 @@ macro_rules! export_binary {
             #[unsafe(no_mangle)]
             pub extern "C" fn [<comet_ $prefix _step>](
                 state: *mut $struct_name, 
-                a_ptr: *const f64, 
-                b_ptr: *const f64, 
+                a: $crate::CometData, 
+                b: $crate::CometData, 
                 out_ptr: *mut f64, 
                 len: usize
             ) {
                 let s = unsafe { &mut *state };
-                s.step(a_ptr, b_ptr, out_ptr, len)
+                s.step(a, b, out_ptr, len)
             }
         }
     };

@@ -1,21 +1,43 @@
-use crate::{BinaryOp, export_binary};
-use std::slice;
+use crate::{BinaryOp, CometData, DataType, export_binary};
+
 #[repr(C)]
-pub struct MidState {
-}
+pub struct MidState {}
 
 impl BinaryOp for MidState {
     fn new(_period: usize, _len: usize) -> Self {
         MidState {}
     }
-    fn step(&mut self, a_ptr: *const f64, b_ptr: *const f64, out_ptr: *mut f64, len: usize) {
-        let a = unsafe { slice::from_raw_parts(a_ptr, len) };
-        let b = unsafe { slice::from_raw_parts(b_ptr, len) };
-        let out = unsafe { slice::from_raw_parts_mut(out_ptr, len) };
+    
+    fn step(&mut self, a: CometData, b: CometData, out_ptr: *mut f64, len: usize) {
+        let out = unsafe { std::slice::from_raw_parts_mut(out_ptr, len) };
 
-        for i in 0..len {
-            out[i] = (a[i] + b[i]) * 0.5;
+        match (a.dtype, b.dtype) {
+            (DataType::DataFrame, DataType::DataFrame) => {
+                let a_sl = unsafe { a.as_slice(len) };
+                let b_sl = unsafe { b.as_slice(len) };
+                for i in 0..len {
+                    out[i] = (a_sl[i] + b_sl[i]) * 0.5;
+                }
+            }
+            (DataType::DataFrame, _) => {
+                let a_sl = unsafe { a.as_slice(len) };
+                let b_val = unsafe { b.get_scalar() };
+                for i in 0..len {
+                    out[i] = (a_sl[i] + b_val) * 0.5;
+                }
+            }
+            (_, DataType::DataFrame) => {
+                let a_val = unsafe { a.get_scalar() };
+                let b_sl = unsafe { b.as_slice(len) };
+                for i in 0..len {
+                    out[i] = (a_val + b_sl[i]) * 0.5;
+                }
+            }
+             _ => {
+                out[0] = unsafe { (a.get_scalar() + b.get_scalar()) * 0.5 };
+            }
         }
     }
 }
+
 export_binary!(MidState, mid);
