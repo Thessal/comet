@@ -14,15 +14,15 @@ Type TimeSeries : Any derives {}
 Type DataFrame : Any derives {}
 Type Matrix : Any derives {}
 
-Property NonZero
-Property Monetary
-Property Ranged
-Property Masked
-Property Constant
+// Property NonZero
+// Property Monetary
+// Property Ranged
+// Property Masked
+// Property Constant
 
 // Mathematical
-Behavior Arithmetic(A, B) -> T
-Behavior Statistical(T) -> Series
+// Behavior Arithmetic(A, B) -> T
+// Behavior Statistical(T) -> Series
 
 // To align with current Rust `stdlib` ABI capability (`*const f64`),
 // we condense all overloaded operations to a single array-compatible signature.
@@ -35,46 +35,46 @@ Fn divide(x: Constant, y: Constant) -> Constant { return x }
 
 Fn const(val: Constant) -> Constant { return val }
 
-// Normalization
-
-// Normalization
-Behavior Normalizer(T) -> T
-
-Fn zscore(x: Series) -> Series {
-    return x
-}
-
-Fn rank(x: Series) -> Series {
-    return x
-}
-
-Fn trim_ternary(x: Series, h: Float, l: Float) -> Series {
-    return x
-}
-
-// Conditionals
-Fn enter_when(data: DataFrame, signal: DataFrame) -> DataFrame where signal is Masked {
-    return data
-}
-
-Fn update_when(data: DataFrame, signal: DataFrame) -> DataFrame where signal is Masked {
-    return data
-}
-
-// Logic to create a mask
-Fn apply_filter(data: DataFrame, threshold: Float) -> DataFrame where data is Ranged ensures { Masked } {
-    // Ideally this attaches 'Masked' property
-    return data
-}
-
-Fn greater_than(val: Float) -> Float {
-    return val 
-}
-
-Fn subtract(x: Series, y: Series) -> Series {
-    return x
-}
-
-Fn clip(x: Series, min: Float, max: Float) -> Series {
-    return x
-}
+// // Normalization
+// 
+// // Normalization
+// Behavior Normalizer(T) -> T
+// 
+// Fn zscore(x: Series) -> Series {
+//     return x
+// }
+// 
+// Fn rank(x: Series) -> Series {
+//     return x
+// }
+// 
+// Fn trim_ternary(x: Series, h: Float, l: Float) -> Series {
+//     return x
+// }
+// 
+// // Conditionals
+// Fn enter_when(data: DataFrame, signal: DataFrame) -> DataFrame where signal is Masked {
+//     return data
+// }
+// 
+// Fn update_when(data: DataFrame, signal: DataFrame) -> DataFrame where signal is Masked {
+//     return data
+// }
+// 
+// // Logic to create a mask
+// Fn apply_filter(data: DataFrame, threshold: Float) -> DataFrame where data is Ranged ensures { Masked } {
+//     // Ideally this attaches 'Masked' property
+//     return data
+// }
+// 
+// Fn greater_than(val: Float) -> Float {
+//     return val 
+// }
+// 
+// Fn subtract(x: Series, y: Series) -> Series {
+//     return x
+// }
+// 
+// Fn clip(x: Series, min: Float, max: Float) -> Series {
+//     return x
+// }
