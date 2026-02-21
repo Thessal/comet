@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::ts_mean::TsMeanState;
-    use crate::StatefulUnary;
+    use crate::UnaryOp;
     use polars::prelude::*;
 
     #[test]

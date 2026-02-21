@@ -18,7 +18,13 @@
 - [x] Execute the corresponding `comet_*_step` call for each operation in topological order.
 - [x] Write a test code that converts a call tree into LLVM IR and print it to the console.
 
-## Phase 4: Cleanup & Export
+## Phase 4: Systemic Verification of stdlib mathematically
+- [ ] Establish a test framework in `stdlib` to validate math logic against `polars`.
+- [ ] Fix existing `test_ts_mean.rs` with the updated polars API.
+- [ ] Write `test_cs_zscore.rs` to verify logic against theoretical or polars output.
+- [ ] Write `test_cs_rank.rs` to verify logic.
+
+## Phase 5: Cleanup & Export
 - [x] Add the cleanup logic to deallocate all operator states via `comet_*_free`.
 - [x] Wire the outputs to the main return array payload.
 - [x] Update `main.rs` to configure an inkwell `Context` and output the compiled IR into a `.ll` testable artifact.

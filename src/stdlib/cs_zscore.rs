@@ -1,10 +1,10 @@
 // src/stdlib/cs_zscore.rs
-use crate::{StatefulUnary, export_unary};
+use crate::{UnaryOp, export_unary};
 
 #[repr(C)]
 pub struct CsZscoreState;
 
-impl StatefulUnary for CsZscoreState {
+impl UnaryOp for CsZscoreState {
     fn new(_period: usize, _len: usize) -> Self {
         CsZscoreState
     }
@@ -25,7 +25,7 @@ impl StatefulUnary for CsZscoreState {
             }
         }
 
-        if count == 0 {
+        if count <= 1 {
             return;
         }
 
@@ -39,7 +39,8 @@ impl StatefulUnary for CsZscoreState {
             }
         }
 
-        let std = (variance_sum / (count as f64)).sqrt();
+        // Polars uses sample standard deviation (N - 1) by default
+        let std = (variance_sum / ((count - 1) as f64)).sqrt();
 
         if std > 0.0 {
             for i in 0..len {

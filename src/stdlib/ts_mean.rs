@@ -1,5 +1,5 @@
 // In src/stdlib/ts_mean.rs
-use crate::{RingBufferF64, StatefulUnary, export_unary};
+use crate::{RingBufferF64, UnaryOp, export_unary};
 #[repr(C)]
 pub struct TsMeanState {
     pub sum: RingBufferF64,
@@ -8,7 +8,7 @@ pub struct TsMeanState {
 }
 
 // 1. Implement the generic trait
-impl StatefulUnary for TsMeanState {
+impl UnaryOp for TsMeanState {
     fn new(period: usize, len: usize) -> Self {
         TsMeanState {
             sum: RingBufferF64::new(1, len),

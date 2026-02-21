@@ -1,13 +1,12 @@
-// In src/stdlib/add.rs
 use crate::{BinaryOp, export_binary};
 use std::slice;
 #[repr(C)]
-pub struct AddState {
+pub struct MidState {
 }
 
-impl BinaryOp for AddState {
+impl BinaryOp for MidState {
     fn new(_period: usize, _len: usize) -> Self {
-        AddState {}
+        MidState {}
     }
     fn step(&mut self, a_ptr: *const f64, b_ptr: *const f64, out_ptr: *mut f64, len: usize) {
         let a = unsafe { slice::from_raw_parts(a_ptr, len) };
@@ -15,8 +14,8 @@ impl BinaryOp for AddState {
         let out = unsafe { slice::from_raw_parts_mut(out_ptr, len) };
 
         for i in 0..len {
-            out[i] = a[i] + b[i];
+            out[i] = (a[i] + b[i]) * 0.5;
         }
     }
 }
-export_binary!(AddState, add);
+export_binary!(MidState, mid);

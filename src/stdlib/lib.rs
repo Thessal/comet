@@ -1,12 +1,58 @@
 // src/stdlib/lib.rs
 
 pub mod add;
-pub mod ts_mean;
-pub mod cs_rank;
 pub mod cs_zscore;
+pub mod cs_rank;
+pub mod ts_mean;
+pub mod ts_diff;
+pub mod abs;
+pub mod ts_decay_linear;
+pub mod ts_decay_exp;
+pub mod ts_argmin;
+pub mod ts_argmax;
+pub mod ts_argminmax;
+pub mod ts_ffill;
+pub mod ts_delay;
+pub mod ts_std;
+pub mod ts_mae;
+pub mod ts_zscore;
+pub mod mid;
+pub mod r#const;
 
 #[cfg(test)]
 mod test_ts_mean;
+#[cfg(test)]
+mod test_cs_zscore;
+#[cfg(test)]
+mod test_cs_rank;
+#[cfg(test)]
+mod test_abs;
+#[cfg(test)]
+mod test_ts_diff;
+#[cfg(test)]
+mod test_ts_decay_linear;
+#[cfg(test)]
+mod test_ts_decay_exp;
+#[cfg(test)]
+mod test_ts_argmin;
+#[cfg(test)]
+mod test_ts_argmax;
+#[cfg(test)]
+mod test_ts_argminmax;
+#[cfg(test)]
+mod test_ts_ffill;
+#[cfg(test)]
+mod test_ts_delay;
+#[cfg(test)]
+mod test_ts_std;
+#[cfg(test)]
+mod test_ts_mae;
+#[cfg(test)]
+mod test_ts_zscore;
+#[cfg(test)]
+mod test_mid;
+#[cfg(test)]
+mod test_const;
 
 /// A generic-purpose 2D ring buffer specifically designed for C-ABI / LLVM compatibility.
 /// Rows = Time (capacity), Cols = Cross-section (len).
@@ -97,13 +143,19 @@ impl RingBufferF64 {
 }
 
 // In src/stdlib/lib.rs
-pub trait StatefulUnary {
+pub trait ConstOp {
+    fn new(c: f64, len: usize) -> Self;
+    fn step(&mut self, out_ptr: *mut f64, len: usize);
+    fn drop_buffers(&mut self) {}
+}
+
+pub trait UnaryOp {
     fn new(period: usize, len: usize) -> Self;
     fn step(&mut self, a_ptr: *const f64, out_ptr: *mut f64, len: usize);
     fn drop_buffers(&mut self) {}
 }
 
-pub trait StatefulBinary {
+pub trait BinaryOp {
     fn new(period: usize, len: usize) -> Self;
     fn step(&mut self, a_ptr: *const f64, b_ptr: *const f64, out_ptr: *mut f64, len: usize);
     fn drop_buffers(&mut self) {}

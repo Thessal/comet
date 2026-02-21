@@ -1,10 +1,10 @@
 // src/stdlib/cs_rank.rs
-use crate::{StatefulUnary, export_unary};
+use crate::{UnaryOp, export_unary};
 
 #[repr(C)]
 pub struct CsRankState;
 
-impl StatefulUnary for CsRankState {
+impl UnaryOp for CsRankState {
     fn new(_period: usize, _len: usize) -> Self {
         CsRankState
     }

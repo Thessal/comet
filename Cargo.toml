@@ -17,4 +17,4 @@ inkwell = { version = "0.8.0", features = ["llvm15-0"] }
 either = "1.15.0"
 
 [dev-dependencies]
-polars = { version = "0.53.0", features = ["dtype-datetime", "lazy", "rolling_window", "temporal"] }
+polars = { version = "0.53.0", features = ["abs", "diff", "dtype-datetime", "lazy", "rank", "rolling_window", "temporal"] }
