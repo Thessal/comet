@@ -36,5 +36,6 @@ Explicit `where` clauses in the Flow act as filters.
 ## 2. Output Generation
 
 At the end of the Flow, the compiler has a list of valid Contexts. Each Context represents a fully resolved "Call Graph" or "Expression Tree".
+<!-- FIXME: The synthesis process lacks a step to lower a Call Graph of MULTIPLE functions into a sequential or composed ordering. How are intermediate variables bound and tracked? -->
 
 These trees are then passed to the Code Generator to emit the actual LLVM IR.

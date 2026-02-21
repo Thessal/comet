@@ -21,6 +21,7 @@ The main Comet compiler codebase (the "parser") acts as a generator of LLVM IR (
     -   Prunes invalid trees using Semantic Properties.
 3.  **Codegen**:
     -   For each valid Tree in the Product Space, generate corresponding LLVM IR (or bitcode).
+    -   <!-- FIXME: When a valid tree contains multiple generated functions, how are they chained together in LLVM IR? We need to specify the passing of intermediate values and execution order. -->
 4.  **Compilation (`llvm` / linker)**:
     -   Compiles and links the generated LLVM code with the `stdlib` dynamic library (`.so`) into a high-performance executable strategy.
 
@@ -60,6 +61,7 @@ The interface is stateless at the library level; state is passed in/out.
 
 #### `generate(variant_id: u32, new_data: DataFrame, state: State) -> (Signal, State)`
 -   NOTE: we need to think about how to do the memory management. There are states for each operator, so passing it as a single blob might be tricky. Maybe we can use a hashmap to store the states of each operator.
+-   <!-- FIXME: When a synthesis result generates multiple functions, clarify the composite state structure. How are individual function states packed/unpacked from this single `State` argument? -->
 -   **Purpose**: Live trading / Incremental update.
 -   **Input**:
     -   `variant_id`: Strategy logic.

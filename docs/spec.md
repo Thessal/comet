@@ -62,6 +62,7 @@ It formalizes logical structures.
     - Flow is a path of transformations from input type constraints to output type constraints.
         - Behavior with its parameters can be used to define a flow.
     - Flow can be defined by chaining functions, behaviors, other flows.
+        - <!-- FIXME: Specify the semantics when a flow chains multiple functions in a single synthesis result. How does data flow between them, and how are multi-function states managed? -->
         - `flow volume_spike = Compare(signal=Volume, reference=HistoricalVolume(signal=Volume, lookback=days()))`
             - Given that `behavior days() -> Days ("21" | "63")` 
             - Volume is a flow, so parenthesis is not added.

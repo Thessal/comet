@@ -7,6 +7,7 @@ The `stdlib` defines operators and functions as a Rust library. When the `stdlib
 The functions within the `stdlib` are designed as stateful kernel functions (similar in application to `pd.DataFrame.rolling.apply`, but implemented natively). They must adhere to a strict structural convention:
 - **Type Signatures**: Functions must have explicit input and output type signatures.
 - **State Management**: Functions receive their stored internal state along with the incoming data, and they return the updated internal state and the outbound data.
+- <!-- FIXME: Specify how disparate internal states from multiple generated functions in a single synthesis result are merged, passed into `stdlib` functions, and updated. -->
 
 ## Built-in Synthesis Logic
 

@@ -47,4 +47,5 @@ Comet relies on a host library to perform the actual computations (`internal_tri
 The standard execution mode is to run all generated variants.
 1.  **Loader**: Loads the generated scripts/graphs.
 2.  **Scheduler**: Executes the DAG (Directed Acyclic Graph) of operations.
+<!-- FIXME: If a single variant generates multiple function calls (a DAG), how does the Scheduler manage memory for intermediate outputs produced between these calls? -->
 3.  **Aggregator**: Collects results (Signals) from all variants for analysis.
