@@ -7,10 +7,11 @@ This document defines the lexical structure of the Comet language.
 Keywords are reserved identifiers.
 
 ### Structural Keywords
--   `Type`
--   `Behavior`
--   `Flow`
--   `Fn`
+// INCONSISTENT CASE (should likely be lowercase `type`, `behavior`, `flow`, `fn` depending on decision)
+// -   `Type`
+// -   `Behavior`
+// -   `Flow`
+// -   `Fn`
 
 ### Logic/Control Flow
 -   `return`
@@ -22,7 +23,8 @@ Keywords are reserved identifiers.
 -   `=>` : Match arrow (if used in expressions)
 -   `.` : Member access
 -   `:` : Type annotation
--   `=` : Assignment (Expression)
+// INCONSISTENT: Missing `<-` and `implements`
+// -   `=` : Assignment (Expression)
 -   `{`, `}` : Block delimiters
 -   `(`, `)` : Parentheses
 -   `,` : Separator

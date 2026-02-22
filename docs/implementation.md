@@ -41,7 +41,8 @@ This document outlines the plan to build the Comet compiler, orchestrating the d
 -   **Process**:
     1.  **Expansion**: The Synthesis Engine produces a "Product Space" of valid execution trees, finding all compatible combinations.
     2.  **Codegen**: For each valid tree, generate corresponding LLVM IR (or bitcode).
-        -   <!-- FIXME: Specify how the backend code generator wires inputs and outputs when a single valid tree consists of multiple chained functions. How are intermediate variables allocated and freed? -->
+        - LLVM IRs are stateless, and intermediate variables are passed as arguments and return values. (typically as &output)
+        - The results are passed as arguments to the next function in the chain. This wiring is done by the codegen and written in LLVM IR.
     3.  **Compilation**: Link the generated LLVM code with the `stdlib` library (`.so`) to form the final executable.
 -   **Generated Interface**:
     -   Stateless logic functions: `generate(variant_id, new_data, state)`.

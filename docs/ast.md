@@ -9,11 +9,13 @@ pub struct Program {
     pub declarations: Vec<Declaration>,
 }
 
-    Type(TypeDecl),
-    Behavior(BehaviorDecl),
-    Function(FuncDecl),
-    Flow(FlowDecl),
-}
+// INCONSISTENT: Missing enum definition and Implementation variant
+// pub enum Declaration {
+//     Type(TypeDecl),
+//     Behavior(BehaviorDecl),
+//     Function(FuncDecl),
+//     Flow(FlowDecl),
+// }
 ```
 
 ## 2. Type Definitions
@@ -47,10 +49,11 @@ pub struct FuncDecl {
 
 ## 4. Flow Logic
 
-pub struct FlowDecl {
-    pub name: Ident,
-    pub expr: Expr,
-}
+// INCONSISTENT SYNTAX: Flow should be a block of statements based on examples
+// pub struct FlowDecl {
+//     pub name: Ident,
+//     pub expr: Expr,
+// }
 
 ## 5. Expressions
 

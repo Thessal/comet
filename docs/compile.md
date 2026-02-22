@@ -21,7 +21,8 @@ The main Comet compiler codebase (the "parser") acts as a generator of LLVM IR (
     -   Prunes invalid trees using Semantic Properties.
 3.  **Codegen**:
     -   For each valid Tree in the Product Space, generate corresponding LLVM IR (or bitcode).
-    -   <!-- FIXME: When a valid tree contains multiple generated functions, how are they chained together in LLVM IR? We need to specify the passing of intermediate values and execution order. -->
+    -   Unique variant_id is assigned for each LLVM IRs. 
+    -   (We don't need it currently, but in the future, memoization can be used to optimize computation tree and reduce recalculation of same subtrees among valid Trees.)
 4.  **Compilation (`llvm` / linker)**:
     -   Compiles and links the generated LLVM code with the `stdlib` dynamic library (`.so`) into a high-performance executable strategy.
 
@@ -37,7 +38,9 @@ The library exports a queryable structure for metadata.
 pub struct StrategyMeta {
     pub variant_id: u32,
     pub tags: HashMap<String, String>, 
-    // Keys: "lookback", "author", "generation_date", "version", "universe", "instrument_type"
+    // Keys: "lookback", "author", "generation_date", "version", "universe", "instrument_type", "used data", ...
+    // TODO: Expression of the strategy that can be used for the symbolic regression.
+    // IMPORTANT - We have to do causal analyais to find factors that results good alpha.
 }
 ```
 
@@ -61,7 +64,9 @@ The interface is stateless at the library level; state is passed in/out.
 
 #### `generate(variant_id: u32, new_data: DataFrame, state: State) -> (Signal, State)`
 -   NOTE: we need to think about how to do the memory management. There are states for each operator, so passing it as a single blob might be tricky. Maybe we can use a hashmap to store the states of each operator.
--   <!-- FIXME: When a synthesis result generates multiple functions, clarify the composite state structure. How are individual function states packed/unpacked from this single `State` argument? -->
+-   State is a ring buffer that is passed between calls to `generate`. There are two types of states:
+    -   Fixed size : Flattened, fixed size matrix. data type is f64 and it is flattened into a 1D array.
+    -   Dynamic size : Iliffe vector. (not implemented yet). Can be used for strings or sparse graphs. (low priority)
 -   **Purpose**: Live trading / Incremental update.
 -   **Input**:
     -   `variant_id`: Strategy logic.

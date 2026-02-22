@@ -54,17 +54,16 @@ It formalizes logical structures.
             - `Compare(signal=DataFrame, reference=DataFrame Finite Positive) -> DataFrame Finite`
             - `Compare(signal=Series, reference=Series Finite Positive) -> Series Finite`
         - These example functions with following types are valid for Compare:
-            - `fn divide(signal:DataFrame, reference:DataFrame Finite Positive) -> DataFrame Finite `
-            - `fn diff(signal:DataFrame Finite Positive SomeOtherType, reference:DataFrame Finite Positive SomeOtherType) -> DataFrame Finite `
-            - `fn divide_1d(signal:Series, reference:Series Finite Positive) -> Series Finite `
+            - `Fn divide(signal:DataFrame, reference:DataFrame Finite Positive) -> DataFrame Finite `
+            - `Fn diff(signal:DataFrame Finite Positive SomeOtherType, reference:DataFrame Finite Positive SomeOtherType) -> DataFrame Finite `
+            - `Fn divide_1d(signal:Series, reference:Series Finite Positive) -> Series Finite `
 
 -   **Flows**
     - Flow is a path of transformations from input type constraints to output type constraints.
         - Behavior with its parameters can be used to define a flow.
     - Flow can be defined by chaining functions, behaviors, other flows.
-        - <!-- FIXME: Specify the semantics when a flow chains multiple functions in a single synthesis result. How does data flow between them, and how are multi-function states managed? -->
-        - `flow volume_spike = Compare(signal=Volume, reference=HistoricalVolume(signal=Volume, lookback=days()))`
-            - Given that `behavior days() -> Days ("21" | "63")` 
+        - `Flow volume_spike { return Compare(signal=Volume, reference=HistoricalVolume(signal=Volume, lookback=days())) }`
+            - Given that `Behavior days() -> Days ("21" | "63")` 
             - Volume is a flow, so parenthesis is not added.
             - Compare, HistoricalVolume, days are behaviors or functions, so parenthesis is added.
         - Flow can be matched to a chain of functions.
@@ -77,7 +76,7 @@ It formalizes logical structures.
 -   **Functions**
     - Functions map that receives a list of concepts and returns a concept.
     - A function is a valid behavior.
-    - `fn Ratio ( signal: DataFrame, reference: DataFrame Positive ) -> (DataFrame Finite) { return A / B }`
+    - `Fn Ratio ( signal: DataFrame, reference: DataFrame Positive ) -> (DataFrame Finite) { return A / B }`
         - Input and output type with code segments. 
         - Type can be used define functions, but constraint cannot be used. 
     - Function can be matched to a behavior all of the following conditions are met: 
@@ -85,10 +84,10 @@ It formalizes logical structures.
         - Input types are valid for the behavior.
         - Output type is valid for the behavior.
     - Example: 
-        - `fn Ratio ( signal: DataFrame, reference: DataFrame Positive ) -> (DataFrame Finite) { return A / B }` can be matched to a behavior `behavior Compare (signal: (DataFrame | Series) 'a, reference: (DataFrame | Series) 'b Finite Positive) -> ('a Finite)`
+        - `Fn Ratio ( signal: DataFrame, reference: DataFrame Positive ) -> (DataFrame Finite) { return A / B }` can be matched to a behavior `behavior Compare (signal: (DataFrame | Series) 'a, reference: (DataFrame | Series) 'b Finite Positive) -> ('a Finite)`
     - data/data.cm contains functions that returns data
-        - `fn load_ebit() -> (DataFrame "EBIT"){ return ... }` \
-        `fn load_ebitda() -> (DataFrame "EBITDA"){ return ... }`
+        - `Fn load_ebit() -> (DataFrame "EBIT"){ return ... }` \
+        `Fn load_ebitda() -> (DataFrame "EBITDA"){ return ... }`
         - These functions can be matched to a behavior `behavior earnings () -> DataFrame ("EBIT"|"EBITDA")`
 
 
@@ -145,19 +144,20 @@ Behaviors define the "Interface" or "Trait" of an operation. Functions provide t
 ```comet
 // Abstract Behavior
 // Maps inputs A and B to an Indicator. B must be valid for the operations expected.
-behavior Comparator(A: DataFrame, B: DataFrame) -> Indicator
+// INCONSISTENT SYNTAX: Examples use capitalized Keywords and 'Implementation'
+// behavior Comparator(A: DataFrame, B: DataFrame) -> Indicator
 
 // Function: Ratio
 // Logic: A / B. Valid only if B is NonZero (to avoid division by zero).
-fn ratio(signal: DataFrame, reference: DataFrame NonZero) -> Indicator {
-    return signal / reference
-}
+// fn ratio(signal: DataFrame, reference: DataFrame NonZero) -> Indicator {
+//     return signal / reference
+// }
 
 // Function: Spread
 // Logic: A - B. Valid generally for Series/DataFrames.
-fn spread(A: DataFrame, B: DataFrame) -> Indicator {
-    return A - B
-}
+// fn spread(A: DataFrame, B: DataFrame) -> Indicator {
+//     return A - B
+// }
 ```
 
 ## 5. Type-Driven Function Synthesis
@@ -179,15 +179,16 @@ behavior HistoricalVolume(signal: DataFrame Volume, lookback: Const Days) -> Dat
 fn ts_mean(x: DataFrame, days: Const Days) -> DataFrame { ... }
 fn ts_delay(x: DataFrame, days: Const Days) -> DataFrame { ... }
 
-flow volume_spike = Comparator(signal=vol(), reference=HistoricalVolume(signal=vol(), lookback=days()))
+// INCONSISTENT SYNTAX: Flow blocks use multiple assignment statements in examples
+// flow volume_spike = Comparator(signal=vol(), reference=HistoricalVolume(signal=vol(), lookback=days()))
 
 // 3. Trigger
-fn trigger(signal: DataFrame, trigger: DataFrame, levels: Const) -> DataFrame Trigger {
-    ...
-    return signal 
-}
+// fn trigger(signal: DataFrame, trigger: DataFrame, levels: Const) -> DataFrame Trigger {
+//     ...
+//     return signal 
+// }
 
-flow result = trigger(signal=earnings(), trigger=volume_spike, levels=levels())
+// flow result = trigger(signal=earnings(), trigger=volume_spike, levels=levels())
 ```
 
 ### Guarding Against Nonsense

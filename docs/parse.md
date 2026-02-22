@@ -12,10 +12,11 @@ Declaration     ::= ImportDecl | TypeDecl | BehaviorDecl | FlowDecl | FuncDecl
 ## 2. Declarations
 
 ```ebnf
-TypeDecl        ::= "type" Identifier (":" TypeRef*)?
-BehaviorDecl    ::= "behavior" Identifier "(" ParamList ")" "->" TypeRef
-FuncDecl        ::= "fn" Identifier "(" ParamList ")" "->" TypeRef "{" Block "}"
-FlowDecl        ::= "flow" Identifier "=" Expr
+// INCONSISTENT SYNTAX:
+// TypeDecl        ::= "type" Identifier (":" TypeRef*)?
+// BehaviorDecl    ::= "behavior" Identifier "(" ParamList ")" "->" TypeRef
+// FuncDecl        ::= "fn" Identifier "(" ParamList ")" "->" TypeRef "{" Block "}"
+// FlowDecl        ::= "flow" Identifier "=" Expr
 
 TypeRef         ::= Identifier
 ParamList       ::= (Param ("," Param)*)?
