@@ -52,6 +52,7 @@ fn main() {
              
              // let mut analyzer = comet::semantics::SemanticAnalyzer::new();
              // match analyzer.analyze(&program, filename) {
+             /*
              match comet::semantics::analyze(&program) {
                  Ok(symbol_table) => {
                      println!("Semantic analysis passed!");
@@ -91,6 +92,7 @@ fn main() {
                      eprintln!("Semantic error: {:?}", e);
                  }
              }
+             */
         },
         Err(e) => {
              eprintln!("Parse error: {:?}", e);

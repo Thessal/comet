@@ -11,7 +11,7 @@ declaration = {
     func_decl
 }
 
-identifier = @{ !keyword ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" | "'")* }
+identifier = @{ !keyword ~ "'"? ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 
 keyword = _{ 
     k_type | k_behavior | k_flow | k_fn | k_return | k_import 
@@ -21,6 +21,7 @@ float_literal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 string_literal = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 bool_literal = { "true" | "false" }
 literal = { float_literal | int_literal | string_literal | bool_literal }
+types = { "Series" | "DataFrame" | "Matrix" | "Vector" }
 
 // Keywords
 // Keywords
@@ -69,12 +70,12 @@ return_stmt = { k_return ~ expr }
 expr_stmt = { expr }
 
 // Constraints
-// A B | C -> (A + B) | C
-constraint = { union_constraint }
-union_constraint = { add_constraint ~ ("|" ~ add_constraint)* }
-add_constraint = { sub_constraint ~ (sub_constraint)* }
-sub_constraint = { atom_constraint ~ ("-" ~ atom_constraint)? }
-atom_constraint = { ("(" ~ constraint ~ ")") | identifier | string_literal }
+// Series A B | C -> (A + B) | C
+constraint = { types ~ category_expr? }
+category_expr = { add_category ~ ("|" ~ add_category)* }
+add_category = { sub_category ~ (sub_category)* }
+sub_category = { atom_category ~ ("-" ~ atom_category)? }
+atom_category = { ("(" ~ category_expr ~ ")") | identifier | string_literal }
 
 // Expressions
 expr = { or_expr }
@@ -110,4 +111,4 @@ path = ${ identifier ~ ("::" ~ identifier)* }
 paren_expr = { "(" ~ expr ~ ")" }
 list_literal = { "[" ~ (expr ~ ("," ~ expr)*)? ~ "]" }
 arg_values = { (arg_value ~ ("," ~ arg_value)*)? }
-arg_value = { (identifier ~ "=")? ~ expr }
+arg_value = { identifier ~ "=" ~ expr }

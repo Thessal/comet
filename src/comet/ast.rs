@@ -25,15 +25,14 @@ pub struct ImportDecl {
 
 // 2. Type Definitions
 
+// (User-defined Type nodes are no longer used. See primitives.)
+
 #[derive(Debug, Clone, PartialEq)]
-pub struct TypeDecl {
-    pub name: Ident,
-    // Spec: type A : B C
-    pub parent_constraint: Option<Constraint>, 
-    // Spec: type A { prop, ... }
-    pub properties: Vec<Ident>,
-    pub components: Option<Vec<Ident>>,
-    pub structure: Option<Ident>,
+pub enum TypeDecl {
+    Series,
+    DataFrame,
+    Matrix,
+    Vector,
 }
 
 // 3. Logic Definitions (Behaviors & Functions)
@@ -43,34 +42,46 @@ pub struct BehaviorDecl {
     pub name: Ident,
     // Spec: behavior Name(arg: Constraint, ...) -> Constraint
     pub args: Vec<TypedArg>,
-    pub return_type: Constraint, 
+    pub return_constraint: ConstraintDecl, 
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FuncDecl {
     pub name: Ident,
     pub params: Vec<TypedArg>, 
-    pub return_type: Constraint,
+    pub return_constraint: ConstraintDecl,
     pub body: Block,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypedArg {
     pub name: Ident,
-    pub constraint: Constraint,
+    pub constraint: ConstraintDecl,
 }
 
-// Spec: Constraints
+// Spec: Categories
 // Addition: (A B)
 // Union: (A | B)
 // Subtraction: (A - B)
 #[derive(Debug, Clone, PartialEq)]
-pub enum Constraint {
-    Atom(Ident),           // "Series", "NonZero", "'a"
-    Addition(Vec<Constraint>), // Intersection / Composition
-    Union(Vec<Constraint>),    // Or
-    Subtraction(Box<Constraint>, Box<Constraint>), // A - B
-    None, // Empty constraint
+pub enum CategoryExpr {
+    Atom(Ident),           // "NonZero", "'a"
+    Addition(Vec<CategoryExpr>), // Intersection / Composition
+    Union(Vec<CategoryExpr>),    // Or
+    Subtraction(Box<CategoryExpr>, Box<CategoryExpr>), // A - B
+    None, // Empty category
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CategorySetDecl {
+    pub name: Option<Ident>, // e.g. 'a, 'b
+    pub categories: Vec<CategoryExpr>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConstraintDecl {
+    pub base_type: TypeDecl,
+    pub category_expr: Option<CategoryExpr>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

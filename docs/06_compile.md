@@ -40,7 +40,7 @@ pub struct StrategyMeta {
     pub tags: HashMap<String, String>, 
     // Keys: "lookback", "author", "generation_date", "version", "universe", "instrument_type", "used data", ...
     // TODO: Expression of the strategy that can be used for the symbolic regression.
-    // IMPORTANT - We have to do causal analyais to find factors that results good alpha.
+    // IMPORTANT - We have to do causal analysis to find factors that results good alpha.
 }
 ```
 

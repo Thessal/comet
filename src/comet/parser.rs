@@ -40,7 +40,6 @@ fn parse_declaration(pair: Pair<Rule>) -> Result<Declaration, ParserError> {
     let inner = pair.into_inner().next().ok_or(ParserError::MissingToken)?;
     match inner.as_rule() {
         Rule::import_decl => Ok(Declaration::Import(parse_import_decl(inner)?)),
-        Rule::type_decl => Ok(Declaration::Type(parse_type_decl(inner)?)),
         Rule::behavior_decl => Ok(Declaration::Behavior(parse_behavior_decl(inner)?)),
         Rule::flow_decl => Ok(Declaration::Flow(parse_flow_decl(inner)?)),
         Rule::func_decl => Ok(Declaration::Function(parse_func_decl(inner)?)),
@@ -62,128 +61,89 @@ fn parse_identifier(pair: Pair<Rule>) -> Ident {
 
 // Constraints Parsing
 
-fn parse_constraint(pair: Pair<Rule>) -> Result<Constraint, ParserError> {
-    // constraint -> union_constraint
-    let inner = pair.into_inner().next().unwrap();
-    parse_union_constraint(inner)
-}
-
-fn parse_union_constraint(pair: Pair<Rule>) -> Result<Constraint, ParserError> {
+fn parse_constraint(pair: Pair<Rule>) -> Result<ConstraintDecl, ParserError> {
     let mut inner = pair.into_inner();
-    let first = parse_add_constraint(inner.next().unwrap())?;
+    let type_val = parse_types(inner.next().unwrap())?;
     
-    let mut constraints = vec![first];
-    while let Some(next_pair) = inner.next() {
-        // Skipped "|" token implicitly? Pest usually handles literals if they are separate tokens.
-        // In grammar: union_constraint = { add_constraint ~ ("|" ~ add_constraint)* }
-        // The "|" is atomic/literal, not a rule unless named.
-        // Pest Pairs skipping unassigned literals? Yes usually.
-        constraints.push(parse_add_constraint(next_pair)?);
-    }
-    
-    if constraints.len() == 1 {
-        Ok(constraints.pop().unwrap())
+    let category_expr = if let Some(cat_pair) = inner.next() {
+        Some(parse_category_expr(cat_pair)?)
     } else {
-        Ok(Constraint::Union(constraints))
+        None
+    };
+    
+    Ok(ConstraintDecl {
+        base_type: type_val,
+        category_expr,
+    })
+}
+
+fn parse_types(pair: Pair<Rule>) -> Result<TypeDecl, ParserError> {
+    match pair.as_str() {
+        "Series" => Ok(TypeDecl::Series),
+        "DataFrame" => Ok(TypeDecl::DataFrame),
+        "Matrix" => Ok(TypeDecl::Matrix),
+        "Vector" => Ok(TypeDecl::Vector),
+        _ => Err(ParserError::UnexpectedRule(pair.as_rule())),
     }
 }
 
-fn parse_add_constraint(pair: Pair<Rule>) -> Result<Constraint, ParserError> {
-    // add_constraint = { sub_constraint ~ (sub_constraint)* }
+fn parse_category_expr(pair: Pair<Rule>) -> Result<CategoryExpr, ParserError> {
     let mut inner = pair.into_inner();
-    let first = parse_sub_constraint(inner.next().unwrap())?;
+    let first = parse_add_category(inner.next().unwrap())?;
     
-    let mut constraints = vec![first];
+    let mut categories = vec![first];
     while let Some(next_pair) = inner.next() {
-        constraints.push(parse_sub_constraint(next_pair)?);
+        categories.push(parse_add_category(next_pair)?);
     }
     
-    if constraints.len() == 1 {
-        Ok(constraints.pop().unwrap())
+    if categories.len() == 1 {
+        Ok(categories.pop().unwrap())
     } else {
-        Ok(Constraint::Addition(constraints))
+        Ok(CategoryExpr::Union(categories))
     }
 }
 
-fn parse_sub_constraint(pair: Pair<Rule>) -> Result<Constraint, ParserError> {
-    // sub_constraint = { atom_constraint ~ ("-" ~ atom_constraint)? }
+fn parse_add_category(pair: Pair<Rule>) -> Result<CategoryExpr, ParserError> {
     let mut inner = pair.into_inner();
-    let lhs = parse_atom_constraint(inner.next().unwrap())?;
+    let first = parse_sub_category(inner.next().unwrap())?;
+    
+    let mut categories = vec![first];
+    while let Some(next_pair) = inner.next() {
+        categories.push(parse_sub_category(next_pair)?);
+    }
+    
+    if categories.len() == 1 {
+        Ok(categories.pop().unwrap())
+    } else {
+        Ok(CategoryExpr::Addition(categories))
+    }
+}
+
+fn parse_sub_category(pair: Pair<Rule>) -> Result<CategoryExpr, ParserError> {
+    let mut inner = pair.into_inner();
+    let lhs = parse_atom_category(inner.next().unwrap())?;
     
     if let Some(rhs_pair) = inner.next() {
-        let rhs = parse_atom_constraint(rhs_pair)?;
-        Ok(Constraint::Subtraction(Box::new(lhs), Box::new(rhs)))
+        let rhs = parse_atom_category(rhs_pair)?;
+        Ok(CategoryExpr::Subtraction(Box::new(lhs), Box::new(rhs)))
     } else {
         Ok(lhs)
     }
 }
 
-fn parse_atom_constraint(pair: Pair<Rule>) -> Result<Constraint, ParserError> {
-    // atom_constraint = { ("(" ~ constraint ~ ")") | identifier | string_literal }
+fn parse_atom_category(pair: Pair<Rule>) -> Result<CategoryExpr, ParserError> {
     let inner = pair.into_inner().next().unwrap();
     match inner.as_rule() {
-        Rule::constraint => parse_constraint(inner),
-        Rule::identifier => Ok(Constraint::Atom(parse_identifier(inner))),
-        Rule::string_literal => Ok(Constraint::Atom(inner.as_str().trim_matches('"').to_string())),
+        Rule::category_expr => parse_category_expr(inner),
+        Rule::identifier => Ok(CategoryExpr::Atom(parse_identifier(inner))),
+        Rule::string_literal => Ok(CategoryExpr::Atom(inner.as_str().trim_matches('"').to_string())),
         _ => Err(ParserError::UnexpectedRule(inner.as_rule())),
     }
 }
 
 // Declaration Parsing
 
-fn parse_type_decl(pair: Pair<Rule>) -> Result<TypeDecl, ParserError> {
-    let mut inner = pair.into_inner();
-    let _k_type = inner.next().unwrap();
-    let name = parse_identifier(inner.next().unwrap());
-    
-    let mut parent_constraint = None;
-    let mut properties = Vec::new();
-    let mut components = None;
-    
-    // Iterate remaining
-    while let Some(part) = inner.next() {
-        match part.as_rule() {
-            Rule::constraint => {
-                parent_constraint = Some(parse_constraint(part)?);
-            },
-            Rule::property_list => {
-                properties = parse_property_list(part)?;
-            },
-            Rule::component_list => {
-                components = Some(parse_component_list(part)?);
-            },
-            _ => {}
-        }
-    }
-
-    Ok(TypeDecl {
-        name,
-        parent_constraint,
-        properties,
-        components,
-        structure: None, // Deprecated/Removed from grammar? Grammar doesn't have structure slot anymore in new version
-    })
-}
-
-fn parse_component_list(pair: Pair<Rule>) -> Result<Vec<Ident>, ParserError> {
-    let mut comps = Vec::new();
-    for inner in pair.into_inner() {
-        if inner.as_rule() == Rule::identifier {
-            comps.push(parse_identifier(inner));
-        }
-    }
-    Ok(comps)
-}
-
-fn parse_property_list(pair: Pair<Rule>) -> Result<Vec<Ident>, ParserError> {
-    let mut props = Vec::new();
-    for inner in pair.into_inner() {
-        if inner.as_rule() == Rule::identifier {
-            props.push(parse_identifier(inner));
-        }
-    }
-    Ok(props)
-}
+// (User-defined Type nodes are no longer used. See primitives.)
 
 fn parse_typed_arg_list(pair: Pair<Rule>) -> Result<Vec<TypedArg>, ParserError> {
     let mut args = Vec::new();
@@ -203,12 +163,12 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
     let _k_behavior = inner.next().unwrap();
     let name = parse_identifier(inner.next().unwrap());
     let args = parse_typed_arg_list(inner.next().unwrap())?;
-    let return_type = parse_constraint(inner.next().unwrap())?;
+    let return_constraint = parse_constraint(inner.next().unwrap())?;
     
     Ok(BehaviorDecl {
         name,
         args,
-        return_type,
+        return_constraint,
     })
 }
 
@@ -224,7 +184,7 @@ fn parse_func_decl(pair: Pair<Rule>) -> Result<FuncDecl, ParserError> {
         }
     }
     
-    let return_type = parse_constraint(inner.next().unwrap())?;
+    let return_constraint = parse_constraint(inner.next().unwrap())?;
     
     // where clause removed
 
@@ -235,7 +195,7 @@ fn parse_func_decl(pair: Pair<Rule>) -> Result<FuncDecl, ParserError> {
     Ok(FuncDecl {
         name,
         params,
-        return_type,
+        return_constraint,
         body,
     })
 }
@@ -476,25 +436,9 @@ fn parse_arg_values(pair: Pair<Rule>) -> Result<Vec<ArgValue>, ParserError> {
     for inner in pair.into_inner() {
         if inner.as_rule() == Rule::arg_value {
             let mut arg_inner = inner.into_inner();
-            let first = arg_inner.next().unwrap();
-            
-            let (name, expr) = if first.as_rule() == Rule::identifier {
-                // named arg: name = expr
-                let name = parse_identifier(first);
-                let expr = parse_expr(arg_inner.next().unwrap())?;
-                (Some(name), expr)
-            } else {
-                // positional arg: expr
-                // parse_expr wants a pair, specifically or_expr which is what parse_expr expects.
-                // first IS an expr rule (or_expr et al) ? No, grammar says:
-                // arg_value = { (identifier ~ "=")? ~ expr }
-                // so first is likely 'expr' rule if no identifier.
-                // Pest might skip expr rule if atomic? no.
-                // first is the expr pair.
-                let expr = parse_expr(first)?;
-                (None, expr)
-            };
-            args.push(ArgValue { name, value: expr });
+            let name = parse_identifier(arg_inner.next().unwrap());
+            let expr = parse_expr(arg_inner.next().unwrap())?;
+            args.push(ArgValue { name: Some(name), value: expr });
         }
     }
     Ok(args)
