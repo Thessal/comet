@@ -173,6 +173,7 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
         name,
         args,
         return_constraint,
+        depth: 1,
     })
 }
 

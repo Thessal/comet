@@ -82,7 +82,7 @@ Calling a Behavior or Function requires **named** arguments set.
     - Behavior is a mapping from input type constraints to output type constraints.
     - To prevent infinite loop, behaviors are not allowed to be recursive, and only one function can be matched for each behavior.
     - Behavior is defined by the following syntax : 
-        - `Behavior <behavior name> (<parameter name> : <input constraints>, ... ) -> <output constraints>`
+        - `Behavior <behavior name> (<parameter name> : <input constraints>, ...) -> <output constraints>`
     - Example : 
         - `Behavior compare (signal: (DataFrame | Series) 'a, reference: (DataFrame | Series) Finite Positive) -> ('a Finite Indicator)`
             - Constraint variable 'a or 'b etc can be used to capture a constraint set.
@@ -94,6 +94,8 @@ Calling a Behavior or Function requires **named** arguments set.
             - `Fn divide(signal:DataFrame, reference:DataFrame Finite Positive) -> DataFrame Finite Indicator`
             - `Fn diff(signal:DataFrame Finite Positive SomeOtherType, reference:DataFrame Finite Positive SomeOtherType) -> DataFrame Finite Indicator`
             - `Fn divide_1d(signal:Series, reference:Series Finite Positive) -> Series Finite Indicator`
+    - "depth" parameter is reserved, and cannot be used in behavior definition.
+    - "depth" parameter is 1 by default, and can be specified in the behavior call. It is used to limit the depth of function calls in the behavior when the behavior is expanded.
 
 - **Flows**
     - Flow is a list of behaviors, that forms a path of transformations that generates data with type constraints.
@@ -107,7 +109,7 @@ Calling a Behavior or Function requires **named** arguments set.
         - 
         ```
             Flow volume_spike { 
-                Compare(signal=data("volume"), reference=HistoricalVolume(signal=data("volume"), lookback=days())) 
+                Compare(signal=data("volume"), reference=HistoricalVolume(signal=data("volume"), lookback=days()), depth=1) 
             }
         ```
         - Given that days is a behavior `Behavior days() -> Days ("21" | "63")`, `data` is a stdlib function `Fn data(symbol: String) -> DataFrame`, `HistoricalVolume` is a behavior `Behavior HistoricalVolume(signal: DataFrame, lookback: Days) -> DataFrame`, `Compare` is a behavior `Behavior Compare(signal: DataFrame, reference: DataFrame Finite Positive) -> DataFrame Finite Indicator`
@@ -124,7 +126,7 @@ Calling a Behavior or Function requires **named** arguments set.
             Flow volume_spike { 
                 volume = data("volume")
                 variousdays = days()
-                Compare(signal=volume, reference=HistoricalVolume(signal=volume, lookback=variousdays)) 
+                Compare(signal=volume, reference=HistoricalVolume(signal=volume, lookback=variousdays), depth=1) 
             }
         ```
         - This code is translated into the first example internally.

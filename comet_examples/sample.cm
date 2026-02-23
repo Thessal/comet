@@ -6,5 +6,5 @@ Fn divide(signal: DataFrame, reference: DataFrame Finite Positive) -> DataFrame 
 Flow volume_spike {
     volume = data(symbol="volume")
     variousdays = days()
-    Compare(signal=volume, reference=HistoricalVolume(signal=volume, lookback=variousdays)) 
+    Compare(signal=volume, reference=HistoricalVolume(signal=volume, lookback=variousdays), depth=1) 
 }

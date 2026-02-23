@@ -47,6 +47,7 @@ pub struct BehaviorDecl {
     // Spec: behavior Name(arg: Constraint, ...) -> Constraint
     pub args: Vec<TypedArg>,
     pub return_constraint: ConstraintDecl, 
+    pub depth: u32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
