@@ -1,3 +1,6 @@
+TODO: FIXME
+TODO: need to find how to index through multiple implementations of a tree
+
 # Synthesis & Property Propagation
 
 The Comet synthesizer transforms a semantic flow definition into an execution graph, resolving types, selecting implementations, and verifying constraints.
