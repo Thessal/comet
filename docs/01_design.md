@@ -32,39 +32,45 @@ Calling a Behavior or Function requires **named** arguments set.
     - For example,
         - `Nonezero` data can be a divisor of another data.
         - `Monetary` data can be "compared" with another `Monetary` data.
-
-- **Constraints**
-    - Constraints specify the input and output parameters of behaviors, by combining types and categories.
-    - Constraints can be **matched** to determine valid types, like a pattern matching in functional programming.
-    - Constraints(constraint set) are set of constraint.
-    - Each constraint is a composed of a single type, followed by zero or more categories.
-    - Constraints can be represented in two ways: Combinatorial and List 
-        - Combinatorial representation : `( Series | DataFrame NonZero | Monetary)`
-        - List representation : `[Series, DataFrame NonZero, Monetary]`
+    - Categories can be represented in combinatorial way. List representation is a parsed form of combinatorial representation.
+        - Combinatorial representation : `( Nonzero | Monetary (Indicator) )`
+            - Category with no union can be written without parenthesis : For example `Monetary Indicator` is identical to `( Monetary Indicator )`
+        - List representation (parsed) : `[Nonzero, {Monetary, Indicator}]`
     - Rules of combinatoric expansion
         - Addition : (LHS) (RHS) 
             - When addition is expanded, RHS is appended to each type that matches LHS.
-            - `Series Monetary` can be expanded to `[Series Monetary]`
-            - `( Series | DataFrame NonZero | Monetary)` can be expanded to `[Series, DataFrame NonZero, Monetary]`
-            - `( Series | DataFrame ) ( NonZero | Monetary)` can be expanded to `[Series NonZero, DataFrame NonZero, Series Monetary, DataFrame Monetary]`
-            - None Type : Adding None type have no effect and removed when expanded.
-                - `Series (None | NonZero) == Series | (Series NonZero)`
+            - `Monetary Indicator` can be expanded to `[{Monetary, Indicator}]`
+            - `( Nonzero | Monetary Indicator | Monetary)` can be expanded to `[Nonzero, {Monetary, Indicator}, Monetary]`
+            - `( Nonzero | Monetary ) ( Indicator | Finite )` can be expanded to `[{Nonzero, Indicator}, {Nonzero, Finite}, {Monetary, Indicator}, {Monetary, Finite}]`
             - Same type added is removed when expanded : `( A A ) == A`
+        - Commutative Addition : 
+            - `{Monetary, Indicator}` is identical to `{Indicator, Monetary}`
         - Union : (LHS) | (RHS)
             - When union is expanded, All type that matches RHS is appended to each type that matches LHS. Duplicates are removed.
             - `( A | B ) | ( C | D )` can be expanded to `[A, B, C, D]`
             - `A C | A C | A D` can be expanded to `[A C, A D]`
         - Subtract : (LHS) - (RHS) 
             - When subtraction is expanded, patterns that matches RHS is removed from LHS.
-            - `( Series | DataFrame ) - DataFrame` can be expanded to `[Series]`
-            - `( Series | DataFrame ) - (DataFrame NonZero)` can be expanded to `[Series, DataFrame]` because `DataFrame` is not matched by `DataFrame NonZero`.
-            - `( Series | DataFrame ) NonZero - ( Series NonZero )` can be expanded to `[DataFrame NonZero]`.
+            - `( Monetary | Indicator ) - Indicator` is expanded to `[Monetary]`
+            - `( Monetary | Indicator ) - (Monetary Nonzero)` can be expanded to `[Monetary, Indicator]` because `Monetary` nor `Nonzero` are not matched by `{Monetary, Nonzero}`.
+            - `( Monetary | Indicator ) Nonzero - ( Monetary Nonzero )` can be expanded to `{Indicator Nonzero}`.
+
+- **Constraints**
+    - Constraints specify the input and output parameters of behaviors, by combining types and categories.
+    - Constraints can be **matched** to determine valid types, like a pattern matching in functional programming.
+    - Constraints(constraint set) are set of constraint.
+    - Each constraint is a composed of a single type, followed by zero or more categories.
+        - `<type name> ( <combinatorial representations of categories> )`
+        - `<type name> <category representation with set size is one>`
     - Matching : 
         - Single type can be matched to a constraint, when expansion of the constraint includes the type.
-            - type `Series NonZero` matches constraint `Series`, `NonZero`, `Series NonZero`  
+            - output `Series Nonzero` can be used for `Series` or `Series Nonzero` arguments.  
         - Constraints can be matched to a constraint, when expansion of the constraint includes the constraint.
-            - constraint `Series NonZero | DataFrame NonZero` matches constraint `NonZero`
-            - constraint `Series NonZero | DataFrame NonZero | DataFrame` does not matches constraint `Nonzero` because "DataFrame" is not matched by `Nonzero`.
+            - `Series Nonzero` or `Series Monetary` output can be used as `Series (Nonzero | Monetary)` arguments.
+            - `Series Nonzero` output cannot be used as `DataFrame (Nonzero | Monetary Nonzero)` argument because "DataFrame" is not matched by `Series`.
+            - `Series Nonzero` output cannot be used as `Series Monetary Nonzero` argument because "Nonzero" is not matched by "Monetary Nonzero".
+            - `Series` output cannot be used as `Series Monetary` argument because no category is not "Monetary" category.
+            - `Series Monetary` output can be used as `Series` argument because Monetary series is a series.
     - Assignment : 
         - Constraint variable '(symbol) can capture a constraints e.g. 'a , 'b  etc. 
         - Constraint can be stored to the constraint variable and recovered from the variable.
@@ -100,7 +106,7 @@ Calling a Behavior or Function requires **named** arguments set.
         - 
         ```
             Flow volume_spike { 
-                return Compare(signal=data("volume"), reference=HistoricalVolume(signal=data("volume"), lookback=days())) 
+                Compare(signal=data("volume"), reference=HistoricalVolume(signal=data("volume"), lookback=days())) 
             }
         ```
         - Given that days is a behavior `Behavior days() -> Days ("21" | "63")`, `data` is a stdlib function `Fn data(symbol: String) -> DataFrame`, `HistoricalVolume` is a behavior `Behavior HistoricalVolume(signal: DataFrame, lookback: Days) -> DataFrame`, `Compare` is a behavior `Behavior Compare(signal: DataFrame, reference: DataFrame Finite Positive) -> DataFrame Finite Indicator`
@@ -117,7 +123,7 @@ Calling a Behavior or Function requires **named** arguments set.
             Flow volume_spike { 
                 volume = data("volume")
                 variousdays = days()
-                return Compare(signal=volume, reference=HistoricalVolume(signal=volume, lookback=variousdays)) 
+                Compare(signal=volume, reference=HistoricalVolume(signal=volume, lookback=variousdays)) 
             }
         ```
         - This code is translated into the first example internally.

@@ -1,5 +1,3 @@
-TODO: FIXME
-
 # Grammar Specification (`parse.md`)
 
 This document defines the EBNF grammar for Comet.
@@ -8,23 +6,30 @@ This document defines the EBNF grammar for Comet.
 
 ```ebnf
 Program         ::= (Declaration)*
-Declaration     ::= ImportDecl | TypeDecl | BehaviorDecl | FlowDecl | FuncDecl
+Declaration     ::= BehaviorDecl | FlowDecl | FuncDecl
 ```
 
 ## 2. Declarations
 
 ```ebnf
-// INCONSISTENT SYNTAX:
-// TypeDecl        ::= "type" Identifier (":" TypeRef*)?
-// BehaviorDecl    ::= "behavior" Identifier "(" ParamList ")" "->" TypeRef
-// FuncDecl        ::= "fn" Identifier "(" ParamList ")" "->" TypeRef "{" Block "}"
-// FlowDecl        ::= "flow" Identifier "=" Expr
+BehaviorDecl    ::= "Behavior" Identifier "(" ParamList ")" "->" TypeRef
+FuncDecl        ::= "Fn" Identifier "(" ParamList ")" "->" TypeRef
+FlowDecl        ::= "Flow" Identifier "{" Block "}" "->" TypeRef
+Block           ::= (Statement)*
+Statement       ::= Assignment | Return
+Assignment      ::= Identifier "=" Expr
+Return          ::= Expr
 
-TypeRef         ::= Identifier
+TypeRef         ::= Constraint
 ParamList       ::= (Param ("," Param)*)?
-Param           ::= Identifier ":" TypeList
-TypeList        ::= Identifier (Identifier)*
-```
+Param           ::= Identifier ":" Constraint
+
+// A constraint combines a single type, followed by optional categories
+Types           ::= "Series" | "DataFrame" | "Matrix" | "Vector"
+Constraint      ::= Types (CategoryExpr)?
+// Categories can be matched or expanded into list representation during parsing
+CategoryExpr    ::= CategoryTerm (("-" | "|") CategoryTerm)*
+CategoryTerm    ::= Identifier | "'" Identifier | "(" CategoryExpr ")" | CategoryTerm Identifier```
 
 
 ## 4. Expressions
@@ -35,16 +40,13 @@ Atom            ::= Literal | Identifier | ParenExpr
 
 CallExpr        ::= Identifier "(" ArgValues ")"
 ArgValues       ::= (Arg ("," Arg)*)?
-Arg             ::= (Identifier "=")? Expr
+Arg             ::= Identifier "=" Expr
 
 ParenExpr       ::= "(" Expr ")"
 ```
 
 ## 5. Primitives
 ```ebnf
-Identifier      ::= [a-zA-Z_][a-zA-Z0-9_]*
-Literal         ::= Integer | Float | String | Boolean
-PropertyList    ::= Identifier ("," Identifier)*
-FieldList       ::= (Identifier ":" TypeName)*
-WhereClause     ::= "where" Expr
+Identifier      ::= "'"? [a-zA-Z_][a-zA-Z0-9_]*
+Literal         ::= Integer | Float | String
 ```

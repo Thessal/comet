@@ -1,5 +1,6 @@
 TODO: FIXME
 TODO: need to find how to index through multiple implementations of a tree
+TODO: We don't know how to find every pattern that matches the constraints.
 
 # Synthesis & Property Propagation
 
@@ -12,7 +13,6 @@ Properties (e.g., `NonZero`, `Ranged`, `Masked`) are metadata attached to types 
 ### 1.1 Source Generation
 Variables derived from `type` definitions inherit properties from the logical type.
 ```comet
-type Volume : NonZero ...
 flow min_vol = Volume() // min_vol has { NonZero }
 ```
 

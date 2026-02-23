@@ -14,6 +14,8 @@ pub enum Declaration {
 }
 ```
 
+import statement is simply copy-paste of the imported module into the current module, which is handled before parsing.
+
 ## 2. Constraints Definitions, that can be expanded or matched
 
 ```rust
@@ -26,9 +28,16 @@ pub enum TypeDecl {
 ```
 
 ```rust
-pub struct ConstraintSetDecl {
-    pub name: Ident,
-    pub constraints: Vec<Ident>,
+// A parsed Combinatorial representation of categories
+pub struct CategorySetDecl {
+    pub name: Option<Ident>, // e.g. 'a, 'b
+    pub categories: Vec<Ident>,
+}
+
+// A constraint combines a Type and a CategorySet
+pub struct ConstraintDecl {
+    pub base_type: TypeDecl,
+    pub category_set: CategorySetDecl,
 }
 ```
 
@@ -37,7 +46,7 @@ pub struct ConstraintSetDecl {
 ```rust
 pub struct Param {
     pub name: Ident,
-    pub constraints: ConstraintSetDecl
+    pub constraint: ConstraintDecl
 }
 ```
 
@@ -45,18 +54,18 @@ pub struct Param {
 pub struct BehaviorDecl {
     pub name: Ident,
     pub args: Vec<Param>, 
-    pub return_constraint: ConstraintSetDecl,
+    pub return_constraint: ConstraintDecl,
 }
 
 pub struct FuncDecl { // Used only to map stdlib functions
     pub name: Ident,
     pub args: Vec<Param>,
-    pub return_constraint: ConstraintSetDecl,
+    pub return_constraint: ConstraintDecl,
 }
 
 pub struct FlowDecl {
     pub name: Ident,
-    pub return_constraint: ConstraintSetDecl,
+    pub return_constraint: ConstraintDecl,
     pub body: Block,
 }
 ```
@@ -67,6 +76,7 @@ pub struct FlowDecl {
 pub enum Expr {
     Symbol(Ident),
     Call(Call),
+    Literal(Literal),
 }
 
 pub enum Call{
@@ -74,14 +84,20 @@ pub enum Call{
     Function(FuncCall),
 }
 
-pub enum BehaviorCall{
-    Identifier(Ident),
-    Arguments(Vec<Expr>),
+pub struct BehaviorCall{
+    pub identifier: Ident,
+    pub arguments: Vec<(Ident, Expr)>,
 }
 
-pub enum FuncCall{
-    Identifier(Ident),
-    Arguments(Vec<Expr>),
+pub struct FuncCall{
+    pub identifier: Ident,
+    pub arguments: Vec<(Ident, Expr)>,
+}
+
+pub enum Literal{
+    Integer(i64),
+    Float(f64),
+    String(String),
 }
 
 ```
@@ -95,7 +111,7 @@ pub struct Block {
 
 pub enum Statement {
     Assignment(Assignment),
-    Return(Return),
+    Return(Expr),
 }
 
 pub struct Assignment {
@@ -103,7 +119,4 @@ pub struct Assignment {
     pub expr: Expr,
 }
 
-pub struct Return {
-    pub expr: Expr,
-}
 ```
