@@ -1,6 +1,13 @@
 use crate::comet::ast::Ident;
 
 #[derive(Debug, Clone)]
+pub enum ConstantValue {
+    Integer(i64),
+    Float(f64),
+    String(String),
+}
+
+#[derive(Debug, Clone)]
 pub struct ExecutionGraph {
     pub nodes: Vec<ExecutionNode>,
 }
@@ -23,8 +30,7 @@ pub enum ExecutionNode {
         type_name: String,
     },
     Constant {
-        value: String,
-        type_name: String,
+        value: ConstantValue,
     },
     Operation {
         op: String,

@@ -1,13 +1,6 @@
-# Compilation Strategy (`compile.md`)
-
-This document defines the compilation strategy for Comet.
-
 ## 1. Targets
 
-We evaluated three options:
-1.  **List of Expressions (Python Runtime)**: Easy but slow. Valid for prototyping.
-2.  **Bytecode (VM)**: Good for portability, but complex to implement a performant VM for combinatorial logic.
-3.  **LLVM IR Generation**: **SELECTED STRATEGY**.
+LLVM IR is generated from the set of function trees by the compiler.
 
 ## 2. LLVM IR Generation
 
@@ -27,11 +20,27 @@ The main Comet compiler codebase (the "parser") acts as a generator of LLVM IR (
 4.  **Compilation (`llvm` / linker)**:
     -   Compiles and links the generated LLVM code with the `stdlib` dynamic library (`.so`) into a high-performance executable strategy.
 
-## 3. Generated Library API
+
+## 3. Compiler & LLVM Codegen Specifications
+
+1. **Primitive Literal Constraints**:
+    - When `RealAST` evaluates native literals (`Int`, `Float`), these should be injected into the LLVM IR as `constant` declarations explicitly compiled inside the variant's function execution block. 
+    - `String` literals (like `data("volume")`) must be saved in `StrategyMeta` tags. We are not sure how to use them yet, so its implementation is low priority.
+
+2. **Category Property LLVM Tags (Type Stripping)**:
+    - `CategoryExpr` boundaries (`'a`, `Normalized`, etc.) exist STRICTLY at compile-time to prune invalid Cartesian `Fn` forests. 
+    - Once `synthesis.rs` resolves a valid `RealAST`, the LLVM generator drops all Semantic Categories. LLVM exclusively recognizes base structural shapes (e.g. `DataFrame` -> `*double` arrays, `Int` -> `i64`).
+
+3. **Execution Ring Buffer State Definition**:
+    - The compiled `.so` C-ABI must explicitly define the passed `State`.
+    - Passing state as a type-erased pointer: The state blob `*u8` passed by the caller should map directly into a static ring buffer struct.
+    - The LLVM IR will allocate offsets dynamically across the active `CallFn` nodes (e.g., `ts_mean` requires an `f64` rolling accumulator offset; `Diff` requires none). Thus, `State` sizes are deterministically precomputed during LLVM Generation.
+
+## 4. Generated Library API
 
 The generated Rust library exposes a C-compatible (or Python-compatible via PyO3) interface to drive the strategies.
 
-### 3.1 Metadata & Tags
+### 4.1 Metadata & Tags
 
 The library exports a queryable structure for metadata.
 
@@ -45,14 +54,15 @@ pub struct StrategyMeta {
 }
 ```
 
-### 3.2 Functions
+### 4.2 Functions
 
 The interface is stateless at the library level; state is passed in/out.
-
+<!-- TODO: We need to define the DataSpec and implement the select function. -->
+<!-- 
 #### `select(variant_id: u32) -> DataSpec`
 -   **Purpose**: Tells the caller what data is needed for this specific combination.
 -   **Input**: Index of the strategy variant.
--   **Output**: Description of required inputs (instruments, lookback windows, etc.).
+-   **Output**: Description of required inputs (instruments, lookback windows, etc.). -->
 
 #### `generate_all(variant_id: u32, history: DataFrame) -> (Signal, State)`
 -   **Purpose**: Cold start / Backtest. Runs the strategy over the entire history.
@@ -81,3 +91,4 @@ The interface is stateless at the library level; state is passed in/out.
 -   **Type Safety**: The LLVM IR generator enforces valid memory access and strict type passing with the `stdlib` components.
 -   **Performance**: Combinatorial explosion requires native speed. LLVM's advanced optimization passes generate highly efficient machine code.
 -   **Compatibility**: Direct linking with the Rust-generated `stdlib` `.so` library allows reusing complex stateful kernels easily without incurring FFI overhead during dynamic execution.
+

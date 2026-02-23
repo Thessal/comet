@@ -81,9 +81,6 @@ impl<'ctx> Codegen<'ctx> {
         for (func_name, func_info) in &symbol_table.functions {
             let fn_name_lower = func_name.to_lowercase();
             
-            let init_type = opaque_ptr_type.fn_type(&[i64_type.into(), i64_type.into()], false);
-            self.module.add_function(&format!("comet_{}_init", fn_name_lower), init_type, None);
-            
             let mut step_args = vec![opaque_ptr_type.into()];
             for _ in 0..func_info.params.len() {
                 step_args.push(comet_data_type.into());
@@ -92,9 +89,6 @@ impl<'ctx> Codegen<'ctx> {
             step_args.push(i64_type.into());     // len
             let step_type = void_type.fn_type(&step_args, false);
             self.module.add_function(&format!("comet_{}_step", fn_name_lower), step_type, None);
-            
-            let free_type = void_type.fn_type(&[opaque_ptr_type.into()], false);
-            self.module.add_function(&format!("comet_{}_free", fn_name_lower), free_type, None);
         }
     }
 
@@ -102,8 +96,10 @@ impl<'ctx> Codegen<'ctx> {
         let void_type = self.context.void_type();
         let i32_type = self.context.i32_type();
         let i64_type = self.context.i64_type();
-        let f64_ptr_type = self.context.f64_type().ptr_type(AddressSpace::default());
+        let f64_type = self.context.f64_type();
+        let f64_ptr_type = f64_type.ptr_type(AddressSpace::default());
         let f64_ptr_ptr_type = f64_ptr_type.ptr_type(AddressSpace::default());
+        let opaque_ptr_type = self.context.i8_type().ptr_type(AddressSpace::default());
 
         let comet_data_type = self.context.struct_type(&[
             i32_type.into(), // dtype
@@ -113,6 +109,7 @@ impl<'ctx> Codegen<'ctx> {
         let fn_type = void_type.fn_type(&[
             f64_ptr_ptr_type.into(), // inputs
             f64_ptr_type.into(),     // output
+            opaque_ptr_type.into(),  // state_blob (contiguous buffer)
             i64_type.into(),         // len
             i64_type.into()          // timesteps
         ], false);
@@ -123,7 +120,10 @@ impl<'ctx> Codegen<'ctx> {
         self.builder.position_at_end(basic_block);
 
         let inputs_ptr = function.get_nth_param(0).unwrap().into_pointer_value();
-        let len_val = function.get_nth_param(2).unwrap().into_int_value();
+        let output_ptr = function.get_nth_param(1).unwrap().into_pointer_value();
+        let state_blob_raw = function.get_nth_param(2).unwrap().into_pointer_value();
+        let len_val = function.get_nth_param(3).unwrap().into_int_value();
+        let timesteps_val = function.get_nth_param(4).unwrap().into_int_value();
         
         // 1. Initialization Phase & Memory Allocations
         let malloc_fn = self.module.get_function("malloc").unwrap();
@@ -133,6 +133,21 @@ impl<'ctx> Codegen<'ctx> {
         let mut node_states = HashMap::new();
         let mut source_indices = HashMap::new();
         let mut next_source_idx = 0;
+
+        // Build the state tracking struct type (each stateful op gets a designated memory block)
+        let state_field_type = f64_type.array_type(256); // Fallback static chunk size
+        let mut state_fields: Vec<inkwell::types::BasicTypeEnum> = Vec::new();
+        let mut stateful_node_indices = HashMap::new();
+
+        for (node_id, node) in graph.nodes.iter().enumerate() {
+            if let ExecutionNode::Operation { op, .. } = node {
+                if op.to_lowercase() != "unknown" {
+                    stateful_node_indices.insert(node_id, state_fields.len() as u32);
+                    state_fields.push(state_field_type.into());
+                }
+            }
+        }
+        let state_struct_type = self.context.struct_type(&state_fields, false);
 
         for (node_id, node) in graph.nodes.iter().enumerate() {
             match node {
@@ -148,35 +163,38 @@ impl<'ctx> Codegen<'ctx> {
                     let load = self.builder.build_load(f64_ptr_type, gep, &format!("var_{}_ptr", node_id)).unwrap();
                     node_outputs.insert(node_id, load.into_pointer_value());
                 },
-                ExecutionNode::Constant { .. } => {
-                    let malloc_call = self.builder.build_call(malloc_fn, &[alloc_size.into()], &format!("malloc_const_{}", node_id)).unwrap();
-                    let raw_ptr = malloc_call.try_as_basic_value().unwrap_basic().into_pointer_value();
-                    node_outputs.insert(node_id, raw_ptr);
+                ExecutionNode::Constant { value } => {
+                    use crate::comet::ir::ConstantValue;
+                    match value {
+                        ConstantValue::Float(f) => {
+                            let f_val = f64_type.const_float(*f);
+                            let alloca = self.builder.build_alloca(f64_type, &format!("const_ptr_{}", node_id)).unwrap();
+                            self.builder.build_store(alloca, f_val).unwrap();
+                            node_outputs.insert(node_id, alloca);
+                        },
+                        ConstantValue::Integer(i) => {
+                            let f_val = f64_type.const_float(*i as f64);
+                            let alloca = self.builder.build_alloca(f64_type, &format!("const_ptr_{}", node_id)).unwrap();
+                            self.builder.build_store(alloca, f_val).unwrap();
+                            node_outputs.insert(node_id, alloca);
+                        },
+                        _ => {}
+                    }
                 },
-                ExecutionNode::Operation { op, .. } => {
+                ExecutionNode::Operation { .. } => {
                     let malloc_call = self.builder.build_call(malloc_fn, &[alloc_size.into()], &format!("malloc_out_{}", node_id)).unwrap();
                     let out_ptr = malloc_call.try_as_basic_value().unwrap_basic().into_pointer_value();
                     node_outputs.insert(node_id, out_ptr);
                     
-                    let func_name = op.to_lowercase();
-
-                    if func_name != "unknown" {
-                        if let Some(init_fn) = self.module.get_function(&format!("comet_{}_init", func_name)) {
-                            let period = i64_type.const_int(10, false); // Example stub constraint value
-                            let init_call = self.builder.build_call(init_fn, &[period.into(), len_val.into()], &format!("state_{}", node_id)).unwrap();
-                            let state_ptr = init_call.try_as_basic_value().unwrap_basic().into_pointer_value();
-                            node_states.insert(node_id, state_ptr);
-                        }
+                    if let Some(target_idx) = stateful_node_indices.get(&node_id) {
+                        // Dynamically map struct offset correctly!
+                        let state_k_ptr = self.builder.build_struct_gep(state_struct_type, state_blob_raw, *target_idx, &format!("state_offset_{}", node_id)).unwrap();
+                        node_states.insert(node_id, state_k_ptr);
                     }
                 }
             }
         }
         
-        let output_ptr = function.get_nth_param(1).unwrap().into_pointer_value();
-        let timesteps_val = function.get_nth_param(3).unwrap().into_int_value();
-        
-        let f64_type = self.context.f64_type();
-
         // 2. Event Loop Phase
         let loop_bb = self.context.append_basic_block(function, "event_loop");
         let loop_inc_bb = self.context.append_basic_block(function, "event_loop_inc");
@@ -206,6 +224,9 @@ impl<'ctx> Codegen<'ctx> {
                     // State Ptr
                     if let Some(state_ptr) = node_states.get(&node_id) {
                         call_args.push((*state_ptr).into());
+                    } else {
+                        // Passes null opaque pointer if state strictly isn't resolved properly (safety fallback)
+                        call_args.push(opaque_ptr_type.const_null().into());
                     }
                     
                     // Input Args
@@ -258,21 +279,12 @@ impl<'ctx> Codegen<'ctx> {
         
         for (node_id, node) in graph.nodes.iter().enumerate() {
             // Free intermediate buffers
-            if let ExecutionNode::Operation { op, .. } = node {
+            if let ExecutionNode::Operation { .. } = node {
                 if node_id != graph.nodes.len() - 1 {
                     self.builder.build_call(free_fn, &[node_outputs[&node_id].into()], &format!("free_buf_{}", node_id)).unwrap();
                 }
-
-                // Free States
-                if let Some(state_ptr) = node_states.get(&node_id) {
-                    let func_name = op.to_lowercase();
-                    if let Some(free_fn) = self.module.get_function(&format!("comet_{}_free", func_name)) {
-                        self.builder.build_call(free_fn, &[(*state_ptr).into()], &format!("free_state_{}", node_id)).unwrap();
-                    }
-                }
-            } else if let ExecutionNode::Constant { .. } = node {
-                self.builder.build_call(free_fn, &[node_outputs[&node_id].into()], &format!("free_const_{}", node_id)).unwrap();
             }
+            // ExecutionNode::Constant uses raw alloca inline memory! So NO free operations injected!
         }
 
         self.builder.build_return(None);
