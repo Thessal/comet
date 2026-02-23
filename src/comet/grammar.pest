@@ -21,7 +21,7 @@ float_literal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 string_literal = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 bool_literal = { "true" | "false" }
 literal = { float_literal | int_literal | string_literal | bool_literal }
-types = { "Series" | "DataFrame" | "Matrix" | "Vector" }
+types = { "Series" | "DataFrame" | "Matrix" | "Vector" | "String" | "Int" | "Float" | "Bool" }
 
 // Keywords
 // Keywords
@@ -53,7 +53,7 @@ typed_arg_list = { (typed_arg ~ (comma ~ typed_arg)*)? }
 typed_arg = { identifier ~ ":" ~ constraint }
 
 // func
-func_decl = { k_fn ~ identifier ~ "(" ~ typed_arg_list? ~ ")" ~ "->" ~ constraint ~ block }
+func_decl = { k_fn ~ identifier ~ "(" ~ typed_arg_list? ~ ")" ~ "->" ~ constraint }
 
 block = { "{" ~ statement* ~ "}" }
 
@@ -61,12 +61,10 @@ flow_decl = { k_flow ~ identifier ~ block }
 
 statement = {
     assignment_stmt |
-    return_stmt |
     expr_stmt
 }
 
 assignment_stmt = { identifier ~ "=" ~ expr }
-return_stmt = { k_return ~ expr }
 expr_stmt = { expr }
 
 // Constraints

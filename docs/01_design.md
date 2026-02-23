@@ -17,11 +17,12 @@ Calling a Behavior or Function requires **named** arguments set.
 - **Types** 
     - Types are used to specify how the data is stored in the memory.
     - All data in comet are stored as a **Series**, which is updated for each time step in rolling manner.
-    - Type keywords specify how the data is stored in the memory. Comet supports four types.
+    - Type keywords specify how the data is stored in the memory. Comet supports the following types.
         - `Series` : single f64 is stored for each time step.
         - `DataFrame` : fixed size array of f64 is assigned for each time step. (with flattened indexing)
         - `Matrix` : fixed 2d array of f64 is assigned for each time step.
         - `Vector` : Iliffe vector. Used for variable length data such as string.
+        - Literal primitives: `String`, `Int`, `Float`, `Bool`. Supported for scalar arguments.
     - Depending on the operator / behavior, there are compatible types. For example,
         - `Series` data can be "added" with another `DataFrame` data.
 
@@ -136,6 +137,7 @@ Calling a Behavior or Function requires **named** arguments set.
     - Functions map that receives a list of concepts and returns a concept.
     - Functions are defined in stdlib, and comet do not support user-defined functions.
     - To map stdlib functions into comet symbols, we use `Fn` keyword, which is similar concept with C header.
+        - `Fn <function name> ( <parameter name> : <input constraints>, ... ) -> <output constraints>`
         - `Fn Ratio ( signal: DataFrame, reference: DataFrame Positive ) -> (DataFrame Finite)`
     - It exists only to help type checking and code generation.
     - Function can be matched to a behavior all of the following conditions are met: 

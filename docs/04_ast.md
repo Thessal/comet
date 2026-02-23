@@ -24,6 +24,10 @@ pub enum TypeDecl {
     DataFrame,
     Matrix,
     Vector,
+    String,
+    Int,
+    Float,
+    Bool,
 }
 ```
 

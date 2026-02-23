@@ -83,6 +83,10 @@ fn parse_types(pair: Pair<Rule>) -> Result<TypeDecl, ParserError> {
         "DataFrame" => Ok(TypeDecl::DataFrame),
         "Matrix" => Ok(TypeDecl::Matrix),
         "Vector" => Ok(TypeDecl::Vector),
+        "String" => Ok(TypeDecl::String),
+        "Int" => Ok(TypeDecl::Int),
+        "Float" => Ok(TypeDecl::Float),
+        "Bool" => Ok(TypeDecl::Bool),
         _ => Err(ParserError::UnexpectedRule(pair.as_rule())),
     }
 }
@@ -186,17 +190,10 @@ fn parse_func_decl(pair: Pair<Rule>) -> Result<FuncDecl, ParserError> {
     
     let return_constraint = parse_constraint(inner.next().unwrap())?;
     
-    // where clause removed
-
-    // ensures removed
-    
-    let body = parse_block(inner.next().unwrap())?;
-    
     Ok(FuncDecl {
         name,
         params,
         return_constraint,
-        body,
     })
 }
 
@@ -210,8 +207,7 @@ fn parse_flow_decl(pair: Pair<Rule>) -> Result<FlowDecl, ParserError> {
     for stmt in block.stmts {
         match stmt {
             Stmt::Flow(f) => body.push(f),
-            Stmt::Return(e) => body.push(FlowStmt::Return(e)),
-            _ => continue,
+            Stmt::Expr(e) => body.push(FlowStmt::Expr(e)), // Return
         }
     }
     
@@ -234,12 +230,6 @@ fn parse_statement(pair: Pair<Rule>) -> Result<Stmt, ParserError> {
             let target = parse_identifier(i.next().unwrap());
             let expr = parse_expr(i.next().unwrap())?;
             Ok(Stmt::Flow(FlowStmt::Assignment { target, expr }))
-        },
-        Rule::return_stmt => {
-            let mut i = inner.into_inner();
-            let _k_return = i.next().unwrap();
-            let expr = parse_expr(i.next().unwrap())?;
-            Ok(Stmt::Return(expr))
         },
         Rule::expr_stmt => {
             let expr = parse_expr(inner.into_inner().next().unwrap())?;

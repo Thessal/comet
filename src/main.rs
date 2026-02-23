@@ -16,6 +16,9 @@ fn main() {
     match comet::parser::parse(&content) {
         Ok(mut program) => {
              println!("Parsed successfully!");
+             println!("--- AST Representation ---");
+             println!("{}", program);
+             println!("--------------------------");
              println!("Total declarations: {}", program.declarations.len());
              for d in &program.declarations {
                  let t = match d {
