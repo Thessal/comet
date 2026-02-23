@@ -339,6 +339,93 @@ impl Synthesizer {
         }
         result
     }
+
+    /// Recursively evaluate an AST Expression to generate a Cartesian product of valid Concrete branches!
+    /// `[5, 21]` evaluates to `vec![Literal(5), Literal(21)]`.
+    /// `ts_mean(window=[5, 21])` evaluates to `vec![Call(ts_mean, 5), Call(ts_mean, 21)]`.
+    pub fn synthesize_expr(expr: &Expr) -> Result<Vec<RealExpr>, String> {
+        match expr {
+            Expr::Literal(lit) => Ok(vec![RealExpr::Literal(lit.clone())]),
+            Expr::Identifier(id) => Ok(vec![RealExpr::Identifier(id.clone())]),
+            Expr::List(exprs) => {
+                let mut possibilities = Vec::new();
+                for e in exprs {
+                    let mut e_combs = Self::synthesize_expr(e)?;
+                    possibilities.append(&mut e_combs);
+                }
+                Ok(possibilities)
+            },
+            Expr::Range { start, step, end } => {
+                let start_lit = Self::get_lit(start)?;
+                let end_lit = Self::get_lit(end)?;
+                let step_lit = if let Some(st) = step {
+                    Self::get_lit(st)?
+                } else {
+                    if let Literal::Integer(_) = start_lit { Literal::Integer(1) } else { Literal::Float(1.0) }
+                };
+
+                let mut possibilities = Vec::new();
+                match (start_lit, end_lit, step_lit) {
+                    (Literal::Integer(s), Literal::Integer(e), Literal::Integer(st)) => {
+                        let mut current = s;
+                        while current <= e {
+                            possibilities.push(RealExpr::Literal(Literal::Integer(current)));
+                            current += st;
+                        }
+                    },
+                    (Literal::Float(s), Literal::Float(e), Literal::Float(st)) => {
+                        let mut current = s;
+                        let epsilon = 1e-9;
+                        while current <= e + epsilon {
+                            possibilities.push(RealExpr::Literal(Literal::Float(current)));
+                            current += st;
+                        }
+                    },
+                    _ => return Err("Range bounds must be monotonically matching numeric literals (Ints or Floats)".to_string()),
+                }
+                Ok(possibilities)
+            },
+            Expr::Call { path, args } => {
+                // Cartesian product of arguments!
+                let mut arg_possibilities: Vec<Vec<(Option<Ident>, RealExpr)>> = vec![vec![]];
+                
+                for arg in args {
+                    let arg_name = arg.name.clone();
+                    let evaluated_values = Self::synthesize_expr(&arg.value)?;
+                    
+                    let mut next_product = Vec::new();
+                    for partial_tuple in &arg_possibilities {
+                        for val in &evaluated_values {
+                            let mut new_tuple = partial_tuple.clone();
+                            new_tuple.push((arg_name.clone(), val.clone()));
+                            next_product.push(new_tuple);
+                        }
+                    }
+                    arg_possibilities = next_product;
+                }
+
+                let mut call_combinations = Vec::new();
+                let func_name = path.segments.last().unwrap().clone();
+                for args_tuple in arg_possibilities {
+                    call_combinations.push(RealExpr::CallFn {
+                        func_name: func_name.clone(),
+                        args: args_tuple,
+                        // Dummy constraint for expression evaluations. Real compiler infers this.
+                        return_constraint: ConstraintDecl { base_type: TypeDecl::Bool, category_expr: None },
+                    });
+                }
+                Ok(call_combinations)
+            },
+            _ => Err("Unsupported AST Expression for Synthesis Cartesian Generation".to_string())
+        }
+    }
+
+    fn get_lit(expr: &Expr) -> Result<Literal, String> {
+         match expr {
+             Expr::Literal(l) => Ok(l.clone()),
+             _ => Err("Not a literal".to_string())
+         }
+    }
 }
 
 #[cfg(test)]
@@ -431,5 +518,59 @@ mod tests {
         // We expect EXACTLY 6 exhaustive mathematical sets of mutually disjoint subsets matching
         // docs/05_synthesis.md's strict unification rules!
         assert_eq!(results.len(), 6, "Expected exactly 6 derived valid Combinations for Comparator.");
+    }
+
+    #[test]
+    fn test_list_range_cartesian_expansion() {
+        use crate::comet::ast::{Path, ArgValue};
+
+        // var = [5, 21]
+        let list_expr = Expr::List(vec![
+            Expr::Literal(Literal::Integer(5)),
+            Expr::Literal(Literal::Integer(21))
+        ]);
+        let r1 = Synthesizer::synthesize_expr(&list_expr).unwrap();
+        assert_eq!(r1.len(), 2);
+
+        // var = [10..10..30] -> 10, 20, 30
+        let range_expr = Expr::Range {
+            start: Box::new(Expr::Literal(Literal::Integer(10))),
+            step: Some(Box::new(Expr::Literal(Literal::Integer(10)))),
+            end: Box::new(Expr::Literal(Literal::Integer(30))),
+        };
+        let r2 = Synthesizer::synthesize_expr(&range_expr).unwrap();
+        assert_eq!(r2.len(), 3);
+
+        // ts_mean(a="volume", window=[5, 21])
+        let call_expr = Expr::Call {
+            path: Path { segments: vec!["ts_mean".to_string()] },
+            args: vec![
+                ArgValue { name: Some("a".to_string()), value: Expr::Literal(Literal::String("volume".to_string())) },
+                ArgValue { name: Some("window".to_string()), value: list_expr },
+            ]
+        };
+        let r3 = Synthesizer::synthesize_expr(&call_expr).unwrap();
+        assert_eq!(r3.len(), 2);
+        if let RealExpr::CallFn { func_name, args, .. } = &r3[0] {
+            assert_eq!(func_name, "ts_mean");
+            assert_eq!(args.len(), 2);
+        }
+
+        // ts_mean(a=["v1", "v2"], window=[10..10..30]) -> 2 * 3 = 6 combinations!
+        let multi_call = Expr::Call {
+            path: Path { segments: vec!["ts_mean".to_string()] },
+            args: vec![
+                ArgValue { 
+                    name: Some("a".to_string()), 
+                    value: Expr::List(vec![
+                        Expr::Literal(Literal::String("v1".to_string())),
+                        Expr::Literal(Literal::String("v2".to_string()))
+                    ])
+                },
+                ArgValue { name: Some("window".to_string()), value: range_expr },
+            ]
+        };
+        let r4 = Synthesizer::synthesize_expr(&multi_call).unwrap();
+        assert_eq!(r4.len(), 6, "Expected exactly 6 cartesian branches (2 * 3)");
     }
 }

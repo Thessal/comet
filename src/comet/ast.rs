@@ -127,7 +127,9 @@ pub enum Expr {
     UnaryOp { op: Op, target: Box<Expr> },
     Call { path: Path, args: Vec<ArgValue> },
     MemberAccess { target: Box<Expr>, field: Ident },
-}
+    List(Vec<Expr>),
+    Range { start: Box<Expr>, step: Option<Box<Expr>>, end: Box<Expr> },
+} // Question : do we allow expressions in list like [ multiply(1,2), 3 ]? should we allow or not?
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Op {
@@ -318,6 +320,17 @@ impl fmt::Display for Expr {
                 write!(f, "{}({})", path, a.join(", "))
             },
             Expr::MemberAccess { target, field } => write!(f, "{}.{}", target, field),
+            Expr::List(exprs) => {
+                let s: Vec<String> = exprs.iter().map(|e| e.to_string()).collect();
+                write!(f, "[{}]", s.join(", "))
+            },
+            Expr::Range { start, step, end } => {
+                if let Some(st) = step {
+                    write!(f, "[{}..{}..{}]", start, st, end)
+                } else {
+                    write!(f, "[{}..{}]", start, end)
+                }
+            }
         }
     }
 }

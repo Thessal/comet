@@ -100,7 +100,7 @@ Calling a Behavior or Function requires **named** arguments set.
 - **Flows**
     - Flow is a list of behaviors, that forms a path of transformations that generates data with type constraints.
     - Flow is defined by the following syntax : 
-        - `Flow <flow name> { <statements> } -> <output constraints>`
+        - `Flow <flow name> { <statements> }`
         - Statements are separated by newlines.
         - Each statement in the flow are either assignment or return, of behavior or function calls.
     - Last statement is returned.
@@ -108,7 +108,7 @@ Calling a Behavior or Function requires **named** arguments set.
     - Statement in a Flow can be defined by chained function.
         - 
         ```
-            Flow volume_spike { 
+            Flow volume_spike -> DataFrame { 
                 Compare(signal=data("volume"), reference=HistoricalVolume(signal=data("volume"), lookback=days()), depth=1) 
             }
         ```

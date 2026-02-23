@@ -416,7 +416,29 @@ fn parse_primary(pair: Pair<Rule>) -> Result<Expr, ParserError> {
             parse_expr(inner.into_inner().next().unwrap())
         },
         Rule::list_literal => {
-            Ok(Expr::Identifier("ListLiteralPlaceholder".to_string()))
+            let mut exprs = Vec::new();
+            for e in inner.into_inner() {
+                exprs.push(parse_expr(e)?);
+            }
+            Ok(Expr::List(exprs))
+        },
+        Rule::range_literal => {
+            let mut exprs = Vec::new();
+            for e in inner.into_inner() {
+                exprs.push(parse_expr(e)?);
+            }
+            if exprs.len() == 2 {
+                let end = exprs.pop().unwrap();
+                let start = exprs.pop().unwrap();
+                Ok(Expr::Range { start: Box::new(start), step: None, end: Box::new(end) })
+            } else if exprs.len() == 3 {
+                let end = exprs.pop().unwrap();
+                let step = exprs.pop().unwrap();
+                let start = exprs.pop().unwrap();
+                Ok(Expr::Range { start: Box::new(start), step: Some(Box::new(step)), end: Box::new(end) })
+            } else {
+                unreachable!()
+            }
         },
         _ => unreachable!(),
     }

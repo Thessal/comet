@@ -15,14 +15,15 @@ The main Comet compiler codebase (the "parser") acts as a generator of LLVM IR (
 
 ### Workflow
 1.  **Source**: `example.cm`
-2.  **Comet Compiler**:
-    -   Parses and resolves Type/Behavior/Function logic.
-    -   Expands the `flow` into a "Product Space" of concrete execution trees, finding all compatible combinations.
-    -   Prunes invalid trees using Semantic Properties.
-3.  **Codegen**:
-    -   For each valid Tree in the Product Space, generate corresponding LLVM IR (or bitcode).
-    -   Unique variant_id is assigned for each LLVM IRs. 
-    -   (We don't need it currently, but in the future, memoization can be used to optimize computation tree and reduce recalculation of same subtrees among valid Trees.)
+2.  **Comet Compiler (Frontend -> Synthesis)**:
+    -   Parses typed primitive literals (`String`, `Int`, `Float`, `Bool`) and explicitly binds categorical constraints and recursion `depth` limits.
+    -   Translates the abstract AST to a concrete `RealAST` by deploying a dynamic programming Exhaustive Search Algorithm.
+    -   Expands Behaviors into a "Product Space" of valid implementations modeled as disjoint `Fn` Forests where exactly one tree matches the return constraint and all side-effect trees return `()`.
+    -   Enforces **Category Capture Unification** (`'a`) to strictly prune asymmetric functional branches during constraint matching.
+3.  **Codegen (RealAST -> LLVM IR)**:
+    -   For each valid Forest in the Product Space, generate corresponding LLVM IR strings.
+    -   Unique `variant_id` is assigned for each resulting distinct LLVM IR combination. 
+    -   (Future: Memoization can be used to optimize independent subtrees across overlapping valid Forests.)
 4.  **Compilation (`llvm` / linker)**:
     -   Compiles and links the generated LLVM code with the `stdlib` dynamic library (`.so`) into a high-performance executable strategy.
 

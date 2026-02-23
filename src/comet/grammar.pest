@@ -102,11 +102,13 @@ primary = {
     literal |
     path |
     paren_expr |
+    range_literal |
     list_literal
 }
 
 path = ${ identifier ~ ("::" ~ identifier)* }
 paren_expr = { "(" ~ expr ~ ")" }
+range_literal = { "[" ~ expr ~ ".." ~ (expr ~ "..")? ~ expr ~ "]" }
 list_literal = { "[" ~ (expr ~ ("," ~ expr)*)? ~ "]" }
 arg_values = { (arg_value ~ ("," ~ arg_value)*)? }
 arg_value = { identifier ~ "=" ~ expr }
