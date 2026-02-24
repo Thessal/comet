@@ -1,41 +1,47 @@
 #[cfg(test)]
 mod tests {
-    use crate::abs::AbsState;
-    use crate::UnaryOp;
+    use crate::multiply::MultiplyState;
+    use crate::{BinaryOp, CometData};
+    use crate::DataType as CometDataType;
     use polars::prelude::*;
 
     #[test]
-    fn test_abs_vs_polars() {
+    fn test_multiply_vs_polars() {
         let period = 1; 
         let len = 5;
 
-        let input_data = vec![
-            10.0,
-            -20.0,
-            -25.5,
-            f64::NAN,
-            40.0,
-        ];
+        let input_data_a = vec![10.0, 20.0, 30.0, f64::NAN, 50.0];
+        let input_data_b = vec![5.0, 2.0, 1.5, 4.0, 0.5];
 
-        // 1. Run our abs
-        let mut state = AbsState::new(period, len);
+        let mut state = MultiplyState::new(period, len);
         let mut our_output = vec![0.0; len];
-        state.step(input_data.as_ptr(), our_output.as_mut_ptr(), len);
+        
+        let data_a = CometData {
+            dtype: CometDataType::DataFrame,
+            ptr: input_data_a.as_ptr(),
+        };
+        let data_b = CometData {
+            dtype: CometDataType::DataFrame,
+            ptr: input_data_b.as_ptr(),
+        };
 
-        // 2. Run polars standard abs
-        let df = df!("input" => &input_data).unwrap();
+        state.step(data_a, data_b, our_output.as_mut_ptr(), len);
+
+        let df = df!(
+            "a" => &input_data_a,
+            "b" => &input_data_b
+        ).unwrap();
         
         let lazy_df = df.lazy()
             .with_column(
-                col("input").abs().alias("abs")
+                (col("a") * col("b")).alias("out")
             );
 
         let out_df = lazy_df.collect().unwrap();
-        let polars_out_series = out_df.column("abs").unwrap();
+        let polars_out_series = out_df.column("out").unwrap();
         
         let polars_out: Vec<Option<f64>> = polars_out_series.f64().unwrap().into_iter().collect();
 
-        // 3. Compare outputs
         assert_eq!(our_output.len(), polars_out.len());
         
         for (i, (ours, theirs)) in our_output.iter().zip(polars_out.iter()).enumerate() {

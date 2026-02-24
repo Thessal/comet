@@ -74,6 +74,40 @@ mod test_mid;
 mod test_const;
 #[cfg(test)]
 mod test_divide;
+#[cfg(test)]
+mod test_subtract;
+#[cfg(test)]
+mod test_multiply;
+#[cfg(test)]
+mod test_power;
+#[cfg(test)]
+mod test_equals;
+#[cfg(test)]
+mod test_greater;
+#[cfg(test)]
+mod test_less;
+#[cfg(test)]
+mod test_min;
+#[cfg(test)]
+mod test_max;
+#[cfg(test)]
+mod test_ts_sum;
+#[cfg(test)]
+mod test_ts_min;
+#[cfg(test)]
+mod test_ts_max;
+#[cfg(test)]
+mod test_ts_rank;
+#[cfg(test)]
+mod test_clip;
+#[cfg(test)]
+mod test_tail_to_nan;
+#[cfg(test)]
+mod test_where;
+#[cfg(test)]
+mod test_tradewhen;
+#[cfg(test)]
+mod test_covariance;
 
 /// A generic-purpose 2D ring buffer specifically designed for C-ABI / LLVM compatibility.
 /// Rows = Time (capacity), Cols = Cross-section (len).

@@ -1,4 +1,4 @@
-use crate::comet::ast::{Ident, Expr, Literal, Op, ConstraintDecl, BehaviorDecl, CategoryExpr, TypeDecl};
+use crate::comet::ast::{Ident, Expr, Literal, ConstraintDecl, BehaviorDecl, CategoryExpr, TypeDecl};
 use std::collections::{HashSet, HashMap};
 
 pub fn substitute_expr(expr: &Expr, env: &HashMap<String, Expr>) -> Expr {

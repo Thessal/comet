@@ -30,7 +30,7 @@ mod tests {
         }
 
         // 2. Run polars standard diff
-        let mut df = df!("input" => &input_data).unwrap();
+        let df = df!("input" => &input_data).unwrap();
         
         let lazy_df = df.lazy()
             .with_column(

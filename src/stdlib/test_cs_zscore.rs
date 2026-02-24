@@ -28,7 +28,7 @@ mod tests {
         // Polars: (val - mean) / std_dev
         // In order to only use non-NaN values for mean/std, Polars handles this correctly
         // However, we want the Z-score column to be evaluated row-by-row on valid entries.
-        let mut df = df!("input" => &input_data).unwrap();
+        let df = df!("input" => &input_data).unwrap();
         
         // Convert f64::NAN to Nulls so polars ignores them correctly in aggregation
         let lazy_df = df.lazy()

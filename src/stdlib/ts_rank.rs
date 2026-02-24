@@ -50,7 +50,7 @@ impl UnaryOp for TsRankState {
             }
             
             // Compute rank
-            if !v.is_nan() && !self.buffers[j].is_empty() {
+            if !v.is_nan() && self.buffers[j].len() > 1 {
                 let mut left = 0;
                 let mut right = 0;
                 for (i, &val) in self.buffers[j].iter().enumerate() {
@@ -61,7 +61,8 @@ impl UnaryOp for TsRankState {
                         right = i + 1;
                     }
                 }
-                out_slice[j] = left as f64 + (right as f64 - left as f64 + 1.0) / 2.0;
+                let avg_rank = left as f64 + (right as f64 - left as f64 + 1.0) / 2.0;
+                out_slice[j] = (avg_rank - 1.0) / ((self.buffers[j].len() - 1) as f64);
             } else {
                 out_slice[j] = f64::NAN;
             }

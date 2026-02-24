@@ -25,7 +25,7 @@ mod tests {
 
         // 2. Run polars standard rank
         // Polars: rank(method='average')
-        let mut df = df!("input" => &input_data).unwrap();
+        let df = df!("input" => &input_data).unwrap();
         
         let lazy_df = df.lazy()
             .with_column(

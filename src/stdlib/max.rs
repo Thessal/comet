@@ -16,25 +16,27 @@ impl BinaryOp for MaxState {
                 let a_sl = unsafe { a.as_slice(len) };
                 let b_sl = unsafe { b.as_slice(len) };
                 for i in 0..len {
-                    out[i] = a_sl[i].max(b_sl[i]);
+                    out[i] = if a_sl[i].is_nan() || b_sl[i].is_nan() { f64::NAN } else { a_sl[i].max(b_sl[i]) };
                 }
             }
             (DataType::DataFrame, _) => {
                 let a_sl = unsafe { a.as_slice(len) };
                 let b_val = unsafe { b.get_scalar() };
                 for i in 0..len {
-                    out[i] = a_sl[i].max(b_val);
+                    out[i] = if a_sl[i].is_nan() || b_val.is_nan() { f64::NAN } else { a_sl[i].max(b_val) };
                 }
             }
             (_, DataType::DataFrame) => {
                 let a_val = unsafe { a.get_scalar() };
                 let b_sl = unsafe { b.as_slice(len) };
                 for i in 0..len {
-                    out[i] = a_val.max(b_sl[i]);
+                    out[i] = if a_val.is_nan() || b_sl[i].is_nan() { f64::NAN } else { a_val.max(b_sl[i]) };
                 }
             }
              _ => {
-                out[0] = unsafe { a.get_scalar().max(b.get_scalar()) };
+                let a_val = unsafe { a.get_scalar() };
+                let b_val = unsafe { b.get_scalar() };
+                out[0] = if a_val.is_nan() || b_val.is_nan() { f64::NAN } else { a_val.max(b_val) };
             }
         }
     }
