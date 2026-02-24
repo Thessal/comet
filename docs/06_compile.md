@@ -10,6 +10,7 @@ The main Comet compiler codebase (the "parser") acts as a generator of LLVM IR (
 1.  **Source**: `example.cm`
 2.  **Comet Compiler (Frontend -> Synthesis)**:
     -   Parses typed primitive literals (`String`, `Int`, `Float`, `Bool`) and explicitly binds categorical constraints and recursion `depth` limits.
+    -   Extracts nested properties and resolves `Flow` variables by running tree transformations using `substitute_expr` before synthesis.
     -   Translates the abstract AST to a concrete `RealAST` by deploying a dynamic programming Exhaustive Search Algorithm.
     -   Expands Behaviors into a "Product Space" of valid implementations modeled as disjoint `Fn` Forests where exactly one tree matches the return constraint and all side-effect trees return `()`.
     -   Enforces **Category Capture Unification** (`'a`) to strictly prune asymmetric functional branches during constraint matching.

@@ -19,6 +19,7 @@ pub mod ts_zscore;
 pub mod mid;
 pub mod r#const;
 pub mod divide;
+pub mod data;
 
 #[cfg(test)]
 mod test_ts_mean;
@@ -216,11 +217,13 @@ macro_rules! export_unary {
             #[unsafe(no_mangle)]
             pub extern "C" fn [<comet_ $prefix _step>](
                 state: *mut $struct_name, 
-                a_ptr: *const f64, 
+                a: *const $crate::CometData, 
                 out_ptr: *mut f64, 
                 len: usize
             ) {
                 let s = unsafe { &mut *state };
+                let a_val = unsafe { *a };
+                let a_ptr = unsafe { a_val.as_slice(len).as_ptr() };
                 s.step(a_ptr, out_ptr, len)
             }
         }
@@ -248,13 +251,15 @@ macro_rules! export_binary {
             #[unsafe(no_mangle)]
             pub extern "C" fn [<comet_ $prefix _step>](
                 state: *mut $struct_name, 
-                a: $crate::CometData, 
-                b: $crate::CometData, 
+                a: *const $crate::CometData, 
+                b: *const $crate::CometData, 
                 out_ptr: *mut f64, 
                 len: usize
             ) {
                 let s = unsafe { &mut *state };
-                s.step(a, b, out_ptr, len)
+                let a_val = unsafe { *a };
+                let b_val = unsafe { *b };
+                s.step(a_val, b_val, out_ptr, len)
             }
         }
     };

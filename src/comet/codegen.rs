@@ -49,17 +49,17 @@ impl<'ctx> Codegen<'ctx> {
         Ok(())
     }
 
-    pub fn generate_ir(&self, contexts: &Vec<crate::comet::synthesis::Context>, symbol_table: &crate::comet::symbols::SymbolTable) -> String {
-        self.declare_externals(symbol_table);
+    pub fn generate_ir(&self, graphs: &Vec<crate::comet::ir::ExecutionGraph>) -> String {
+        self.declare_externals(graphs);
 
-        for (i, ctx) in contexts.iter().enumerate() {
-            self.generate_variant_executor(i, &ctx.graph);
+        for (i, graph) in graphs.iter().enumerate() {
+            self.generate_variant_executor(i, graph);
         }
 
         self.module.print_to_string().to_string()
     }
 
-    fn declare_externals(&self, symbol_table: &crate::comet::symbols::SymbolTable) {
+    fn declare_externals(&self, graphs: &Vec<crate::comet::ir::ExecutionGraph>) {
         let void_type = self.context.void_type();
         let i64_type = self.context.i64_type();
         let f64_ptr_type = self.context.f64_type().ptr_type(AddressSpace::default());
@@ -78,11 +78,22 @@ impl<'ctx> Codegen<'ctx> {
             f64_ptr_type.into()             // ptr
         ], false);
 
-        for (func_name, func_info) in &symbol_table.functions {
+        let mut required_functions = std::collections::HashMap::new();
+        for graph in graphs {
+            for node in &graph.nodes {
+                if let crate::comet::ir::ExecutionNode::Operation { op, args } = node {
+                    let stream_args_count = args.iter().filter(|&&id| !matches!(&graph.nodes[id], crate::comet::ir::ExecutionNode::Constant { .. })).count();
+                    required_functions.insert(op.clone(), stream_args_count);
+                }
+            }
+        }
+
+        for (func_name, arg_count) in required_functions {
             let fn_name_lower = func_name.to_lowercase();
+            if fn_name_lower == "unknown" { continue; }
             
             let mut step_args = vec![opaque_ptr_type.into()];
-            for _ in 0..func_info.params.len() {
+            for _ in 0..arg_count {
                 step_args.push(comet_data_type.into());
             }
             step_args.push(f64_ptr_type.into()); // output ptr
@@ -93,6 +104,12 @@ impl<'ctx> Codegen<'ctx> {
     }
 
     fn generate_variant_executor(&self, id: usize, graph: &ExecutionGraph) {
+        let ast_cstring = std::ffi::CString::new(graph.ast_string.as_str()).unwrap_or_default();
+        let string_val = self.context.const_string(ast_cstring.as_bytes_with_nul(), false);
+        let global_ast = self.module.add_global(string_val.get_type(), None, &format!("comet_ast_{}", id));
+        global_ast.set_initializer(&string_val);
+        global_ast.set_linkage(inkwell::module::Linkage::External);
+        
         let void_type = self.context.void_type();
         let i32_type = self.context.i32_type();
         let i64_type = self.context.i64_type();
@@ -231,6 +248,10 @@ impl<'ctx> Codegen<'ctx> {
                     
                     // Input Args
                     for &arg_id in args {
+                        if matches!(&graph.nodes[arg_id], ExecutionNode::Constant { .. }) {
+                            continue;
+                        }
+
                         let mut arg_ptr = node_outputs[&arg_id];
                         let mut node_dtype = 2; // Default to DataFrame=2
                         // If it's a Source node, we must offset its stream pointer
@@ -238,8 +259,6 @@ impl<'ctx> Codegen<'ctx> {
                             arg_ptr = unsafe { self.builder.build_gep(f64_type, arg_ptr, &[offset], &format!("stream_in_{}", arg_id)).unwrap() };
                             if type_name == "Constant" { node_dtype = 0; }
                             else if type_name == "TimeSeries" { node_dtype = 1; }
-                        } else if let ExecutionNode::Constant { .. } = &graph.nodes[arg_id] {
-                            node_dtype = 0; // Constant=0
                         }
 
                         // Build CometData struct dynamically to pass to BinaryOp
@@ -247,7 +266,9 @@ impl<'ctx> Codegen<'ctx> {
                         struct_val = self.builder.build_insert_value(struct_val, i32_type.const_int(node_dtype, false), 0, "insert_dtype").unwrap().into_struct_value();
                         struct_val = self.builder.build_insert_value(struct_val, arg_ptr, 1, "insert_ptr").unwrap().into_struct_value();
                         
-                        call_args.push(struct_val.into());
+                        let struct_ptr = self.builder.build_alloca(comet_data_type, "comet_data_ptr").unwrap();
+                        self.builder.build_store(struct_ptr, struct_val).unwrap();
+                        call_args.push(struct_ptr.into());
                     }
                     
                     // Output Ptr
@@ -319,15 +340,7 @@ mod tests {
             graph,
         };
 
-        let mut st = crate::comet::symbols::SymbolTable::new();
-        st.functions.insert("cs_zscore".to_string(), crate::comet::symbols::FuncInfo {
-            name: "cs_zscore".to_string(),
-            params: vec![crate::comet::ast::TypedArg { name: "x".to_string(), constraint: crate::comet::ast::Constraint::None }],
-            return_type: crate::comet::ast::Constraint::None,
-            body: crate::comet::ast::Block { stmts: vec![] }
-        });
-
-        let ir = codegen.generate_ir(&vec![synth_ctx], &st);
+        let ir = codegen.generate_ir(&vec![synth_ctx]);
         println!("Generated IR:\n{}", ir);
         assert!(ir.contains("comet_cs_zscore_step"));
     }

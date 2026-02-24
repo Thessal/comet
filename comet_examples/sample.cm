@@ -1,10 +1,21 @@
-Behavior Compare(signal: DataFrame 'a, reference: DataFrame Finite Positive) -> DataFrame 'a Finite Indicator
-
 Fn data(symbol: String) -> DataFrame
-Fn divide(signal: DataFrame, reference: DataFrame Finite Positive) -> DataFrame Finite Indicator 
+Fn divide(signal: DataFrame, reference: DataFrame) -> DataFrame
+Fn ts_mean(child: DataFrame, lookback: Integer) -> DataFrame
 
 Flow volume_spike {
     volume = data(symbol="volume")
-    variousdays = days()
-    Compare(signal=volume, reference=HistoricalVolume(signal=volume, lookback=variousdays), depth=1) 
+    mean_vol = ts_mean(child=volume, lookback=10)
+    divide(signal=volume, reference=mean_vol)
 }
+
+
+// Behavior Compare(signal: DataFrame 'a, reference: DataFrame Finite Positive) -> DataFrame 'a Finite Indicator
+// 
+// Fn data(symbol: String) -> DataFrame
+// Fn divide(signal: DataFrame, reference: DataFrame Finite Positive) -> DataFrame Finite Indicator 
+// 
+// Flow volume_spike {
+//     volume = data(symbol="volume")
+//     variousdays = days()
+//     Compare(signal=volume, reference=HistoricalVolume(signal=volume, lookback=variousdays), depth=1) 
+// }

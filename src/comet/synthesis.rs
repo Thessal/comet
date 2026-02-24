@@ -1,6 +1,48 @@
 use crate::comet::ast::{Ident, Expr, Literal, Op, ConstraintDecl, BehaviorDecl, CategoryExpr, TypeDecl};
 use std::collections::{HashSet, HashMap};
 
+pub fn substitute_expr(expr: &Expr, env: &HashMap<String, Expr>) -> Expr {
+    match expr {
+        Expr::Identifier(id) => {
+            if let Some(val) = env.get(id) {
+                // Recursively substitute
+                substitute_expr(val, env)
+            } else {
+                expr.clone()
+            }
+        },
+        Expr::List(exprs) => {
+            Expr::List(exprs.iter().map(|e| substitute_expr(e, env)).collect())
+        },
+        Expr::Range { start, step, end } => {
+            Expr::Range {
+                start: Box::new(substitute_expr(start, env)),
+                step: step.as_ref().map(|s| Box::new(substitute_expr(s, env))),
+                end: Box::new(substitute_expr(end, env)),
+            }
+        },
+        Expr::Call { path, args } => {
+            let new_args = args.iter().map(|arg| {
+                crate::comet::ast::ArgValue {
+                    name: arg.name.clone(),
+                    value: substitute_expr(&arg.value, env),
+                }
+            }).collect();
+            Expr::Call {
+                path: path.clone(),
+                args: new_args,
+            }
+        },
+        Expr::MemberAccess { target, field } => {
+            Expr::MemberAccess {
+                target: Box::new(substitute_expr(target, env)),
+                field: field.clone(),
+            }
+        },
+        _ => expr.clone()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FnSignature {
     pub name: Ident,
@@ -19,6 +61,46 @@ pub enum RealExpr {
     Identifier(Ident),
     BinaryOp { left: Box<RealExpr>, op: Op, right: Box<RealExpr> },
     UnaryOp { op: Op, target: Box<RealExpr> },
+}
+
+impl std::fmt::Display for RealExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RealExpr::Identifier(name) => write!(f, "{}", name),
+            RealExpr::Literal(lit) => match lit {
+                Literal::Integer(i) => write!(f, "{}", i),
+                Literal::Float(fl) => write!(f, "{}", fl),
+                Literal::String(s) => write!(f, "\"{}\"", s),
+                Literal::Boolean(b) => write!(f, "{}", b),
+            },
+            RealExpr::CallFn { func_name, args, .. } => {
+                write!(f, "{}(", func_name)?;
+                for (i, (arg_name_opt, arg_expr)) in args.iter().enumerate() {
+                    if i > 0 { write!(f, ", ")?; }
+                    if let Some(arg_name) = arg_name_opt {
+                        write!(f, "{}={}", arg_name, arg_expr)?;
+                    } else {
+                        write!(f, "{}", arg_expr)?;
+                    }
+                }
+                write!(f, ")")
+            },
+            RealExpr::BinaryOp { left, op, right } => {
+                let op_str = match op {
+                    Op::Add => "+", Op::Sub => "-", Op::Mul => "*", Op::Div => "/",
+                    Op::Eq => "==", Op::Neq => "!=", Op::Lt => "<", Op::Gt => ">",
+                    Op::And => "and", Op::Or => "or", Op::Not => "!",
+                };
+                write!(f, "({} {} {})", left, op_str, right)
+            },
+            RealExpr::UnaryOp { op, target } => {
+                let op_str = match op {
+                    Op::Sub => "-", Op::Not => "!", _ => "?",
+                };
+                write!(f, "{}{}", op_str, target)
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

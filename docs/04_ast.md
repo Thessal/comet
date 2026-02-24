@@ -110,18 +110,13 @@ pub enum Literal{
 ## 5. Flow body
 
 ```rust
-pub struct Block {
-    pub statements: Vec<Statement>,
+pub enum FlowStmt {
+    Expr(Expr),
+    Assignment {
+        target: String,
+        expr: Expr,
+    },
 }
-
-pub enum Statement {
-    Assignment(Assignment),
-    Return(Expr),
-}
-
-pub struct Assignment {
-    pub name: Ident,
-    pub expr: Expr,
-}
-
 ```
+
+Assignments within a Flow are resolved and recursively substituted into the final target expressions using `comet::synthesis::substitute_expr` before synthesis.

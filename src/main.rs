@@ -53,49 +53,55 @@ fn main() {
              }
              program.declarations = all_decls;
              
-             // let mut analyzer = comet::semantics::SemanticAnalyzer::new();
-             // match analyzer.analyze(&program, filename) {
-             /*
-             match comet::semantics::analyze(&program) {
-                 Ok(symbol_table) => {
-                     println!("Semantic analysis passed!");
-                     println!("Symbol Table Stats:");
-                     println!("Types: {}", symbol_table.types.len());
-                     println!("Behaviors: {}", symbol_table.behaviors.len());
-                     println!("Functions: {}", symbol_table.functions.len());
-                     println!("Flows: {}", symbol_table.flows.len());
-                     
-                     // Synthesis Step
-                     let synthesizer = comet::synthesis::Synthesizer::new(&symbol_table);
-                     for (flow_name, _) in &symbol_table.flows {
-                        println!("Synthesizing flow: {}", flow_name);
-                         match synthesizer.synthesize(flow_name) {
-                             Ok(contexts) => {
-                                 println!("Synthesis successful for {}! Count: {}", flow_name, contexts.len());
-                                 
-                                 // Initialize the LLVM codegen context
-                                 let inkwell_ctx = inkwell::context::Context::create();
-                                 let codegen = comet::codegen::Codegen::new(&inkwell_ctx, flow_name);
-                                 
-                                 // Generate the internal LLVM IR structure
-                                 let _ir_string = codegen.generate_ir(&contexts, &symbol_table);
-                                 println!("Generated LLVM IR for {}.", flow_name);
-                                 
-                                 // Export the generated module to a .so library artifact
-                                 match codegen.emit_library(flow_name) {
-                                     Ok(_) => println!("Successfully compiled {}.so library!", flow_name),
-                                     Err(e) => eprintln!("Failed to compile library: {}", e),
-                                 }
-                             },
-                             Err(e) => eprintln!("Synthesis error for {}: {:?}", flow_name, e),
+             println!("Evaluating flows directly since semantics module is removed for redesign:");
+             for decl in &program.declarations {
+                 if let comet::ast::Declaration::Flow(flow) = decl {
+                     println!("Synthesizing flow: {}", flow.name);
+                     println!("--- AST Flow Body ---");
+                     for stmt in &flow.body {
+                         println!("{:#?}", stmt);
+                     }
+                     println!("---------------------");
+
+                     let mut env_map = std::collections::HashMap::new();
+                     for stmt in &flow.body {
+                         if let comet::ast::FlowStmt::Assignment { target, expr } = stmt {
+                             env_map.insert(target.clone(), expr.clone());
                          }
                      }
-                 },
-                 Err(e) => {
-                     eprintln!("Semantic error: {:?}", e);
+
+                     for stmt in &flow.body {
+                         if let comet::ast::FlowStmt::Expr(expr) = stmt {
+                             let substituted_expr = comet::synthesis::substitute_expr(expr, &env_map);
+                             println!("Synthesizing fully substituted target expression: {:#?}", substituted_expr);
+                             match comet::synthesis::Synthesizer::synthesize_expr(&substituted_expr) {
+                                 Ok(real_exprs) => {
+                                     
+                                     let mut graphs = Vec::new();
+                                     for (i, real_expr) in real_exprs.iter().enumerate() {
+                                         println!("--- Context {} ---", i);
+                                         println!("AST equivalent: {:?}", real_expr);
+                                         let g = comet::ir::ExecutionGraph::from_real_expr(real_expr);
+                                         graphs.push(g);
+                                     }
+                                     
+                                     let inkwell_ctx = inkwell::context::Context::create();
+                                     let codegen = comet::codegen::Codegen::new(&inkwell_ctx, &flow.name);
+                                     
+                                     let ir_string = codegen.generate_ir(&graphs);
+                                     println!("Generated LLVM IR for {}:\n{}", flow.name, ir_string);
+                                     
+                                     match codegen.emit_library(&flow.name) {
+                                          Ok(_) => println!("Successfully compiled {}.so library!", flow.name),
+                                          Err(e) => eprintln!("Failed to compile library: {}", e),
+                                     }
+                                 },
+                                 Err(e) => eprintln!("Synthesis error: {}", e),
+                             }
+                         }
+                     }
                  }
              }
-             */
         },
         Err(e) => {
              eprintln!("Parse error: {:?}", e);

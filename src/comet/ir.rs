@@ -5,21 +5,66 @@ pub enum ConstantValue {
     Integer(i64),
     Float(f64),
     String(String),
+    Boolean(bool),
 }
 
 #[derive(Debug, Clone)]
 pub struct ExecutionGraph {
     pub nodes: Vec<ExecutionNode>,
+    pub ast_string: String,
 }
 
 impl ExecutionGraph {
     pub fn new() -> Self {
-        ExecutionGraph { nodes: Vec::new() }
+        ExecutionGraph { nodes: Vec::new(), ast_string: String::new() }
     }
 
     pub fn add_node(&mut self, node: ExecutionNode) -> usize {
         self.nodes.push(node);
         self.nodes.len() - 1
+    }
+
+    pub fn from_real_expr(expr: &crate::comet::synthesis::RealExpr) -> Self {
+        let mut graph = ExecutionGraph::new();
+        graph.ast_string = expr.to_string();
+        Self::build_graph(&mut graph, expr);
+        graph
+    }
+
+    fn build_graph(graph: &mut ExecutionGraph, expr: &crate::comet::synthesis::RealExpr) -> usize {
+        match expr {
+            crate::comet::synthesis::RealExpr::Identifier(name) => {
+                graph.add_node(ExecutionNode::Source {
+                    name: name.clone(),
+                    type_name: "TimeSeries".to_string(), // Simplified default
+                })
+            },
+            crate::comet::synthesis::RealExpr::Literal(lit) => {
+                let cv = match lit {
+                    crate::comet::ast::Literal::Integer(i) => ConstantValue::Integer(*i),
+                    crate::comet::ast::Literal::Float(f) => ConstantValue::Float(*f),
+                    crate::comet::ast::Literal::String(s) => ConstantValue::String(s.clone()),
+                    crate::comet::ast::Literal::Boolean(b) => ConstantValue::Boolean(*b),
+                };
+                graph.add_node(ExecutionNode::Constant { value: cv })
+            },
+            crate::comet::synthesis::RealExpr::CallFn { func_name, args, .. } => {
+                let mut arg_indices = Vec::new();
+                for (_, arg_expr) in args {
+                    arg_indices.push(Self::build_graph(graph, arg_expr));
+                }
+                graph.add_node(ExecutionNode::Operation {
+                    op: func_name.clone(),
+                    args: arg_indices,
+                })
+            },
+            _ => {
+                graph.add_node(ExecutionNode::Operation {
+                    op: "unknown".to_string(),
+                    args: vec![],
+                })
+            }
+        }
     }
 }
 
