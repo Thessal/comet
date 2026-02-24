@@ -1,0 +1,43 @@
+use crate::{BinaryOp, CometData, DataType, export_binary};
+
+#[repr(C)]
+pub struct EqualsState {}
+
+impl BinaryOp for EqualsState {
+    fn new(_period: usize, _len: usize) -> Self {
+        EqualsState {}
+    }
+    
+    fn step(&mut self, a: CometData, b: CometData, out_ptr: *mut f64, len: usize) {
+        let out = unsafe { std::slice::from_raw_parts_mut(out_ptr, len) };
+
+        match (a.dtype, b.dtype) {
+            (DataType::DataFrame, DataType::DataFrame) => {
+                let a_sl = unsafe { a.as_slice(len) };
+                let b_sl = unsafe { b.as_slice(len) };
+                for i in 0..len {
+                    out[i] = if a_sl[i] == b_sl[i] { 1.0 } else { 0.0 };
+                }
+            }
+            (DataType::DataFrame, _) => {
+                let a_sl = unsafe { a.as_slice(len) };
+                let b_val = unsafe { b.get_scalar() };
+                for i in 0..len {
+                    out[i] = if a_sl[i] == b_val { 1.0 } else { 0.0 };
+                }
+            }
+            (_, DataType::DataFrame) => {
+                let a_val = unsafe { a.get_scalar() };
+                let b_sl = unsafe { b.as_slice(len) };
+                for i in 0..len {
+                    out[i] = if a_val == b_sl[i] { 1.0 } else { 0.0 };
+                }
+            }
+             _ => {
+                out[0] = if unsafe { a.get_scalar() == b.get_scalar() } { 1.0 } else { 0.0 };
+            }
+        }
+    }
+}
+
+export_binary!(EqualsState, equals);

@@ -1,9 +1,26 @@
 // src/stdlib/lib.rs
 
 pub mod add;
+pub mod subtract;
+pub mod multiply;
+pub mod power;
+pub mod equals;
+pub mod greater;
+pub mod less;
+pub mod min;
+pub mod max;
 pub mod cs_zscore;
 pub mod cs_rank;
 pub mod ts_mean;
+pub mod ts_sum;
+pub mod ts_min;
+pub mod ts_max;
+pub mod ts_rank;
+pub mod clip;
+pub mod tail_to_nan;
+pub mod r#where;
+pub mod tradewhen;
+pub mod covariance;
 pub mod ts_diff;
 pub mod abs;
 pub mod ts_decay_linear;

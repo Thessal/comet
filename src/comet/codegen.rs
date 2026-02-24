@@ -316,9 +316,7 @@ impl<'ctx> Codegen<'ctx> {
 mod tests {
     use super::*;
     use crate::comet::ir::{ExecutionGraph, ExecutionNode};
-    use crate::comet::synthesis::Context as SynthesisContext;
     use inkwell::context::Context;
-    use std::collections::HashMap;
 
     #[test]
     fn test_llvm_ir_generation() {
@@ -335,12 +333,7 @@ mod tests {
             args: vec![0],
         });
 
-        let synth_ctx = SynthesisContext {
-            variables: HashMap::new(),
-            graph,
-        };
-
-        let ir = codegen.generate_ir(&vec![synth_ctx]);
+        let ir = codegen.generate_ir(&vec![graph]);
         println!("Generated IR:\n{}", ir);
         assert!(ir.contains("comet_cs_zscore_step"));
     }
