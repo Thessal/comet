@@ -21,7 +21,7 @@ float_literal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 string_literal = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 bool_literal = { "true" | "false" }
 literal = { float_literal | int_literal | string_literal | bool_literal }
-types = { "Series" | "DataFrame" | "Matrix" | "Vector" | "String" | "Int" | "Float" | "Bool" }
+types = { "Series" | "DataFrame" | "Matrix" | "Vector" | "String" | "Int" | "Float" | "Bool" | "Void" }
 
 // Keywords
 // Keywords

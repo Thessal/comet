@@ -27,7 +27,8 @@ in pkgs.mkShell.override { stdenv = pkgs.clangStdenv; } {
     antigravity
     myRust
   ] ++ (with pkgs; [
-    cargo rustc gcc rustfmt clippy rust-analyzer pkg-config maturin
+    cargo rustc gcc rustfmt clippy rust-analyzer 
+    python313 python313.pkgs.numpy
   ]) ;
   RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
 }

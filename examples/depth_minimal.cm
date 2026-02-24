@@ -1,0 +1,18 @@
+Behavior Comparator(signal: DataFrame, eps: Float Nonzero Optional, reference: DataFrame) -> DataFrame Indicator
+
+Fn data(symbol: String) -> DataFrame
+Fn consume(b: Float Optional) -> Void
+Fn cs_rank(a: DataFrame) -> DataFrame Normalized
+// Fn RankNonzero(a: DataFrame, eps: Float Nonzero) -> DataFrame Normalized Nonzero
+// Fn ts_diff(a: DataFrame, b:DataFrame) -> DataFrame Indicator
+// Fn divide(a: DataFrame, b: DataFrame Nonzero) -> DataFrame Indicator
+Fn rank_nonzero(a: DataFrame, eps: Float Nonzero) -> DataFrame Normalized Nonzero
+Fn ts_diff(a: DataFrame 'a, b:DataFrame 'a) -> DataFrame 'a Indicator
+Fn divide(a: DataFrame 'a, b: DataFrame 'a Nonzero) -> DataFrame 'a Indicator
+
+Flow volume_spike {
+    volume = data(symbol="volume")
+    adv20 = data(symbol="adv20")
+    variousdays = [5, 21, 252]
+    Comparator(signal=volume, reference=adv20, eps=0.1, depth=2)
+}

@@ -23,7 +23,6 @@ fn main() {
              for d in &program.declarations {
                  let t = match d {
                      comet::ast::Declaration::Import(_) => "Import",
-                     comet::ast::Declaration::Type(_) => "Type",
                      comet::ast::Declaration::Behavior(_) => "Behavior",
                      comet::ast::Declaration::Function(_) => "Function",
                      comet::ast::Declaration::Flow(_) => "Flow",
@@ -53,6 +52,28 @@ fn main() {
              }
              program.declarations = all_decls;
              
+             let mut library = Vec::new();
+             let mut behaviors = std::collections::HashMap::new();
+             for decl in &program.declarations {
+                 match decl {
+                     comet::ast::Declaration::Function(f) => {
+                         let mut args = Vec::new();
+                         for p in &f.params {
+                             args.push((p.name.clone(), p.constraint.clone()));
+                         }
+                         library.push(comet::synthesis::FnSignature {
+                             name: f.name.clone(),
+                             args,
+                             return_constraint: f.return_constraint.clone(),
+                         });
+                     },
+                     comet::ast::Declaration::Behavior(b) => {
+                         behaviors.insert(b.name.clone(), b.clone());
+                     },
+                     _ => {}
+                 }
+             }
+
              println!("Evaluating flows directly since semantics module is removed for redesign:");
              for decl in &program.declarations {
                  if let comet::ast::Declaration::Flow(flow) = decl {
@@ -74,14 +95,16 @@ fn main() {
                          if let comet::ast::FlowStmt::Expr(expr) = stmt {
                              let substituted_expr = comet::synthesis::substitute_expr(expr, &env_map);
                              println!("Synthesizing fully substituted target expression: {:#?}", substituted_expr);
-                             match comet::synthesis::Synthesizer::synthesize_expr(&substituted_expr) {
+                             match comet::synthesis::Synthesizer::synthesize_expr(&substituted_expr, &behaviors, &library) {
                                  Ok(real_exprs) => {
                                      
                                      let mut graphs = Vec::new();
-                                     for (i, real_expr) in real_exprs.iter().enumerate() {
+                                     for (i, real_forest) in real_exprs.iter().enumerate() {
                                          println!("--- Context {} ---", i);
-                                         println!("AST equivalent: {:?}", real_expr);
-                                         let g = comet::ir::ExecutionGraph::from_real_expr(real_expr);
+                                         for (j, tree) in real_forest.iter().enumerate() {
+                                             println!("AST equivalent [Tree {}]: {:?}", j, tree);
+                                         }
+                                         let g = comet::ir::ExecutionGraph::from_forest(real_forest);
                                          graphs.push(g);
                                      }
                                      

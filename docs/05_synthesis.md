@@ -16,12 +16,12 @@ This is done by iterating over the cartesian product space of Behavior and Flow.
   - Behavior arguments must be compatible to the function inputs constraints, so it is able to be used as the function inputs.
   - It must return a value that satisfies the return constraint of the behavior.
 
-- For example, `behavior Comparator(signal: DataFrame, eps: Float Nonzero Optional, reference: DataFrame) -> DataFrame Indicator`
+- For example, `Behavior Comparator(signal: DataFrame, eps: Float Nonzero Optional, reference: DataFrame) -> DataFrame Indicator`
    - One possible behavior call is `Comparator(signal=volume, reference=adv20, eps=0.1, depth=2)`
       - Literal `0.1` validates call constraints, so it is user's responsibility to provide a valid literal.
    - Assume that there are functions:
-      - `Fn Consume(b: Float Optional) -> ()`
-      - `Fn Rank(a: DataFrame) -> Normalized DataFrame`
+      - `Fn Consume(b: Float Optional) -> Void`
+      - `Fn Rank(a: DataFrame) -> DataFrame Normalized`
       - `Fn RankNonzero(a: DataFrame, eps: Float Nonzero) -> DataFrame Normalized Nonzero`
       - `Fn Diff(a: DataFrame, b:DataFrame) -> DataFrame Indicator`
       - `Fn Divide(a: DataFrame, b: DataFrame Nonzero) -> DataFrame Indicator`

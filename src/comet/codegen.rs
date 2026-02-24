@@ -62,9 +62,9 @@ impl<'ctx> Codegen<'ctx> {
     fn declare_externals(&self, graphs: &Vec<crate::comet::ir::ExecutionGraph>) {
         let void_type = self.context.void_type();
         let i64_type = self.context.i64_type();
-        let f64_ptr_type = self.context.f64_type().ptr_type(AddressSpace::default());
-        let opaque_ptr_type = self.context.i8_type().ptr_type(AddressSpace::default());
-        let i8_ptr_type = self.context.i8_type().ptr_type(AddressSpace::default());
+        let f64_ptr_type = self.context.ptr_type(AddressSpace::default());
+        let opaque_ptr_type = self.context.ptr_type(AddressSpace::default());
+        let i8_ptr_type = self.context.ptr_type(AddressSpace::default());
 
         // libc malloc / free
         let malloc_type = i8_ptr_type.fn_type(&[i64_type.into()], false);
@@ -114,9 +114,9 @@ impl<'ctx> Codegen<'ctx> {
         let i32_type = self.context.i32_type();
         let i64_type = self.context.i64_type();
         let f64_type = self.context.f64_type();
-        let f64_ptr_type = f64_type.ptr_type(AddressSpace::default());
-        let f64_ptr_ptr_type = f64_ptr_type.ptr_type(AddressSpace::default());
-        let opaque_ptr_type = self.context.i8_type().ptr_type(AddressSpace::default());
+        let f64_ptr_type = self.context.ptr_type(AddressSpace::default());
+        let f64_ptr_ptr_type = self.context.ptr_type(AddressSpace::default());
+        let opaque_ptr_type = self.context.ptr_type(AddressSpace::default());
 
         let comet_data_type = self.context.struct_type(&[
             i32_type.into(), // dtype
@@ -308,7 +308,7 @@ impl<'ctx> Codegen<'ctx> {
             // ExecutionNode::Constant uses raw alloca inline memory! So NO free operations injected!
         }
 
-        self.builder.build_return(None);
+        let _ = self.builder.build_return(None);
     }
 }
 

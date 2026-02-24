@@ -1,11 +1,11 @@
-use crate::comet::ast::Ident;
+
 
 #[derive(Debug, Clone)]
 pub enum ConstantValue {
     Integer(i64),
     Float(f64),
-    String(String),
-    Boolean(bool),
+    String,
+    Boolean,
 }
 
 #[derive(Debug, Clone)]
@@ -31,6 +31,16 @@ impl ExecutionGraph {
         graph
     }
 
+    pub fn from_forest(forest: &[crate::comet::synthesis::RealExpr]) -> Self {
+        let mut graph = ExecutionGraph::new();
+        let s: Vec<String> = forest.iter().map(|t| t.to_string()).collect();
+        graph.ast_string = s.join("; ");
+        for tree in forest {
+            Self::build_graph(&mut graph, tree);
+        }
+        graph
+    }
+
     fn build_graph(graph: &mut ExecutionGraph, expr: &crate::comet::synthesis::RealExpr) -> usize {
         match expr {
             crate::comet::synthesis::RealExpr::Identifier(name) => {
@@ -43,8 +53,8 @@ impl ExecutionGraph {
                 let cv = match lit {
                     crate::comet::ast::Literal::Integer(i) => ConstantValue::Integer(*i),
                     crate::comet::ast::Literal::Float(f) => ConstantValue::Float(*f),
-                    crate::comet::ast::Literal::String(s) => ConstantValue::String(s.clone()),
-                    crate::comet::ast::Literal::Boolean(b) => ConstantValue::Boolean(*b),
+                    crate::comet::ast::Literal::String(_) => ConstantValue::String,
+                    crate::comet::ast::Literal::Boolean(_) => ConstantValue::Boolean,
                 };
                 graph.add_node(ExecutionNode::Constant { value: cv })
             },
@@ -58,12 +68,7 @@ impl ExecutionGraph {
                     args: arg_indices,
                 })
             },
-            _ => {
-                graph.add_node(ExecutionNode::Operation {
-                    op: "unknown".to_string(),
-                    args: vec![],
-                })
-            }
+
         }
     }
 }

@@ -165,15 +165,15 @@ impl CometData {
     #[inline(always)]
     pub unsafe fn as_slice(&self, len: usize) -> &[f64] {
         if self.dtype == DataType::DataFrame {
-            std::slice::from_raw_parts(self.ptr, len)
+            unsafe { std::slice::from_raw_parts(self.ptr, len) }
         } else {
-            std::slice::from_raw_parts(self.ptr, 1)
+            unsafe { std::slice::from_raw_parts(self.ptr, 1) }
         }
     }
 
     #[inline(always)]
     pub unsafe fn get_scalar(&self) -> f64 {
-        *self.ptr
+        unsafe { *self.ptr }
     }
 }
 

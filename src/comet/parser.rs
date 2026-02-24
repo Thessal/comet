@@ -4,6 +4,8 @@ use crate::comet::ast::*;
 use pest::iterators::Pair;
 use thiserror::Error;
 
+use std::collections::HashSet;
+
 #[derive(Parser)]
 #[grammar = "comet/grammar.pest"]
 pub struct CometParser;
@@ -16,6 +18,8 @@ pub enum ParserError {
     UnexpectedRule(Rule),
     #[error("Missing token")]
     MissingToken,
+    #[error("Semantic error: {0}")]
+    SemanticError(String),
 }
 
 pub fn parse(input: &str) -> Result<Program, ParserError> {
@@ -33,7 +37,76 @@ fn parse_program(pair: Pair<Rule>) -> Result<Program, ParserError> {
             _ => return Err(ParserError::UnexpectedRule(inner.as_rule())),
         }
     }
-    Ok(Program { declarations })
+    
+    let prog = Program { declarations };
+    validate_program(&prog)?;
+    Ok(prog)
+}
+
+fn validate_program(program: &Program) -> Result<(), ParserError> {
+    let mut known_functions = HashSet::new();
+    for decl in &program.declarations {
+        match decl {
+            Declaration::Function(f) => {
+                known_functions.insert(f.name.clone());
+            },
+            Declaration::Behavior(b) => {
+                known_functions.insert(b.name.clone());
+            },
+            _ => {}
+        }
+    }
+    
+    for decl in &program.declarations {
+        if let Declaration::Flow(flow) = decl {
+            for stmt in &flow.body {
+                if let FlowStmt::Expr(expr) = stmt {
+                    validate_expr(expr, &known_functions)?;
+                } else if let FlowStmt::Assignment { expr, .. } = stmt {
+                     validate_expr(expr, &known_functions)?;
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+fn validate_expr(expr: &Expr, known_functions: &HashSet<String>) -> Result<(), ParserError> {
+    match expr {
+        Expr::Call { path, args } => {
+            let func_name = path.segments.last().unwrap();
+            if !known_functions.contains(func_name) {
+                return Err(ParserError::SemanticError(format!("Undefined function or behavior called: '{}'", func_name)));
+            }
+            for arg in args {
+                validate_expr(&arg.value, known_functions)?;
+            }
+            Ok(())
+        },
+        Expr::BinaryOp { left, right, .. } => {
+            validate_expr(left, known_functions)?;
+            validate_expr(right, known_functions)?;
+            Ok(())
+        },
+        Expr::UnaryOp { target, .. } => validate_expr(target, known_functions),
+        Expr::MemberAccess { target, .. } => validate_expr(target, known_functions),
+        Expr::List(exprs) => {
+            for e in exprs {
+                validate_expr(e, known_functions)?;
+            }
+            Ok(())
+        },
+        Expr::Range { start, step, end } => {
+            validate_expr(start, known_functions)?;
+            if let Some(s) = step {
+                validate_expr(s, known_functions)?;
+            }
+            validate_expr(end, known_functions)?;
+            Ok(())
+        },
+        _ => Ok(()),
+    }
 }
 
 fn parse_declaration(pair: Pair<Rule>) -> Result<Declaration, ParserError> {
@@ -87,6 +160,7 @@ fn parse_types(pair: Pair<Rule>) -> Result<TypeDecl, ParserError> {
         "Int" => Ok(TypeDecl::Int),
         "Float" => Ok(TypeDecl::Float),
         "Bool" => Ok(TypeDecl::Bool),
+        "Void" => Ok(TypeDecl::Void),
         _ => Err(ParserError::UnexpectedRule(pair.as_rule())),
     }
 }

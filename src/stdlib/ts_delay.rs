@@ -19,8 +19,6 @@ impl UnaryOp for TsDelayState {
         let old_history_slice_opt = self.history.get_oldest();
         
         for i in 0..len {
-            let val = a_slice[i];
-            
             // 2. Erase the oldest value if we reached capacity and it wasn't NaN
             if let Some(old_history_slice) = old_history_slice_opt {
                 let old_val = old_history_slice[i];

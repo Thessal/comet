@@ -12,7 +12,6 @@ pub struct Program {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Declaration {
     Import(ImportDecl),
-    Type(TypeDecl),
     Behavior(BehaviorDecl),
     Function(FuncDecl),
     Flow(FlowDecl),
@@ -37,6 +36,7 @@ pub enum TypeDecl {
     Int,
     Float,
     Bool,
+    Void,
 }
 
 // 3. Logic Definitions (Behaviors & Functions)
@@ -73,14 +73,9 @@ pub enum CategoryExpr {
     Addition(Vec<CategoryExpr>), // Intersection / Composition
     Union(Vec<CategoryExpr>),    // Or
     Subtraction(Box<CategoryExpr>, Box<CategoryExpr>), // A - B
-    None, // Empty category
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct CategorySetDecl {
-    pub name: Option<Ident>, // e.g. 'a, 'b
-    pub categories: Vec<CategoryExpr>,
-}
+// CategorySetDecl is currently unused
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConstraintDecl {
@@ -170,7 +165,6 @@ impl fmt::Display for Declaration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Declaration::Import(i) => write!(f, "{}", i),
-            Declaration::Type(t) => write!(f, "{}", t),
             Declaration::Behavior(b) => write!(f, "{}", b),
             Declaration::Function(fun) => write!(f, "{}", fun),
             Declaration::Flow(flow) => write!(f, "{}", flow),
@@ -195,6 +189,7 @@ impl fmt::Display for TypeDecl {
             TypeDecl::Int => write!(f, "Int"),
             TypeDecl::Float => write!(f, "Float"),
             TypeDecl::Bool => write!(f, "Bool"),
+            TypeDecl::Void => write!(f, "()"),
         }
     }
 }
@@ -214,7 +209,6 @@ impl fmt::Display for CategoryExpr {
             CategoryExpr::Subtraction(lhs, rhs) => {
                 write!(f, "{} - {}", lhs, rhs)
             },
-            CategoryExpr::None => write!(f, ""),
         }
     }
 }
@@ -229,15 +223,7 @@ impl fmt::Display for ConstraintDecl {
     }
 }
 
-impl fmt::Display for CategorySetDecl {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(n) = &self.name {
-            write!(f, "{}: ", n)?;
-        }
-        let cats: Vec<String> = self.categories.iter().map(|c| c.to_string()).collect();
-        write!(f, "{}", cats.join(", "))
-    }
-}
+// Trait for CategorySetDecl removed
 
 impl fmt::Display for TypedArg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

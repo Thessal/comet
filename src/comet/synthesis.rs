@@ -59,8 +59,8 @@ pub enum RealExpr {
     },
     Literal(Literal),
     Identifier(Ident),
-    BinaryOp { left: Box<RealExpr>, op: Op, right: Box<RealExpr> },
-    UnaryOp { op: Op, target: Box<RealExpr> },
+    //Literal(Literal),
+    //Identifier(Ident),
 }
 
 impl std::fmt::Display for RealExpr {
@@ -85,20 +85,6 @@ impl std::fmt::Display for RealExpr {
                 }
                 write!(f, ")")
             },
-            RealExpr::BinaryOp { left, op, right } => {
-                let op_str = match op {
-                    Op::Add => "+", Op::Sub => "-", Op::Mul => "*", Op::Div => "/",
-                    Op::Eq => "==", Op::Neq => "!=", Op::Lt => "<", Op::Gt => ">",
-                    Op::And => "and", Op::Or => "or", Op::Not => "!",
-                };
-                write!(f, "({} {} {})", left, op_str, right)
-            },
-            RealExpr::UnaryOp { op, target } => {
-                let op_str = match op {
-                    Op::Sub => "-", Op::Not => "!", _ => "?",
-                };
-                write!(f, "{}{}", op_str, target)
-            }
         }
     }
 }
@@ -117,8 +103,8 @@ impl Synthesizer {
     /// Exhaustively synthesizes a BehaviorDecl into all mathematically valid disjoint forests.
     /// Returns a list of forests, where each forest is a `Vec<RealExpr>`. The primary expression
     /// (which returns the Behavior output) will be first, followed by independent side-effect exprs (e.g. `Consume`).
-    pub fn exhaustive_synthesize(behavior: &BehaviorDecl, library: &[FnSignature]) -> Vec<Vec<RealExpr>> {
-        let max_depth = behavior.depth;
+    pub fn exhaustive_synthesize(behavior: &BehaviorDecl, library: &[FnSignature], explicit_depth: u32) -> Vec<Vec<RealExpr>> {
+        let max_depth = explicit_depth;
         let mut pool: Vec<SubtreeState> = Vec::new();
 
         // Step 1.1: Initialization (Depth 0)
@@ -146,7 +132,7 @@ impl Synthesizer {
                 
                 if n_args == 0 {
                     // Nullary function mapping (e.g., globals, constants)
-                    let mut bindings = HashMap::new();
+                    let bindings = HashMap::new();
                     let return_bound = Self::resolve_return(&func.return_constraint, &bindings);
                     next_states.push(SubtreeState {
                         tree: RealExpr::CallFn {
@@ -214,15 +200,15 @@ impl Synthesizer {
         }
 
         // Find all side effect trees (e.g. `Consume`)
-        // In this mockup, we define `Consume` as returning `output_constraint` with name "SideEffect" (or we just know them by their lack of need to match return).
+        // We define side effects as those functions returning `Void` ().
         let mut side_trees = Vec::new();
         for (i, state) in pool.iter().enumerate() {
-            if let RealExpr::CallFn { ref func_name, .. } = state.tree {
-                if func_name.starts_with("Consume") {
-                    side_trees.push((i, state));
-                }
+            if state.output_constraint.base_type == crate::comet::ast::TypeDecl::Void {
+                side_trees.push((i, state));
             }
         }
+        
+        println!("DEBUG: pool size = {}, side_trees size = {}, main_trees size = {}", pool.len(), side_trees.len(), main_trees.len());
 
         // For each main tree, recursively add side trees until consumed_args == expected_args
         for (_m_idx, m_state) in main_trees {
@@ -244,21 +230,26 @@ impl Synthesizer {
         results: &mut Vec<Vec<RealExpr>>
     ) {
         if current_consumed == expected {
+            println!("DEBUG: Found forest!");
             results.push(current_forest.clone());
             return;
         }
 
         for i in start_idx..side_trees.len() {
             let s_state = side_trees[i].1;
+            println!("DEBUG: Trying side tree {:?} with consumed_args {:?}", s_state.tree, s_state.consumed_args);
             
             // Check if disjoint
             if s_state.consumed_args.is_disjoint(current_consumed) {
                 let mut next_consumed = current_consumed.clone();
                 next_consumed.extend(s_state.consumed_args.iter().cloned());
+                println!("DEBUG: disjoint! next_consumed {:?}", next_consumed);
                 
                 current_forest.push(s_state.tree.clone());
                 Self::assemble_forest(expected, &mut next_consumed, current_forest, side_trees, i + 1, results);
                 current_forest.pop(); // Backtrack
+            } else {
+                println!("DEBUG: not disjoint with current_consumed {:?}", current_consumed);
             }
         }
     }
@@ -415,24 +406,48 @@ impl Synthesizer {
             match c {
                 CategoryExpr::Addition(cats) => result.extend(cats.clone()),
                 CategoryExpr::Atom(_) => result.push(c.clone()),
-                CategoryExpr::None => {},
+                // CategoryExpr::None => {},
                 _ => result.push(c.clone()), // Support others trivially
             }
         }
         result
     }
 
+    pub fn substitute_real_expr(expr: &RealExpr, bindings: &HashMap<String, RealExpr>) -> RealExpr {
+        match expr {
+            RealExpr::Identifier(id) => {
+                if let Some(replacement) = bindings.get(id) {
+                    replacement.clone()
+                } else {
+                    expr.clone()
+                }
+            },
+            RealExpr::CallFn { func_name, args, return_constraint } => {
+                let mut new_args = Vec::new();
+                for (opt_id, arg_expr) in args {
+                    new_args.push((opt_id.clone(), Self::substitute_real_expr(arg_expr, bindings)));
+                }
+                RealExpr::CallFn {
+                    func_name: func_name.clone(),
+                    args: new_args,
+                    return_constraint: return_constraint.clone(),
+                }
+            },
+            RealExpr::Literal(_) => expr.clone(),
+        }
+    }
+
     /// Recursively evaluate an AST Expression to generate a Cartesian product of valid Concrete branches!
     /// `[5, 21]` evaluates to `vec![Literal(5), Literal(21)]`.
     /// `ts_mean(window=[5, 21])` evaluates to `vec![Call(ts_mean, 5), Call(ts_mean, 21)]`.
-    pub fn synthesize_expr(expr: &Expr) -> Result<Vec<RealExpr>, String> {
+    pub fn synthesize_expr(expr: &Expr, behaviors: &HashMap<String, BehaviorDecl>, library: &[FnSignature]) -> Result<Vec<Vec<RealExpr>>, String> {
         match expr {
-            Expr::Literal(lit) => Ok(vec![RealExpr::Literal(lit.clone())]),
-            Expr::Identifier(id) => Ok(vec![RealExpr::Identifier(id.clone())]),
+            Expr::Literal(lit) => Ok(vec![vec![RealExpr::Literal(lit.clone())]]),
+            Expr::Identifier(id) => Ok(vec![vec![RealExpr::Identifier(id.clone())]]),
             Expr::List(exprs) => {
                 let mut possibilities = Vec::new();
                 for e in exprs {
-                    let mut e_combs = Self::synthesize_expr(e)?;
+                    let mut e_combs = Self::synthesize_expr(e, behaviors, library)?;
                     possibilities.append(&mut e_combs);
                 }
                 Ok(possibilities)
@@ -451,7 +466,7 @@ impl Synthesizer {
                     (Literal::Integer(s), Literal::Integer(e), Literal::Integer(st)) => {
                         let mut current = s;
                         while current <= e {
-                            possibilities.push(RealExpr::Literal(Literal::Integer(current)));
+                            possibilities.push(vec![RealExpr::Literal(Literal::Integer(current))]);
                             current += st;
                         }
                     },
@@ -459,7 +474,7 @@ impl Synthesizer {
                         let mut current = s;
                         let epsilon = 1e-9;
                         while current <= e + epsilon {
-                            possibilities.push(RealExpr::Literal(Literal::Float(current)));
+                            possibilities.push(vec![RealExpr::Literal(Literal::Float(current))]);
                             current += st;
                         }
                     },
@@ -473,13 +488,13 @@ impl Synthesizer {
                 
                 for arg in args {
                     let arg_name = arg.name.clone();
-                    let evaluated_values = Self::synthesize_expr(&arg.value)?;
+                    let evaluated_values = Self::synthesize_expr(&arg.value, behaviors, library)?;
                     
                     let mut next_product = Vec::new();
                     for partial_tuple in &arg_possibilities {
-                        for val in &evaluated_values {
+                        for val_forest in &evaluated_values {
                             let mut new_tuple = partial_tuple.clone();
-                            new_tuple.push((arg_name.clone(), val.clone()));
+                            new_tuple.push((arg_name.clone(), val_forest[0].clone()));
                             next_product.push(new_tuple);
                         }
                     }
@@ -488,13 +503,43 @@ impl Synthesizer {
 
                 let mut call_combinations = Vec::new();
                 let func_name = path.segments.last().unwrap().clone();
-                for args_tuple in arg_possibilities {
-                    call_combinations.push(RealExpr::CallFn {
-                        func_name: func_name.clone(),
-                        args: args_tuple,
-                        // Dummy constraint for expression evaluations. Real compiler infers this.
-                        return_constraint: ConstraintDecl { base_type: TypeDecl::Bool, category_expr: None },
-                    });
+                if let Some(behavior) = behaviors.get(&func_name) {
+                    for args_tuple in arg_possibilities {
+                        let mut formal_to_real = HashMap::new();
+                        let mut call_depth = behavior.depth;
+                        for (idx, provided) in args_tuple.iter().enumerate() {
+                            if let Some(ref named) = provided.0 {
+                                if named == "depth" {
+                                    if let RealExpr::Literal(Literal::Integer(d)) = &provided.1 {
+                                        call_depth = *d as u32;
+                                    }
+                                    continue; // Do not add depth to actual consumed formal args yet, or keep it if behavior expects it
+                                }
+                                formal_to_real.insert(named.clone(), provided.1.clone());
+                            } else if idx < behavior.args.len() {
+                                formal_to_real.insert(behavior.args[idx].name.clone(), provided.1.clone());
+                            }
+                        }
+
+                        let forest_paths = Self::exhaustive_synthesize(behavior, library, call_depth);
+                        for forest in &forest_paths {
+                            if !forest.is_empty() {
+                                let mut subbed_forest = Vec::new();
+                                for tree in forest {
+                                    subbed_forest.push(Self::substitute_real_expr(tree, &formal_to_real));
+                                }
+                                call_combinations.push(subbed_forest);
+                            }
+                        }
+                    }
+                } else {
+                    for args_tuple in arg_possibilities {
+                        call_combinations.push(vec![RealExpr::CallFn {
+                            func_name: func_name.clone(),
+                            args: args_tuple,
+                            return_constraint: ConstraintDecl { base_type: TypeDecl::Bool, category_expr: None },
+                        }]);
+                    }
                 }
                 Ok(call_combinations)
             },
@@ -541,14 +586,14 @@ mod tests {
         // Build Library
         let mut lib = Vec::new();
 
-        // `Fn Consume(b: Float Optional) -> Bool` (Bool acts as void here)
+        // `Fn Consume(b: Float Optional) -> ()` (Void acts as void here)
         lib.push(FnSignature {
             name: "Consume".to_string(),
             args: vec![("b".to_string(), ConstraintDecl { base_type: TypeDecl::Float, category_expr: make_atom("Optional") })],
-            return_constraint: ConstraintDecl { base_type: TypeDecl::Bool, category_expr: None }, // Dummy void
+            return_constraint: ConstraintDecl { base_type: TypeDecl::Void, category_expr: None }, // Void type
         });
 
-        // `Fn Rank(a: DataFrame) -> Normalized DataFrame`  (We mock this loosely: 'a' bindings in comet are DataFrame)
+        // `Fn Rank(a: DataFrame) -> DataFrame Normalized`  (We mock this loosely: 'a' bindings in comet are DataFrame)
         lib.push(FnSignature {
             name: "Rank".to_string(),
             args: vec![("a".to_string(), ConstraintDecl { base_type: TypeDecl::DataFrame, category_expr: None })],
@@ -585,7 +630,7 @@ mod tests {
             return_constraint: ConstraintDecl { base_type: TypeDecl::DataFrame, category_expr: make_compound(&["'a", "Indicator"]) },
         });
 
-        let results = Synthesizer::exhaustive_synthesize(&behavior, &lib);
+        let results = Synthesizer::exhaustive_synthesize(&behavior, &lib, behavior.depth);
 
         // Debug output to see exactly what combinations survived
         for (i, r) in results.iter().enumerate() {
@@ -611,7 +656,7 @@ mod tests {
             Expr::Literal(Literal::Integer(5)),
             Expr::Literal(Literal::Integer(21))
         ]);
-        let r1 = Synthesizer::synthesize_expr(&list_expr).unwrap();
+        let r1 = Synthesizer::synthesize_expr(&list_expr, &HashMap::new(), &[]).unwrap();
         assert_eq!(r1.len(), 2);
 
         // var = [10..10..30] -> 10, 20, 30
@@ -620,7 +665,7 @@ mod tests {
             step: Some(Box::new(Expr::Literal(Literal::Integer(10)))),
             end: Box::new(Expr::Literal(Literal::Integer(30))),
         };
-        let r2 = Synthesizer::synthesize_expr(&range_expr).unwrap();
+        let r2 = Synthesizer::synthesize_expr(&range_expr, &HashMap::new(), &[]).unwrap();
         assert_eq!(r2.len(), 3);
 
         // ts_mean(a="volume", window=[5, 21])
@@ -631,9 +676,9 @@ mod tests {
                 ArgValue { name: Some("window".to_string()), value: list_expr },
             ]
         };
-        let r3 = Synthesizer::synthesize_expr(&call_expr).unwrap();
+        let r3 = Synthesizer::synthesize_expr(&call_expr, &HashMap::new(), &[]).unwrap();
         assert_eq!(r3.len(), 2);
-        if let RealExpr::CallFn { func_name, args, .. } = &r3[0] {
+        if let RealExpr::CallFn { func_name, args, .. } = &r3[0][0] {
             assert_eq!(func_name, "ts_mean");
             assert_eq!(args.len(), 2);
         }
@@ -652,7 +697,7 @@ mod tests {
                 ArgValue { name: Some("window".to_string()), value: range_expr },
             ]
         };
-        let r4 = Synthesizer::synthesize_expr(&multi_call).unwrap();
+        let r4 = Synthesizer::synthesize_expr(&multi_call, &HashMap::new(), &[]).unwrap();
         assert_eq!(r4.len(), 6, "Expected exactly 6 cartesian branches (2 * 3)");
     }
 }
