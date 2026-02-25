@@ -31,44 +31,52 @@ source_filename = "volume_spike"
 @comet_ast_0 = global [98 x i8] c"divide(signal=data(symbol=\22volume\22), reference=ts_mean(child=data(symbol=\22volume\22), lookback=10))\00"
 
 declare ptr @malloc(i64)
+
 declare void @free(ptr)
-declare void @comet_divide_step(ptr, { i32, ptr }, { i32, ptr }, ptr, i64)
-declare void @comet_data_step(ptr, ptr, i64)
+
 declare void @comet_ts_mean_step(ptr, { i32, ptr }, ptr, i64)
+
+declare void @comet_data_step(ptr, ptr, i64)
+
+declare void @comet_divide_step(ptr, { i32, ptr }, { i32, ptr }, ptr, i64)
 
 define void @execute_variant_0(ptr %0, ptr %1, ptr %2, i64 %3, i64 %4) {
 entry:
   %alloc_size = mul i64 %3, 8
   %malloc_out_1 = call ptr @malloc(i64 %alloc_size)
   %state_offset_1 = getelementptr inbounds nuw { [256 x double], [256 x double], [256 x double], [256 x double] }, ptr %2, i32 0, i32 0
-  ; ... State initialization & memory allocation ...
-
+  %malloc_out_3 = call ptr @malloc(i64 %alloc_size)
+  %state_offset_3 = getelementptr inbounds nuw { [256 x double], [256 x double], [256 x double], [256 x double] }, ptr %2, i32 0, i32 1
+  %const_ptr_4 = alloca double, align 8
+  store double 1.000000e+01, ptr %const_ptr_4, align 8
+  %malloc_out_5 = call ptr @malloc(i64 %alloc_size)
+  %state_offset_5 = getelementptr inbounds nuw { [256 x double], [256 x double], [256 x double], [256 x double] }, ptr %2, i32 0, i32 2
+  %malloc_out_6 = call ptr @malloc(i64 %alloc_size)
+  %state_offset_6 = getelementptr inbounds nuw { [256 x double], [256 x double], [256 x double], [256 x double] }, ptr %2, i32 0, i32 3
   %t = alloca i64, align 8
   store i64 0, ptr %t, align 4
   br label %event_loop_cond
 
 event_loop:                                       ; preds = %event_loop_cond
   %offset = mul i64 %t_val, %3
-  
-  ; Operator kernels are called consecutively passing the static component states
   call void @comet_data_step(ptr %state_offset_1, ptr %malloc_out_1, i64 %3)
-  
-  ; ... Argument mapping and polymorphic type injection ...
+  call void @comet_data_step(ptr %state_offset_3, ptr %malloc_out_3, i64 %3)
   %insert_ptr = insertvalue { i32, ptr } { i32 2, ptr undef }, ptr %malloc_out_3, 1
   %comet_data_ptr = alloca { i32, ptr }, align 8
   store { i32, ptr } %insert_ptr, ptr %comet_data_ptr, align 8
-  
   call void @comet_ts_mean_step(ptr %state_offset_5, ptr %comet_data_ptr, ptr %malloc_out_5, i64 %3)
-  
-  ; Core logic division step yielding directly to stream pointer
+  %insert_ptr1 = insertvalue { i32, ptr } { i32 2, ptr undef }, ptr %malloc_out_1, 1
+  %comet_data_ptr2 = alloca { i32, ptr }, align 8
+  store { i32, ptr } %insert_ptr1, ptr %comet_data_ptr2, align 8
+  %insert_ptr3 = insertvalue { i32, ptr } { i32 2, ptr undef }, ptr %malloc_out_5, 1
+  %comet_data_ptr4 = alloca { i32, ptr }, align 8
+  store { i32, ptr } %insert_ptr3, ptr %comet_data_ptr4, align 8
   %stream_out = getelementptr double, ptr %1, i64 %offset
   call void @comet_divide_step(ptr %state_offset_6, ptr %comet_data_ptr2, ptr %comet_data_ptr4, ptr %stream_out, i64 %3)
-  
   br label %event_loop_inc
 
 event_loop_inc:                                   ; preds = %event_loop
-  %t_val1 = load i64, ptr %t, align 4
-  %t_next = add i64 %t_val1, 1
+  %t_next = add i64 %t_val, 1
   store i64 %t_next, ptr %t, align 4
   br label %event_loop_cond
 
@@ -78,6 +86,9 @@ event_loop_cond:                                  ; preds = %event_loop_inc, %en
   br i1 %loop_cond, label %event_loop, label %event_loop_end
 
 event_loop_end:                                   ; preds = %event_loop_cond
+  call void @free(ptr %malloc_out_1)
+  call void @free(ptr %malloc_out_3)
+  call void @free(ptr %malloc_out_5)
   ret void
 }
 ```
