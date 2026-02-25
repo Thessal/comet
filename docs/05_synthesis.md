@@ -110,8 +110,8 @@ A complete implementation is a subset of mutually disjoint subtrees that perfect
 
 1. **Forest Assembly:**
    - Find all subsets of subtrees from the pool `P` such that:
-     1. **Return Constraint:** Exactly one subtree $T_{main}$ produces an `output_constraint` that satisfies the behavior's expected `return_constraint`.
-     2. **Side Effects:** All other subtrees $T_{side}$ in the subset must return `()` (e.g., diverse side-effect functions like `ConsumeInt`, `ConsumeFloat`, `LogData`, etc.).
+     1. **Return Constraint:** Exactly one subtree $T_{main}$ produces an `output_constraint` that satisfies the behavior's expected `return_constraint`. This becomes the **primary output node** wired to the main `Flow` output.
+     2. **Side Effects:** All other subtrees $T_{side}$ in the subset must return `()` (e.g., diverse side-effect functions like `ConsumeInt`, `ConsumeFloat`, `LogData`, `consume()`, etc.). These execute independently as collateral constraints and do **not** route their return streams to the primary output pointer.
      3. **Exact Consumption:** The `consumed_args` between all subtrees in the subset are mutually disjoint, and their union perfectly exactly equals the set of all behavior arguments.
 2. **Yielding:**
    - Return these mutually valid subsets as the exhaustive list of implementations. (e.g., `Consume(eps=eps); Diff(volume, adv20)` is simply natively assembled and recognized as the subset `{ Consume(eps), Diff(volume, adv20) }`).

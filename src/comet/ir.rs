@@ -12,11 +12,12 @@ pub enum ConstantValue {
 pub struct ExecutionGraph {
     pub nodes: Vec<ExecutionNode>,
     pub ast_string: String,
+    pub primary_output_node: usize,
 }
 
 impl ExecutionGraph {
     pub fn new() -> Self {
-        ExecutionGraph { nodes: Vec::new(), ast_string: String::new() }
+        ExecutionGraph { nodes: Vec::new(), ast_string: String::new(), primary_output_node: 0 }
     }
 
     pub fn add_node(&mut self, node: ExecutionNode) -> usize {
@@ -27,7 +28,7 @@ impl ExecutionGraph {
     pub fn from_real_expr(expr: &crate::comet::synthesis::RealExpr) -> Self {
         let mut graph = ExecutionGraph::new();
         graph.ast_string = expr.to_string();
-        Self::build_graph(&mut graph, expr);
+        graph.primary_output_node = Self::build_graph(&mut graph, expr);
         graph
     }
 
@@ -35,8 +36,11 @@ impl ExecutionGraph {
         let mut graph = ExecutionGraph::new();
         let s: Vec<String> = forest.iter().map(|t| t.to_string()).collect();
         graph.ast_string = s.join("; ");
-        for tree in forest {
-            Self::build_graph(&mut graph, tree);
+        for (i, tree) in forest.iter().enumerate() {
+            let root_id = Self::build_graph(&mut graph, tree);
+            if i == 0 {
+                graph.primary_output_node = root_id;
+            }
         }
         graph
     }
@@ -59,6 +63,16 @@ impl ExecutionGraph {
                 graph.add_node(ExecutionNode::Constant { value: cv })
             },
             crate::comet::synthesis::RealExpr::CallFn { func_name, args, .. } => {
+                if func_name == "data" {
+                    if let Some((_, arg_expr)) = args.first() {
+                        if let crate::comet::synthesis::RealExpr::Literal(crate::comet::ast::Literal::String(s)) = arg_expr {
+                            return graph.add_node(ExecutionNode::Source {
+                                name: s.clone(),
+                                type_name: "DataFrame".to_string(), // Keep consistent
+                            });
+                        }
+                    }
+                }
                 let mut arg_indices = Vec::new();
                 for (_, arg_expr) in args {
                     arg_indices.push(Self::build_graph(graph, arg_expr));

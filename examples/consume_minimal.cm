@@ -1,10 +1,10 @@
 Behavior Comparator(signal: DataFrame, eps: Float Nonzero Optional, reference: DataFrame) -> DataFrame Indicator
 
 Fn data(symbol: String) -> DataFrame
-Fn consume(b: Float Optional) -> Void
+Fn consume_float(b: Float Optional) -> Void
 Fn cs_rank(a: DataFrame) -> DataFrame Normalized
 // Fn RankNonzero(a: DataFrame, eps: Float Nonzero) -> DataFrame Normalized Nonzero
-Fn ts_diff(a: DataFrame, b:DataFrame) -> DataFrame Indicator
+Fn ts_diff(a: DataFrame, days: Int) -> DataFrame Indicator
 Fn divide(a: DataFrame, b: DataFrame Nonzero) -> DataFrame Indicator
 
 Flow volume_spike {

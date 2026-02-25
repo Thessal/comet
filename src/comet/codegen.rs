@@ -53,6 +53,7 @@ impl<'ctx> Codegen<'ctx> {
         self.declare_externals(graphs);
 
         for (i, graph) in graphs.iter().enumerate() {
+            self.generate_variant_init(i, graph);
             self.generate_variant_executor(i, graph);
         }
 
@@ -71,6 +72,16 @@ impl<'ctx> Codegen<'ctx> {
         self.module.add_function("malloc", malloc_type, None);
         let free_type = void_type.fn_type(&[i8_ptr_type.into()], false);
         self.module.add_function("free", free_type, None);
+
+        // llvm intrinsic memcpy
+        let bool_type = self.context.bool_type();
+        let memcpy_type = void_type.fn_type(&[
+            i8_ptr_type.into(), // dest
+            i8_ptr_type.into(), // src
+            i64_type.into(),    // len
+            bool_type.into()    // isvolatile
+        ], false);
+        self.module.add_function("llvm.memcpy.p0i8.p0i8.i64", memcpy_type, None);
 
         // Define CometData LLVM struct globally: { i32, double* }
         let comet_data_type = self.context.struct_type(&[
@@ -94,7 +105,7 @@ impl<'ctx> Codegen<'ctx> {
             
             let mut step_args = vec![opaque_ptr_type.into()];
             for _ in 0..arg_count {
-                step_args.push(comet_data_type.into());
+                step_args.push(opaque_ptr_type.into()); // Pass CometData by pointer, not by value!
             }
             step_args.push(f64_ptr_type.into()); // output ptr
             step_args.push(i64_type.into());     // len
@@ -152,7 +163,7 @@ impl<'ctx> Codegen<'ctx> {
         let mut next_source_idx = 0;
 
         // Build the state tracking struct type (each stateful op gets a designated memory block)
-        let state_field_type = f64_type.array_type(256); // Fallback static chunk size
+        let state_field_type = opaque_ptr_type; // Store pointers!
         let mut state_fields: Vec<inkwell::types::BasicTypeEnum> = Vec::new();
         let mut stateful_node_indices = HashMap::new();
 
@@ -206,7 +217,8 @@ impl<'ctx> Codegen<'ctx> {
                     if let Some(target_idx) = stateful_node_indices.get(&node_id) {
                         // Dynamically map struct offset correctly!
                         let state_k_ptr = self.builder.build_struct_gep(state_struct_type, state_blob_raw, *target_idx, &format!("state_offset_{}", node_id)).unwrap();
-                        node_states.insert(node_id, state_k_ptr);
+                        let loaded_state_ptr = self.builder.build_load(opaque_ptr_type, state_k_ptr, &format!("state_ptr_{}", node_id)).unwrap();
+                        node_states.insert(node_id, loaded_state_ptr.into_pointer_value());
                     }
                 }
             }
@@ -309,6 +321,133 @@ impl<'ctx> Codegen<'ctx> {
         }
 
         let _ = self.builder.build_return(None);
+    }
+    fn generate_variant_init(&self, id: usize, graph: &ExecutionGraph) {
+        let i32_type = self.context.i32_type();
+        let i64_type = self.context.i64_type();
+        let f64_type = self.context.f64_type();
+        let opaque_ptr_type = self.context.ptr_type(AddressSpace::default());
+
+        let fn_type = opaque_ptr_type.fn_type(&[i64_type.into()], false);
+        let function_name = format!("init_variant_{}", id);
+        let function = self.module.add_function(&function_name, fn_type, None);
+        let basic_block = self.context.append_basic_block(function, "entry");
+        self.builder.position_at_end(basic_block);
+
+        let len_val = function.get_nth_param(0).unwrap().into_int_value();
+        
+        let state_field_type = opaque_ptr_type;
+        let mut state_fields: Vec<inkwell::types::BasicTypeEnum> = Vec::new();
+        let mut stateful_node_indices = HashMap::new();
+
+        for (node_id, node) in graph.nodes.iter().enumerate() {
+            match node {
+                ExecutionNode::Operation { op, .. } => {
+                    if op.to_lowercase() != "unknown" {
+                        stateful_node_indices.insert(node_id, state_fields.len() as u32);
+                        state_fields.push(state_field_type.into());
+                    }
+                },
+                ExecutionNode::Source { .. } => {
+                    // Source nodes do not possess internal state. Their data pointers are mapped via Python inputs.
+                },
+                _ => {}
+            }
+        }
+        let state_struct_type = self.context.struct_type(&state_fields, false);
+        
+        let malloc_fn = self.module.get_function("malloc").unwrap();
+        let struct_size = self.builder.build_int_mul(
+            i64_type.const_int(state_fields.len() as u64, false),
+            i64_type.const_int(8, false),
+            "state_size"
+        ).unwrap();
+        
+        let malloc_call = self.builder.build_call(malloc_fn, &[struct_size.into()], "malloc_state").unwrap();
+        let state_blob_raw = malloc_call.try_as_basic_value().unwrap_basic().into_pointer_value();
+
+        for (node_id, node) in graph.nodes.iter().enumerate() {
+            let mut struct_ptr = None;
+
+            match node {
+                ExecutionNode::Source { .. } => {
+                    // No initialization step for Sources since Python manages the memory for the inputs buffer.
+                },
+                ExecutionNode::Operation { op, args } => {
+                    let func_name = op.to_lowercase();
+                    
+                    let init_fn_name = format!("comet_{}_init", func_name);
+                    let init_fn = match self.module.get_function(&init_fn_name) {
+                        Some(f) => f,
+                        None => {
+                            let mut param_types: Vec<inkwell::types::BasicTypeEnum> = Vec::new();
+                            for &arg_id in args {
+                                if let ExecutionNode::Constant { value } = &graph.nodes[arg_id] {
+                                    use crate::comet::ir::ConstantValue;
+                                    match value {
+                                        ConstantValue::Integer(_) => param_types.push(i64_type.into()),
+                                        ConstantValue::Float(_) => param_types.push(f64_type.into()),
+                                        ConstantValue::String => {
+                                            param_types.push(opaque_ptr_type.into()); // ptr
+                                            param_types.push(i64_type.into());        // len
+                                        },
+                                        ConstantValue::Boolean => param_types.push(i64_type.into()),
+                                    }
+                                }
+                            }
+                            
+                            param_types.push(i64_type.into()); // append len
+                            
+                            let meta_params: Vec<inkwell::types::BasicMetadataTypeEnum> = param_types.iter().map(|&t| t.into()).collect();
+                            let init_type = opaque_ptr_type.fn_type(&meta_params, false);
+                            self.module.add_function(&init_fn_name, init_type, None)
+                        }
+                    };
+
+                    let mut call_args = Vec::new();
+                    for &arg_id in args {
+                        if let ExecutionNode::Constant { value } = &graph.nodes[arg_id] {
+                            use crate::comet::ir::ConstantValue;
+                            match value {
+                                ConstantValue::Integer(i) => call_args.push(i64_type.const_int(*i as u64, false).into()),
+                                ConstantValue::Float(f) => call_args.push(f64_type.const_float(*f).into()),
+                                ConstantValue::String => {
+                                    call_args.push(opaque_ptr_type.const_null().into());
+                                    call_args.push(i64_type.const_int(0, false).into());
+                                },
+                                ConstantValue::Boolean => call_args.push(i64_type.const_int(0, false).into()),
+                            }
+                        }
+                    }
+                    
+                    if init_fn.count_params() as usize == call_args.len() + 2 {
+                         call_args.push(i64_type.const_int(0, false).into());
+                    }
+
+                    call_args.push(len_val.into());
+
+                    let mut final_args = Vec::new();
+                    for i in 0..init_fn.count_params() {
+                        if i < call_args.len() as u32 {
+                             final_args.push(call_args[i as usize]);
+                        }
+                    }
+
+                    let init_call = self.builder.build_call(init_fn, &final_args, &format!("init_call_{}", node_id)).unwrap();
+                    struct_ptr = Some(init_call.try_as_basic_value().unwrap_basic().into_pointer_value());
+                },
+                _ => {}
+            }
+
+            if let Some(ptr) = struct_ptr {
+                if let Some(target_idx) = stateful_node_indices.get(&node_id) {
+                    let state_k_ptr = self.builder.build_struct_gep(state_struct_type, state_blob_raw, *target_idx, &format!("state_offset_{}", node_id)).unwrap();
+                    self.builder.build_store(state_k_ptr, ptr).unwrap();
+                }
+            }
+        }
+
+        self.builder.build_return(Some(&state_blob_raw)).unwrap();
     }
 }
 

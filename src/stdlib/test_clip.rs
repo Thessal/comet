@@ -21,7 +21,9 @@ mod tests {
             ptr: input_data.as_ptr(),
         };
 
-        comet_clip_step(std::ptr::null_mut(), &data as *const CometData, lower, upper, our_output.as_mut_ptr(), len);
+        let state = crate::clip::comet_clip_init(lower, upper, len);
+        comet_clip_step(state, &data as *const CometData, our_output.as_mut_ptr(), len);
+        crate::clip::comet_clip_free(state);
 
         let expected_out = vec![
             10.0,

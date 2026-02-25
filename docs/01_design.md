@@ -133,7 +133,7 @@ Calling a Behavior or Function requires **named** arguments set.
         - `volume` and `variousdays` are symbols that capture the result of `data("volume")` and `days()` respectively.
         - However, they have only local scope in the flow, and does not mean storing data in memory.
         - The effect of assignment is to replace the symbol with the result of the function call. So, `days()` is called twice in the above example. It is the user's responsibility to avoid function call explosion.
-    - Last flow in the code should return DataFrame, which are the final result of the flow.
+    - Last flow in the code should return *DataFrame*, which are the final result of the flow.
     
 - **Functions**
     - Functions map that receives a list of concepts and returns a concept.

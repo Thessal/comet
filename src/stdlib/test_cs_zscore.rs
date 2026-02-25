@@ -23,7 +23,7 @@ mod tests {
         // 1. Run our cs_zscore
         let mut state = CsZscoreState::new(period, len);
         let mut our_output = vec![0.0; len];
-        state.step(input_data.as_ptr(), our_output.as_mut_ptr(), len);
+        state.step(crate::CometData { dtype: crate::DataType::DataFrame, ptr: input_data.as_ptr() }, our_output.as_mut_ptr(), len);
 
         // Polars: (val - mean) / std_dev
         // In order to only use non-NaN values for mean/std, Polars handles this correctly

@@ -24,7 +24,7 @@ mod tests {
 
         for val in &input_data {
             let mut out = vec![0.0; len];
-            state.step(&[*val] as *const f64, out.as_mut_ptr(), len);
+            state.step(crate::CometData { dtype: crate::DataType::DataFrame, ptr: &[*val] as *const f64 }, out.as_mut_ptr(), len);
             our_output.push(out[0]);
         }
 

@@ -21,7 +21,7 @@ mod tests {
         // 1. Run our cs_rank
         let mut state = CsRankState::new(period, len);
         let mut our_output = vec![0.0; len];
-        state.step(input_data.as_ptr(), our_output.as_mut_ptr(), len);
+        state.step(crate::CometData { dtype: crate::DataType::DataFrame, ptr: input_data.as_ptr() }, our_output.as_mut_ptr(), len);
 
         // 2. Run polars standard rank
         // Polars: rank(method='average')

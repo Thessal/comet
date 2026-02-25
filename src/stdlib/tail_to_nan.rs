@@ -12,7 +12,7 @@ pub extern "C" fn comet_tail_to_nan_free(_state: *mut std::ffi::c_void) {}
 pub extern "C" fn comet_tail_to_nan_step(
     _state: *mut std::ffi::c_void,
     signal: *const CometData,
-    lower: f64,
+    lower: f64, // TODO : move it to state
     upper: f64,
     out_ptr: *mut f64,
     len: usize

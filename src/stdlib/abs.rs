@@ -8,7 +8,8 @@ impl UnaryOp for AbsState {
     fn new(_period: usize, _len: usize) -> Self {
         AbsState {}
     }
-    fn step(&mut self, a_ptr: *const f64, out_ptr: *mut f64, len: usize) {
+    fn step(&mut self, a: crate::CometData, out_ptr: *mut f64, len: usize) {
+        let a_ptr = unsafe { a.as_slice(len).as_ptr() };
         let a = unsafe { slice::from_raw_parts(a_ptr, len) };
         let out = unsafe { slice::from_raw_parts_mut(out_ptr, len) };
 

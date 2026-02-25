@@ -37,6 +37,8 @@ pub mod mid;
 pub mod r#const;
 pub mod divide;
 pub mod data;
+pub mod consume;
+pub mod cs_rank_nonzero;
 
 #[cfg(test)]
 mod test_ts_mean;
@@ -237,7 +239,7 @@ pub trait ConstOp {
 
 pub trait UnaryOp {
     fn new(period: usize, len: usize) -> Self;
-    fn step(&mut self, a_ptr: *const f64, out_ptr: *mut f64, len: usize);
+    fn step(&mut self, a: CometData, out_ptr: *mut f64, len: usize);
     fn drop_buffers(&mut self) {}
 }
 
@@ -274,8 +276,7 @@ macro_rules! export_unary {
             ) {
                 let s = unsafe { &mut *state };
                 let a_val = unsafe { *a };
-                let a_ptr = unsafe { a_val.as_slice(len).as_ptr() };
-                s.step(a_ptr, out_ptr, len)
+                s.step(a_val, out_ptr, len)
             }
         }
     };

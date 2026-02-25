@@ -9,8 +9,8 @@ impl UnaryOp for CsRankState {
         CsRankState
     }
 
-    fn step(&mut self, a_ptr: *const f64, out_ptr: *mut f64, len: usize) {
-        let a_slice = unsafe { std::slice::from_raw_parts(a_ptr, len) };
+    fn step(&mut self, a: crate::CometData, out_ptr: *mut f64, len: usize) {
+        let a_slice = unsafe { a.as_slice(len) };
         let out_slice = unsafe { std::slice::from_raw_parts_mut(out_ptr, len) };
 
         out_slice.fill(f64::NAN);
