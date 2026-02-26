@@ -18,8 +18,7 @@ The main Comet compiler codebase (the "parser") acts as a generator of LLVM IR (
     -   Expands Behaviors into a product space of valid implementations modeled as disjoint `Fn` Forests.
 3.  **Codegen (RealAST -> LLVM IR)**:
     -   For each valid Forest in the product space, generate corresponding LLVM IR strings.
-    -   Unique `variant_id` is assigned for each resulting distinct LLVM IR combination. 
-    -   (Future: Memoization can be used to optimize independent subtrees across overlapping valid Forests.)
+    -   The Forest is sampled and merged into a single execution graph. (DAG)
 4.  **Compilation (`llvm` / linker)**:
     -   Compiles and links the generated LLVM code with the `stdlib` dynamic library (`.so`) into a high-performance executable strategy.
 
@@ -47,6 +46,7 @@ The generated Rust library exposes a C-compatible (or Python-compatible via PyO3
 
 The library exports a queryable structure for metadata.
 
+// subject to change
 ```rust
 pub struct StrategyMeta {
     pub variant_id: u32,
@@ -58,6 +58,7 @@ pub struct StrategyMeta {
 ```
 
 ### 4.2 Functions
+// subject to change
 
 The interface is stateless at the library level; state is passed in/out.
 <!-- TODO: We need to define the DataSpec and implement the select function. -->

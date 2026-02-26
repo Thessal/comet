@@ -9,17 +9,17 @@ def run_test():
         return
 
     try:
-        lib = ctypes.CDLL('./volume_spike.so')
+        lib = ctypes.CDLL('./volume_spike_stage_0.so')
     except OSError as e:
         print(f"Failed to load library: {e}")
         return
 
     lib.execute_variant_0.argtypes = [
-        ctypes.POINTER(ctypes.POINTER(ctypes.c_double)), 
-        ctypes.POINTER(ctypes.c_double),                 
-        ctypes.c_void_p,                                 
-        ctypes.c_int64,                                  
-        ctypes.c_int64                                   
+        ctypes.POINTER(ctypes.POINTER(ctypes.c_double)), # inputs
+        ctypes.POINTER(ctypes.POINTER(ctypes.c_double)), # outputs
+        ctypes.c_void_p,                                 # state
+        ctypes.c_int64,                                  # feature_len
+        ctypes.c_int64                                   # timesteps
     ]
     lib.execute_variant_0.restype = None
 
@@ -35,26 +35,37 @@ def run_test():
         input2.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
     )
 
-    output = np.zeros((timesteps * feature_len,), dtype=np.float64)
-    out_ptr = output.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    num_outputs = 12 # Based on the multiple_variants_minimal.cm stage 0 LLVM IR showing out_gep_11
+    outputs = [np.zeros((timesteps * feature_len,), dtype=np.float64) for _ in range(num_outputs)]
+    
+    OutputArrayType = ctypes.POINTER(ctypes.c_double) * num_outputs
+    outputs_arr = OutputArrayType(*[
+        out.ctypes.data_as(ctypes.POINTER(ctypes.c_double)) for out in outputs
+    ])
 
     lib.init_variant_0.argtypes = [ctypes.c_int64]
     lib.init_variant_0.restype = ctypes.c_void_p
     
     print("Calling automated LLVM initializer")
-    state_blob_ptr = lib.init_variant_0(feature_len) # It will be nice if there's easy way to visualize the state blob, with named offsets. But that's optional. 
+    state_blob_ptr = lib.init_variant_0(feature_len)
 
-    print(f"Executing volume_spike.so variant 0 for {timesteps} timesteps...")
+    for i in range(num_outputs):
+        array_type = ctypes.c_char * 1024
+        ast = array_type.in_dll(lib, f"comet_ast_0_{i}").value.decode("utf8")
+        print(ast)
+
+    print(f"Executing volume_spike_stage_0.so with {num_outputs} variants for {timesteps} timesteps...")
     try:
         lib.execute_variant_0(
             inputs_arr,
-            ctypes.cast(out_ptr, ctypes.POINTER(ctypes.c_double)),
+            outputs_arr,
             ctypes.cast(state_blob_ptr, ctypes.c_void_p),
             feature_len,
             timesteps
         )
         print("Execution finished successfully.")
-        print("Output:", output)
+        for i, out in enumerate(outputs):
+            print(f"Variant {i} Output:", out)
     except Exception as e:
         print(f"Error during execution: {e}")
 

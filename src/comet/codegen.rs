@@ -49,18 +49,16 @@ impl<'ctx> Codegen<'ctx> {
         Ok(())
     }
 
-    pub fn generate_ir(&self, graphs: &Vec<crate::comet::ir::ExecutionGraph>) -> String {
-        self.declare_externals(graphs);
+    pub fn generate_ir(&self, graph: &crate::comet::ir::ExecutionGraph) -> String {
+        self.declare_externals(graph);
 
-        for (i, graph) in graphs.iter().enumerate() {
-            self.generate_variant_init(i, graph);
-            self.generate_variant_executor(i, graph);
-        }
+        self.generate_variant_init(graph);
+        self.generate_variant_executor(graph);
 
         self.module.print_to_string().to_string()
     }
 
-    fn declare_externals(&self, graphs: &Vec<crate::comet::ir::ExecutionGraph>) {
+    fn declare_externals(&self, graph: &crate::comet::ir::ExecutionGraph) {
         let void_type = self.context.void_type();
         let i64_type = self.context.i64_type();
         let f64_ptr_type = self.context.ptr_type(AddressSpace::default());
@@ -84,18 +82,16 @@ impl<'ctx> Codegen<'ctx> {
         self.module.add_function("llvm.memcpy.p0i8.p0i8.i64", memcpy_type, None);
 
         // Define CometData LLVM struct globally: { i32, double* }
-        let comet_data_type = self.context.struct_type(&[
+        let _comet_data_type = self.context.struct_type(&[
             self.context.i32_type().into(), // dtype
             f64_ptr_type.into()             // ptr
         ], false);
 
         let mut required_functions = std::collections::HashMap::new();
-        for graph in graphs {
-            for node in &graph.nodes {
-                if let crate::comet::ir::ExecutionNode::Operation { op, args } = node {
-                    let stream_args_count = args.iter().filter(|&&id| !matches!(&graph.nodes[id], crate::comet::ir::ExecutionNode::Constant { .. })).count();
-                    required_functions.insert(op.clone(), stream_args_count);
-                }
+        for node in &graph.nodes {
+            if let crate::comet::ir::ExecutionNode::Operation { op, args } = node {
+                let stream_args_count = args.iter().filter(|&&id| !matches!(&graph.nodes[id], crate::comet::ir::ExecutionNode::Constant { .. })).count();
+                required_functions.insert(op.clone(), stream_args_count);
             }
         }
 
@@ -114,12 +110,14 @@ impl<'ctx> Codegen<'ctx> {
         }
     }
 
-    fn generate_variant_executor(&self, id: usize, graph: &ExecutionGraph) {
-        let ast_cstring = std::ffi::CString::new(graph.ast_string.as_str()).unwrap_or_default();
-        let string_val = self.context.const_string(ast_cstring.as_bytes_with_nul(), false);
-        let global_ast = self.module.add_global(string_val.get_type(), None, &format!("comet_ast_{}", id));
-        global_ast.set_initializer(&string_val);
-        global_ast.set_linkage(inkwell::module::Linkage::External);
+    fn generate_variant_executor(&self, graph: &ExecutionGraph) {
+        for (idx, ast) in graph.ast_strings.iter().enumerate() {
+            let ast_cstring = std::ffi::CString::new(ast.as_str()).unwrap_or_default();
+            let string_val = self.context.const_string(ast_cstring.as_bytes_with_nul(), false);
+            let global_ast = self.module.add_global(string_val.get_type(), None, &format!("comet_ast_0_{}", idx));
+            global_ast.set_initializer(&string_val);
+            global_ast.set_linkage(inkwell::module::Linkage::External);
+        }
         
         let void_type = self.context.void_type();
         let i32_type = self.context.i32_type();
@@ -136,19 +134,19 @@ impl<'ctx> Codegen<'ctx> {
 
         let fn_type = void_type.fn_type(&[
             f64_ptr_ptr_type.into(), // inputs
-            f64_ptr_type.into(),     // output
+            f64_ptr_ptr_type.into(), // outputs
             opaque_ptr_type.into(),  // state_blob (contiguous buffer)
             i64_type.into(),         // len
             i64_type.into()          // timesteps
         ], false);
 
-        let function_name = format!("execute_variant_{}", id);
-        let function = self.module.add_function(&function_name, fn_type, None);
+        let function_name = "execute_variant_0";
+        let function = self.module.add_function(function_name, fn_type, None);
         let basic_block = self.context.append_basic_block(function, "entry");
         self.builder.position_at_end(basic_block);
 
         let inputs_ptr = function.get_nth_param(0).unwrap().into_pointer_value();
-        let output_ptr = function.get_nth_param(1).unwrap().into_pointer_value();
+        let outputs_ptr_array = function.get_nth_param(1).unwrap().into_pointer_value();
         let state_blob_raw = function.get_nth_param(2).unwrap().into_pointer_value();
         let len_val = function.get_nth_param(3).unwrap().into_int_value();
         let timesteps_val = function.get_nth_param(4).unwrap().into_int_value();
@@ -161,6 +159,15 @@ impl<'ctx> Codegen<'ctx> {
         let mut node_states = HashMap::new();
         let mut source_indices = HashMap::new();
         let mut next_source_idx = 0;
+        
+        // Cache outputs pointers array lookups before event loop
+        let mut loaded_output_ptrs = Vec::new();
+        for i in 0..graph.output_nodes.len() {
+            let idx_val = i64_type.const_int(i as u64, false);
+            let gep = unsafe { self.builder.build_gep(f64_ptr_type, outputs_ptr_array, &[idx_val], &format!("out_gep_{}", i)).unwrap() };
+            let load = self.builder.build_load(f64_ptr_type, gep, &format!("out_ptr_{}", i)).unwrap();
+            loaded_output_ptrs.push(load.into_pointer_value());
+        }
 
         // Build the state tracking struct type (each stateful op gets a designated memory block)
         let state_field_type = opaque_ptr_type; // Store pointers!
@@ -210,9 +217,22 @@ impl<'ctx> Codegen<'ctx> {
                     }
                 },
                 ExecutionNode::Operation { .. } => {
-                    let malloc_call = self.builder.build_call(malloc_fn, &[alloc_size.into()], &format!("malloc_out_{}", node_id)).unwrap();
-                    let out_ptr = malloc_call.try_as_basic_value().unwrap_basic().into_pointer_value();
-                    node_outputs.insert(node_id, out_ptr);
+                    let mut is_intermediate = false;
+                    for other_node in &graph.nodes {
+                        if let ExecutionNode::Operation { args, .. } = other_node {
+                            if args.contains(&node_id) { is_intermediate = true; }
+                        }
+                    }
+                    let output_indices: Vec<usize> = graph.output_nodes.iter().enumerate()
+                        .filter(|&(_, &id)| id == node_id).map(|(i, _)| i).collect();
+                    
+                    let needs_malloc = is_intermediate || output_indices.len() != 1;
+                    
+                    if needs_malloc {
+                        let malloc_call = self.builder.build_call(malloc_fn, &[alloc_size.into()], &format!("malloc_out_{}", node_id)).unwrap();
+                        let out_ptr = malloc_call.try_as_basic_value().unwrap_basic().into_pointer_value();
+                        node_outputs.insert(node_id, out_ptr);
+                    }
                     
                     if let Some(target_idx) = stateful_node_indices.get(&node_id) {
                         // Dynamically map struct offset correctly!
@@ -284,10 +304,21 @@ impl<'ctx> Codegen<'ctx> {
                     }
                     
                     // Output Ptr
-                    let mut out_ptr = node_outputs[&node_id];
-                    if node_id == graph.nodes.len() - 1 {
-                        // The final node writes directly to the function's output pointer stream
-                        out_ptr = unsafe { self.builder.build_gep(f64_type, output_ptr, &[offset], "stream_out").unwrap() };
+                    let mut directly_written_output = None;
+                    let out_ptr;
+                    
+                    let output_indices: Vec<usize> = graph.output_nodes.iter().enumerate()
+                        .filter(|&(_, &id)| id == node_id).map(|(i, _)| i).collect();
+
+                    if let Some(&malloc_ptr) = node_outputs.get(&node_id) {
+                        out_ptr = malloc_ptr;
+                    } else if output_indices.len() == 1 {
+                        let variant_idx = output_indices[0];
+                        out_ptr = unsafe { self.builder.build_gep(f64_type, loaded_output_ptrs[variant_idx], &[offset], &format!("stream_out_direct_{}", node_id)).unwrap() };
+                        directly_written_output = Some(variant_idx);
+                    } else {
+                        // Dead code path fallback
+                        out_ptr = f64_ptr_type.const_null();
                     }
                     call_args.push(out_ptr.into());
                     
@@ -295,6 +326,23 @@ impl<'ctx> Codegen<'ctx> {
                     call_args.push(len_val.into());
                     
                     self.builder.build_call(step_fn, &call_args, &format!("step_{}", node_id)).unwrap();
+                    
+                    if !output_indices.is_empty() {
+                        let memcpy_fn = self.module.get_function("llvm.memcpy.p0i8.p0i8.i64").unwrap();
+                        for &variant_idx in &output_indices {
+                            if Some(variant_idx) == directly_written_output {
+                                continue;
+                            }
+                            let dest_ptr = unsafe { self.builder.build_gep(f64_type, loaded_output_ptrs[variant_idx], &[offset], &format!("stream_out_copy_{}", node_id)).unwrap() };
+                            
+                            self.builder.build_call(memcpy_fn, &[
+                                dest_ptr.into(),
+                                out_ptr.into(),
+                                alloc_size.into(),
+                                self.context.bool_type().const_int(0, false).into() // isvolatile = false
+                            ], &format!("memcpy_out_{}", node_id)).unwrap();
+                        }
+                    }
                 }
             }
         }
@@ -313,8 +361,8 @@ impl<'ctx> Codegen<'ctx> {
         for (node_id, node) in graph.nodes.iter().enumerate() {
             // Free intermediate buffers
             if let ExecutionNode::Operation { .. } = node {
-                if node_id != graph.nodes.len() - 1 {
-                    self.builder.build_call(free_fn, &[node_outputs[&node_id].into()], &format!("free_buf_{}", node_id)).unwrap();
+                if let Some(&malloc_ptr) = node_outputs.get(&node_id) {
+                    self.builder.build_call(free_fn, &[malloc_ptr.into()], &format!("free_buf_{}", node_id)).unwrap();
                 }
             }
             // ExecutionNode::Constant uses raw alloca inline memory! So NO free operations injected!
@@ -322,15 +370,15 @@ impl<'ctx> Codegen<'ctx> {
 
         let _ = self.builder.build_return(None);
     }
-    fn generate_variant_init(&self, id: usize, graph: &ExecutionGraph) {
+    fn generate_variant_init(&self, graph: &ExecutionGraph) {
         let i32_type = self.context.i32_type();
         let i64_type = self.context.i64_type();
         let f64_type = self.context.f64_type();
         let opaque_ptr_type = self.context.ptr_type(AddressSpace::default());
 
         let fn_type = opaque_ptr_type.fn_type(&[i64_type.into()], false);
-        let function_name = format!("init_variant_{}", id);
-        let function = self.module.add_function(&function_name, fn_type, None);
+        let function_name = "init_variant_0";
+        let function = self.module.add_function(function_name, fn_type, None);
         let basic_block = self.context.append_basic_block(function, "entry");
         self.builder.position_at_end(basic_block);
 

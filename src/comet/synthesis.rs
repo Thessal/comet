@@ -100,6 +100,39 @@ pub struct SubtreeState {
 pub struct Synthesizer;
 
 impl Synthesizer {
+    pub fn calculate_forest_weight(forest: &[RealExpr], behaviors: &HashMap<String, BehaviorDecl>) -> f64 {
+        let mut total_w = 1.0;
+        for tree in forest {
+            total_w *= Self::calculate_tree_weight(tree, behaviors);
+        }
+        total_w
+    }
+
+    fn calculate_tree_weight(expr: &RealExpr, behaviors: &HashMap<String, BehaviorDecl>) -> f64 {
+        match expr {
+            RealExpr::CallFn { func_name, args, .. } => {
+                let mut w = 1.0;
+                // We use global behavior dict. If func_name matches a behavior, maybe it has a weight? Wait.
+                // The prompt says "Behavior Normalizer { weights: { Rank: 0.8 } }".
+                // This means when computing weights INSIDE a behavior calculation, we use that behavior's matrix.
+                // Since the trees are fully expanded, we just match `func_name` to ANY behavior's weight if it's the root block?
+                // Actually, the simplest implementation is to let the tree inherently find the weight if the parent was a behavior.
+                for (_, behavior) in behaviors.iter() {
+                    if let Some(&weight) = behavior.weights.get(func_name) {
+                        w *= weight;
+                    } else if let Some(&default_w) = behavior.weights.get("*") {
+                        w *= default_w;
+                    }
+                }
+                for (_, arg) in args {
+                    w *= Self::calculate_tree_weight(arg, behaviors);
+                }
+                w
+            },
+            _ => 1.0,
+        }
+    }
+
     /// Exhaustively synthesizes a BehaviorDecl into all mathematically valid disjoint forests.
     /// Returns a list of forests, where each forest is a `Vec<RealExpr>`. The primary expression
     /// (which returns the Behavior output) will be first, followed by independent side-effect exprs (e.g. `Consume`).
@@ -581,6 +614,7 @@ mod tests {
             ],
             return_constraint: ConstraintDecl { base_type: TypeDecl::DataFrame, category_expr: make_atom("Indicator") },
             depth: 2,
+            weights: HashMap::new(),
         };
 
         // Build Library

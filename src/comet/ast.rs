@@ -48,6 +48,7 @@ pub struct BehaviorDecl {
     pub args: Vec<TypedArg>,
     pub return_constraint: ConstraintDecl, 
     pub depth: u32,
+    pub weights: std::collections::HashMap<String, f64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -144,6 +145,32 @@ pub enum Literal {
     Boolean(bool),
 }
 
+impl Eq for Literal {}
+
+use std::hash::{Hash, Hasher};
+impl Hash for Literal {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Literal::Integer(i) => {
+                0_u8.hash(state);
+                i.hash(state);
+            }
+            Literal::Float(f) => {
+                1_u8.hash(state);
+                f.to_bits().hash(state);
+            }
+            Literal::String(s) => {
+                2_u8.hash(state);
+                s.hash(state);
+            }
+            Literal::Boolean(b) => {
+                3_u8.hash(state);
+                b.hash(state);
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ArgValue {
     pub name: Option<Ident>,
@@ -234,7 +261,21 @@ impl fmt::Display for TypedArg {
 impl fmt::Display for BehaviorDecl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let args: Vec<String> = self.args.iter().map(|a| a.to_string()).collect();
-        write!(f, "Behavior {}({}) -> {}\n", self.name, args.join(", "), self.return_constraint)
+        write!(f, "Behavior {}({}) -> {}", self.name, args.join(", "), self.return_constraint)?;
+        if !self.weights.is_empty() {
+            writeln!(f, " {{")?;
+            writeln!(f, "    weights: {{")?;
+            // Sort keys for deterministic output
+            let mut keys: Vec<&String> = self.weights.keys().collect();
+            keys.sort();
+            for k in keys {
+                writeln!(f, "        {}: {},", k, self.weights[k])?;
+            }
+            writeln!(f, "    }}")?;
+            writeln!(f, "}}")
+        } else {
+            writeln!(f, "")
+        }
     }
 }
 

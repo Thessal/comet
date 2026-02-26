@@ -243,11 +243,35 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
     let args = parse_typed_arg_list(inner.next().unwrap())?;
     let return_constraint = parse_constraint(inner.next().unwrap())?;
     
+    let mut weights = std::collections::HashMap::new();
+    if let Some(body_pair) = inner.next() {
+        if body_pair.as_rule() == Rule::behavior_body {
+            let mut body_inner = body_pair.into_inner();
+            if let Some(weight_list_pair) = body_inner.next() {
+                if weight_list_pair.as_rule() == Rule::weight_list {
+                    for weight_entry_pair in weight_list_pair.into_inner() {
+                        let mut entry_inner = weight_entry_pair.into_inner();
+                        let id_pair = entry_inner.next().unwrap();
+                        let id = if id_pair.as_rule() == Rule::identifier {
+                            parse_identifier(id_pair)
+                        } else {
+                            id_pair.as_str().to_string() // "*"
+                        };
+                        let val_pair = entry_inner.next().unwrap();
+                        let val: f64 = val_pair.as_str().parse().unwrap();
+                        weights.insert(id, val);
+                    }
+                }
+            }
+        }
+    }
+    
     Ok(BehaviorDecl {
         name,
         args,
         return_constraint,
         depth: 1,
+        weights,
     })
 }
 

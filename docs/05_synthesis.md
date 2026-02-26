@@ -20,7 +20,7 @@ This is done by iterating over the cartesian product space of Behavior and Flow.
    - One possible behavior call is `Comparator(signal=volume, reference=adv20, eps=0.1, depth=2)`
       - Literal `0.1` validates call constraints, so it is user's responsibility to provide a valid literal.
    - Assume that there are functions:
-      - `Fn Consume(b: Float Optional) -> Void`
+      - `Fn Consume(b: Float Optional) -> Void` // Maybe we could call it "Ground"?
       - `Fn Rank(a: DataFrame) -> DataFrame Normalized`
       - `Fn RankNonzero(a: DataFrame, eps: Float Nonzero) -> DataFrame Normalized Nonzero`
       - `Fn Diff(a: DataFrame, b:DataFrame) -> DataFrame Indicator`
@@ -75,6 +75,21 @@ This is done by iterating over the cartesian product space of Behavior and Flow.
             - `Consume(eps=eps); Diff(Rank(adv20), Rank(volume))` (Normalized, Normalized)
 
 - Output of the behavior call is the output of the function call, but the constraints acquired by the output is the constraint of the behavior call, which is only subset of the direct function output.
+
+## Contextual Weighting (The "Gene")
+To support targeted variant sampling and evolutionary optimization, the synthesizer employs Behavior-specific probability matrices rather than static function weights. 
+
+When a `Behavior` is defined, it can optionally specify a `weights` dictionary. This dictionary assigns sample probabilities to `Fn` names when resolving that specific behavior:
+```comet
+Behavior Normalizer(signal: DataFrame) -> DataFrame Normalized {
+    weights: { Rank: 0.8, MovingAverage: 0.2, *: 0.05 }
+}
+
+Behavior Indicator(signal: DataFrame, reference: DataFrame) -> DataFrame Indicator {
+    weights: { Diff: 0.7, MACD: 0.6, Rank: 0.1 }
+}
+```
+This contextual weighting acts as the "Gene" for the synthesis engine. During the sampling phase (post-exhaustive generation), the compiler biases its selection towards branches that contain explicitly high-weighted functions for the target behavior. An external evolutionary loop can mutate these `weights` dictionaries to prune barren search paths or hybridize successful search parameters.
 
 ## Algorithm for Exhaustive Search
 

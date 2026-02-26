@@ -1,16 +1,26 @@
 mod comet;
 
-use std::env;
 use std::fs;
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// The input .cm file to compile
+    file: String,
+
+    /// The fraction of variants to sample per stage (0.0 to 1.0)
+    #[arg(long, default_value_t = 1.0)]
+    sample_rate: f64,
+
+    /// Number of exclusive sampling stages to emit as individual .so files
+    #[arg(long, default_value_t = 1)]
+    exclusive_sample_stages: usize,  //maybe better shortter name could be used
+}
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        eprintln!("Usage: comet <file.cm>");
-        return;
-    }
-    
-    let filename = &args[1];
+    let args = Args::parse();
+    let filename = &args.file;
     let content = fs::read_to_string(filename).expect("Failed to read file");
     
     match comet::parser::parse(&content) {
@@ -98,25 +108,67 @@ fn main() {
                              match comet::synthesis::Synthesizer::synthesize_expr(&substituted_expr, &behaviors, &library) {
                                  Ok(real_exprs) => {
                                      
-                                     let mut graphs = Vec::new();
-                                     for (i, real_forest) in real_exprs.iter().enumerate() {
-                                         println!("--- Context {} ---", i);
-                                         for (j, tree) in real_forest.iter().enumerate() {
-                                             println!("AST equivalent [Tree {}]: {:?}", j, tree);
+                                     let mut available_variants = real_exprs.clone();
+                                     let mut rng = rand::thread_rng();
+                                     use rand::seq::SliceRandom;
+                                     use rand::distributions::WeightedIndex;
+                                     use rand::prelude::Distribution;
+
+                                     for stage in 0..args.exclusive_sample_stages {
+                                         let sample_size = std::cmp::min(
+                                             (real_exprs.len() as f64 * args.sample_rate).ceil() as usize,
+                                             available_variants.len()
+                                         );
+                                         
+                                         if sample_size == 0 {
+                                             println!("No more variants to sample. Ending stages early.");
+                                             break;
                                          }
-                                         let g = comet::ir::ExecutionGraph::from_forest(real_forest);
-                                         graphs.push(g);
-                                     }
-                                     
-                                     let inkwell_ctx = inkwell::context::Context::create();
-                                     let codegen = comet::codegen::Codegen::new(&inkwell_ctx, &flow.name);
-                                     
-                                     let ir_string = codegen.generate_ir(&graphs);
-                                     println!("Generated LLVM IR for {}:\n{}", flow.name, ir_string);
-                                     
-                                     match codegen.emit_library(&flow.name) {
-                                          Ok(_) => println!("Successfully compiled {}.so library!", flow.name),
-                                          Err(e) => eprintln!("Failed to compile library: {}", e),
+
+                                         let mut weights = Vec::new();
+                                         for variant in &available_variants {
+                                             weights.push(comet::synthesis::Synthesizer::calculate_forest_weight(variant, &behaviors));
+                                         }
+                                         
+                                         let mut sampled_forests = Vec::new();
+                                         if let Ok(dist) = WeightedIndex::new(&weights) {
+                                             let mut selected_indices = std::collections::HashSet::new();
+                                             while selected_indices.len() < sample_size {
+                                                 let idx = dist.sample(&mut rng);
+                                                 if selected_indices.insert(idx) {
+                                                     sampled_forests.push(available_variants[idx].clone());
+                                                 }
+                                             }
+                                             
+                                             let mut remaining = Vec::new();
+                                             for (i, v) in available_variants.into_iter().enumerate() {
+                                                 if !selected_indices.contains(&i) {
+                                                     remaining.push(v);
+                                                 }
+                                             }
+                                             available_variants = remaining;
+                                         } else {
+                                             available_variants.shuffle(&mut rng);
+                                             sampled_forests = available_variants.drain(..sample_size).collect();
+                                         }
+
+                                         println!("--- Stage {} ({} samples) ---", stage, sampled_forests.len());
+                                         
+                                         let graph = comet::ir::ExecutionGraph::from_variants(&sampled_forests);
+                                         
+                                         let inkwell_ctx = inkwell::context::Context::create();
+                                         let module_name = format!("{}_stage_{}", flow.name, stage);
+                                         let codegen = comet::codegen::Codegen::new(&inkwell_ctx, &module_name);
+                                         
+                                         let ir_string = codegen.generate_ir(&graph);
+                                         // Print first few lines of IR for brief logging
+                                         let ir_preview: String = ir_string.lines().take(5).collect::<Vec<&str>>().join("\n");
+                                         println!("Generated LLVM IR for {} (Preview):\n{} ...\n", module_name, ir_preview);
+                                         
+                                         match codegen.emit_library(&module_name) {
+                                              Ok(_) => println!("Successfully compiled {}.so library!", module_name),
+                                              Err(e) => eprintln!("Failed to compile library: {}", e),
+                                         }
                                      }
                                  },
                                  Err(e) => eprintln!("Synthesis error: {}", e),

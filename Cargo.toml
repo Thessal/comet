@@ -18,6 +18,8 @@ either = "1.15.0"
 flate2 = "1.1.9"
 csv = "1.4.0"
 chrono = "0.4.39"
+clap = { version = "4.4", features = ["derive"] }
+rand = "0.8"
 
 [dev-dependencies]
 polars = { version = "0.53.0", features = ["abs", "diff", "dtype-datetime", "lazy", "rank", "rolling_window", "temporal"] }

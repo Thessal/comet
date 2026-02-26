@@ -46,8 +46,11 @@ type_ref = { identifier }
 
 comma = _{ "," }
 
-// behavior Compare (A, B) -> Series
-behavior_decl = { k_behavior ~ identifier ~ "(" ~ typed_arg_list ~ ")" ~ "->" ~ constraint }
+// behavior Compare (A, B) -> Series { weights: { Rank: 0.8, *: 0.05 } }
+behavior_decl = { k_behavior ~ identifier ~ "(" ~ typed_arg_list ~ ")" ~ "->" ~ constraint ~ behavior_body? }
+behavior_body = { "{" ~ "weights" ~ ":" ~ "{" ~ weight_list? ~ "}" ~ "}" }
+weight_list = { weight_entry ~ ("," ~ weight_entry)* }
+weight_entry = { (identifier | "*") ~ ":" ~ float_literal }
 arg_list = { (identifier ~ (comma ~ identifier)*)? }
 typed_arg_list = { (typed_arg ~ (comma ~ typed_arg)*)? }
 typed_arg = { identifier ~ ":" ~ constraint }
