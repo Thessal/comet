@@ -1,0 +1,9 @@
+Fn data(symbol: String) -> DataFrame
+Fn divide(signal: DataFrame, reference: DataFrame) -> DataFrame
+Fn ts_mean(child: DataFrame, lookback: Integer) -> DataFrame
+
+Flow volume_spike {
+    volume = data(symbol="volume")
+    mean_vol = ts_mean(child=volume, lookback=10)
+    divide(signal=volume, reference=mean_vol)
+}

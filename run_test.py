@@ -1,7 +1,7 @@
 import ctypes
 import numpy as np
 
-def run_test():
+def run_test(filename):
     try:
         stdlib = ctypes.CDLL('./target/debug/libstdlib.so', mode=ctypes.RTLD_GLOBAL)
     except OSError as e:
@@ -9,7 +9,7 @@ def run_test():
         return
 
     try:
-        lib = ctypes.CDLL('./volume_spike_stage_0.so')
+        lib = ctypes.CDLL(filename)
     except OSError as e:
         print(f"Failed to load library: {e}")
         return
@@ -69,5 +69,12 @@ def run_test():
     except Exception as e:
         print(f"Error during execution: {e}")
 
+import glob 
+
 if __name__ == '__main__':
-    run_test()
+    for filename in sorted(glob.glob("./*.so")):
+        print(filename)
+        try:
+            run_test(filename)
+        except Exception as e:
+            print(f"Error during execution: {e}")

@@ -1,0 +1,14 @@
+Behavior Compare(signal: DataFrame 'a, reference: DataFrame) -> DataFrame 'a {
+    weights: { divide: 0.2, subtract: 10.0 }
+}
+
+Fn data(symbol: String) -> DataFrame
+Fn ts_mean(signal: DataFrame, lookback: Int) -> DataFrame
+Fn divide(signal: DataFrame, reference: DataFrame) -> DataFrame
+Fn subtract(signal: DataFrame, reference: DataFrame) -> DataFrame
+
+Flow volume_spike {
+    volume = data(symbol="volume")
+    variousdays = [1,2,3,4,5, 21, 252]
+    Compare(signal=volume, reference=ts_mean(signal=volume, lookback=variousdays), depth=1) 
+}

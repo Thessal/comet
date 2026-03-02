@@ -2,12 +2,25 @@ use crate::CometData;
 use crate::cs_rank::CsRankState; //step as cs_rank_step;
 use crate::{UnaryOp, export_unary};
 
-// TODO: use `export_unary` macro
-
 #[repr(C)]
 pub struct CsRankNonzeroState {
     pub eps: f64,
 }
+
+impl UnaryOp for CsRankNonzeroState {
+    fn new(_period: usize, _len: usize) -> Self {
+        CsRankNonzeroState
+    }
+
+    fn step(&mut self, a: crate::CometData, out_ptr: *mut f64, len: usize) {
+         //TODO FIXME
+    }
+}
+
+export_unary!(CsRankState, cs_rank);
+
+// TODO: use `export_unary` macro
+
 
 #[unsafe(no_mangle)]
 pub extern "C" fn comet_cs_rank_nonzero_init(eps: f64, _len: usize) -> *mut CsRankNonzeroState {

@@ -249,6 +249,12 @@ pub trait BinaryOp {
     fn drop_buffers(&mut self) {}
 }
 
+pub trait TernaryOp {
+    fn new(period: usize, len: usize) -> Self;
+    fn step(&mut self, a: CometData, b: CometData, c: CometData, out_ptr: *mut f64, len: usize);
+    fn drop_buffers(&mut self) {}
+}
+
 #[macro_export]
 macro_rules! export_unary {
     ($struct_name:ident, $prefix:ident) => {
@@ -312,6 +318,43 @@ macro_rules! export_binary {
                 let a_val = unsafe { *a };
                 let b_val = unsafe { *b };
                 s.step(a_val, b_val, out_ptr, len)
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! export_ternary {
+    ($struct_name:ident, $prefix:ident) => {
+        paste::paste! {
+            #[unsafe(no_mangle)]
+            pub extern "C" fn [<comet_ $prefix _init>](period: usize, len: usize) -> *mut $struct_name {
+                let state = Box::new($struct_name::new(period, len));
+                Box::into_raw(state)
+            }
+            #[unsafe(no_mangle)]
+            pub extern "C" fn [<comet_ $prefix _free>](state: *mut $struct_name) {
+                if !state.is_null() {
+                    unsafe {
+                        let mut s = Box::from_raw(state);
+                        s.drop_buffers();
+                    }
+                }
+            }
+            #[unsafe(no_mangle)]
+            pub extern "C" fn [<comet_ $prefix _step>](
+                state: *mut $struct_name, 
+                a: *const $crate::CometData, 
+                b: *const $crate::CometData, 
+                c: *const $crate::CometData, 
+                out_ptr: *mut f64, 
+                len: usize
+            ) {
+                let s = unsafe { &mut *state };
+                let a_val = unsafe { *a };
+                let b_val = unsafe { *b };
+                let c_val = unsafe { *c };
+                s.step(a_val, b_val, c_val, out_ptr, len)
             }
         }
     };
