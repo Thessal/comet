@@ -1,5 +1,5 @@
 // src/stdlib/cs_rank.rs
-use crate::{UnaryOp, export_unary};
+use crate::{UnaryOp};
 
 #[repr(C)]
 pub struct CsRankState;
@@ -43,5 +43,3 @@ impl UnaryOp for CsRankState {
         }
     }
 }
-
-export_unary!(CsRankState, cs_rank);

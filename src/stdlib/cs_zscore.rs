@@ -1,5 +1,5 @@
 // src/stdlib/cs_zscore.rs
-use crate::{UnaryOp, export_unary};
+use crate::{UnaryOp};
 
 #[repr(C)]
 pub struct CsZscoreState;
@@ -51,5 +51,3 @@ impl UnaryOp for CsZscoreState {
         }
     }
 }
-
-export_unary!(CsZscoreState, cs_zscore);

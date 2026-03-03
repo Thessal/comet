@@ -1,4 +1,4 @@
-use crate::{BinaryOp, CometData, DataType, export_binary};
+use crate::{BinaryOp, CometData, DataType};
 
 #[repr(C)]
 pub struct MaxState {}
@@ -41,5 +41,3 @@ impl BinaryOp for MaxState {
         }
     }
 }
-
-export_binary!(MaxState, max);

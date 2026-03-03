@@ -1,4 +1,4 @@
-use crate::{RingBufferF64, UnaryOp, export_unary};
+use crate::{RingBufferF64, UnaryOp};
 #[repr(C)]
 pub struct TsDelayState {
     pub history: RingBufferF64,
@@ -36,4 +36,3 @@ impl UnaryOp for TsDelayState {
         self.history.drop_inner();
     }
 }
-export_unary!(TsDelayState, ts_delay);

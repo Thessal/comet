@@ -1,4 +1,4 @@
-use crate::{BinaryOp, CometData, DataType, export_binary};
+use crate::{BinaryOp, CometData, DataType};
 
 #[repr(C)]
 pub struct MinState {}
@@ -41,5 +41,3 @@ impl BinaryOp for MinState {
         }
     }
 }
-
-export_binary!(MinState, min);

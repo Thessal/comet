@@ -1,4 +1,4 @@
-use crate::{UnaryOp, export_unary};
+use crate::{UnaryOp};
 
 #[repr(C)]
 pub struct ConsumeFloatState {}
@@ -12,5 +12,3 @@ impl UnaryOp for ConsumeFloatState {
         // Void function, no output
     }
 }
-
-export_unary!(ConsumeFloatState, consume_float);

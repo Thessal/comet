@@ -1,4 +1,4 @@
-use crate::{RingBufferF64, UnaryOp, export_unary};
+use crate::{RingBufferF64, UnaryOp};
 
 #[repr(C)]
 pub struct TsRankState {
@@ -77,4 +77,3 @@ impl UnaryOp for TsRankState {
         self.buffers.clear();
     }
 }
-export_unary!(TsRankState, ts_rank);

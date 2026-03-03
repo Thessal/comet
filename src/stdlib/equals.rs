@@ -1,4 +1,4 @@
-use crate::{BinaryOp, CometData, DataType, export_binary};
+use crate::{BinaryOp, CometData, DataType};
 
 #[repr(C)]
 pub struct EqualsState {}
@@ -39,5 +39,3 @@ impl BinaryOp for EqualsState {
         }
     }
 }
-
-export_binary!(EqualsState, equals);

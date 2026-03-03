@@ -1,4 +1,4 @@
-use crate::{RingBufferF64, UnaryOp, export_unary};
+use crate::{RingBufferF64, UnaryOp};
 
 #[repr(C)]
 pub struct TsDecayLinearState {
@@ -48,4 +48,3 @@ impl UnaryOp for TsDecayLinearState {
         self.history.drop_inner();
     }
 }
-export_unary!(TsDecayLinearState, ts_decay_linear);

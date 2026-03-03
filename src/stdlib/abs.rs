@@ -1,4 +1,4 @@
-use crate::{UnaryOp, export_unary};
+use crate::{UnaryOp};
 use std::slice;
 #[repr(C)]
 pub struct AbsState {
@@ -18,4 +18,3 @@ impl UnaryOp for AbsState {
         }
     }
 }
-export_unary!(AbsState, abs);

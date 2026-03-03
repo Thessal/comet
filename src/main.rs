@@ -15,7 +15,7 @@ struct Args {
 
     /// Number of exclusive sampling stages to emit as individual .so files
     #[arg(long, default_value_t = 1)]
-    exclusive_sample_stages: usize,  //maybe better shortter name could be used
+    sample_stages: usize, 
 }
 
 fn main() {
@@ -114,7 +114,7 @@ fn main() {
                                      use rand::distributions::WeightedIndex;
                                      use rand::prelude::Distribution;
 
-                                     for stage in 0..args.exclusive_sample_stages {
+                                     for stage in 0..args.sample_stages {
                                          let sample_size = std::cmp::min(
                                              (real_exprs.len() as f64 * args.sample_rate).ceil() as usize,
                                              available_variants.len()
@@ -127,7 +127,10 @@ fn main() {
 
                                          let mut weights = Vec::new();
                                          for variant in &available_variants {
-                                             weights.push(comet::synthesis::Synthesizer::calculate_forest_weight(variant, &behaviors));
+                                             let w = comet::synthesis::Synthesizer::calculate_forest_weight(variant, &behaviors);
+                                             weights.push(w);
+                                             let s: Vec<String> = variant.iter().map(|n| n.to_string()).collect();
+                                             // println!("Weight Evaluated: {} | Variant: {}", w, s.join("; "));
                                          }
                                          
                                          let mut sampled_forests = Vec::new();
@@ -137,6 +140,9 @@ fn main() {
                                                  let idx = dist.sample(&mut rng);
                                                  if selected_indices.insert(idx) {
                                                      sampled_forests.push(available_variants[idx].clone());
+                                                     //println!("Selected index: {}", idx);
+                                                     //println!("weight: {}", weights[idx]);
+                                                     //println!("expression: {:?}", available_variants[idx]);
                                                  }
                                              }
                                              
@@ -156,16 +162,15 @@ fn main() {
                                          
                                          let graph = comet::ir::ExecutionGraph::from_variants(&sampled_forests);
                                          
-                                         let inkwell_ctx = inkwell::context::Context::create();
                                          let module_name = format!("{}_stage_{}", flow.name, stage);
-                                         let codegen = comet::codegen::Codegen::new(&inkwell_ctx, &module_name);
+                                         let codegen = comet::codegen::Codegen::new(&module_name);
                                          
                                          let ir_string = codegen.generate_ir(&graph);
                                          // Print first few lines of IR for brief logging
                                          let ir_preview: String = ir_string.lines().take(5).collect::<Vec<&str>>().join("\n");
-                                         println!("Generated LLVM IR for {} (Preview):\n{} ...\n", module_name, ir_preview);
+                                         println!("Generated Rust source for {} (Preview):\n{} ...\n", module_name, ir_preview);
                                          
-                                         match codegen.emit_library(&module_name) {
+                                         match codegen.emit_library(&module_name, &ir_string) {
                                               Ok(_) => println!("Successfully compiled {}.so library!", module_name),
                                               Err(e) => eprintln!("Failed to compile library: {}", e),
                                          }

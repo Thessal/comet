@@ -1,4 +1,4 @@
-use crate::{RingBufferF64, UnaryOp, export_unary};
+use crate::{RingBufferF64, UnaryOp};
 #[repr(C)]
 pub struct TsDiffState {
     pub history: RingBufferF64,
@@ -38,4 +38,3 @@ impl UnaryOp for TsDiffState {
         self.history.drop_inner();
     }
 }
-export_unary!(TsDiffState, ts_diff);

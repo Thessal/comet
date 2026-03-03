@@ -35,7 +35,19 @@ def run_test(filename):
         input2.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
     )
 
-    num_outputs = 12 # Based on the multiple_variants_minimal.cm stage 0 LLVM IR showing out_gep_11
+    num_outputs = 0
+    while True:
+        try:
+            array_type = ctypes.c_char * 1024
+            array_type.in_dll(lib, f"comet_ast_0_{num_outputs}")
+            num_outputs += 1
+        except ValueError:
+            break
+
+    print(f"Detected {num_outputs} variants.")
+    if num_outputs == 0:
+        return
+
     outputs = [np.zeros((timesteps * feature_len,), dtype=np.float64) for _ in range(num_outputs)]
     
     OutputArrayType = ctypes.POINTER(ctypes.c_double) * num_outputs

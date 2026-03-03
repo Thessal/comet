@@ -1,4 +1,4 @@
-use crate::{UnaryOp, export_unary};
+use crate::{UnaryOp};
 
 #[repr(C)]
 pub struct TsFfillState {
@@ -43,4 +43,3 @@ impl UnaryOp for TsFfillState {
         // Rust Vec drops automatically when TsFfillState drops.
     }
 }
-export_unary!(TsFfillState, ts_ffill);

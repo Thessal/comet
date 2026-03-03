@@ -1,4 +1,4 @@
-use crate::{RingBufferF64, UnaryOp, export_unary};
+use crate::{RingBufferF64, UnaryOp};
 use std::collections::VecDeque;
 
 #[repr(C)]
@@ -80,4 +80,3 @@ impl UnaryOp for TsMaxState {
         self.valid_counts.clear();
     }
 }
-export_unary!(TsMaxState, ts_max);

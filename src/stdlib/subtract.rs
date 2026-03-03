@@ -1,4 +1,4 @@
-use crate::{BinaryOp, CometData, DataType, export_binary};
+use crate::{BinaryOp, CometData, DataType};
 
 #[repr(C)]
 pub struct SubtractState {}
@@ -39,5 +39,3 @@ impl BinaryOp for SubtractState {
         }
     }
 }
-
-export_binary!(SubtractState, subtract);

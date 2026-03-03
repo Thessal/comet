@@ -1,4 +1,4 @@
-use crate::{BinaryOp, CometData, DataType, export_binary};
+use crate::{BinaryOp, CometData, DataType};
 
 #[repr(C)]
 pub struct DivideState {}
@@ -40,5 +40,3 @@ impl BinaryOp for DivideState {
         }
     }
 }
-
-export_binary!(DivideState, divide);

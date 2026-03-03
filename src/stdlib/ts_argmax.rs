@@ -1,4 +1,4 @@
-use crate::{RingBufferF64, UnaryOp, export_unary};
+use crate::{RingBufferF64, UnaryOp};
 
 #[repr(C)]
 pub struct TsArgmaxState {
@@ -57,4 +57,3 @@ impl UnaryOp for TsArgmaxState {
         self.history.drop_inner();
     }
 }
-export_unary!(TsArgmaxState, ts_argmax);

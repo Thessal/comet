@@ -64,5 +64,3 @@ impl TernaryOp for TradewhenState {
         }
     }
 }
-
-crate::export_ternary!(TradewhenState, tradewhen);

@@ -1,4 +1,4 @@
-use crate::{RingBufferF64, UnaryOp, export_unary};
+use crate::{RingBufferF64, UnaryOp};
 
 #[repr(C)]
 pub struct TsSumState {
@@ -62,4 +62,3 @@ impl UnaryOp for TsSumState {
         self.history.drop_inner();
     }
 }
-export_unary!(TsSumState, ts_sum);

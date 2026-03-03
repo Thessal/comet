@@ -1,4 +1,4 @@
-use crate::{RingBufferF64, UnaryOp, export_unary};
+use crate::{RingBufferF64, UnaryOp};
 
 #[repr(C)]
 pub struct TsMaeState {
@@ -63,4 +63,3 @@ impl UnaryOp for TsMaeState {
         self.history.drop_inner();
     }
 }
-export_unary!(TsMaeState, ts_mae);

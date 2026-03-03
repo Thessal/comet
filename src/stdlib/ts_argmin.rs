@@ -1,4 +1,4 @@
-use crate::{RingBufferF64, UnaryOp, export_unary};
+use crate::{RingBufferF64, UnaryOp};
 
 #[repr(C)]
 pub struct TsArgminState {
@@ -57,4 +57,3 @@ impl UnaryOp for TsArgminState {
         self.history.drop_inner();
     }
 }
-export_unary!(TsArgminState, ts_argmin);

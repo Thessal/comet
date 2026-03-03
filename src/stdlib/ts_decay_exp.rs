@@ -1,4 +1,4 @@
-use crate::{RingBufferF64, UnaryOp, export_unary};
+use crate::{RingBufferF64, UnaryOp};
 
 #[repr(C)]
 pub struct TsDecayExpState {
@@ -52,4 +52,3 @@ impl UnaryOp for TsDecayExpState {
         self.ema.drop_inner();
     }
 }
-export_unary!(TsDecayExpState, ts_decay_exp);

@@ -1,4 +1,4 @@
-use crate::{BinaryOp, CometData, DataType, export_binary};
+use crate::{BinaryOp, CometData, DataType};
 
 #[repr(C)]
 pub struct MultiplyState {}
@@ -39,5 +39,3 @@ impl BinaryOp for MultiplyState {
         }
     }
 }
-
-export_binary!(MultiplyState, multiply);
