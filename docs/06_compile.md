@@ -1,10 +1,10 @@
 ## 1. Targets
 
-LLVM IR is generated from the set of function trees by the compiler.
+Rust code is generated from the set of function trees by the compiler.
 
-## 2. LLVM IR Generation
+## 2. Rust code Generation
 
-The main Comet compiler codebase (the "parser") acts as a generator of LLVM IR (or bitcode).
+The main Comet compiler codebase (the "parser") acts as a generator of Rust code (or bitcode).
 
 ### Workflow
 1.  **Source**: `example.cm`
@@ -16,27 +16,27 @@ The main Comet compiler codebase (the "parser") acts as a generator of LLVM IR (
     -   Expands Behaviors into a "Product Space" of valid implementations modeled as disjoint `Fn` Forests where exactly one tree matches the return constraint and all side-effect trees return `()`. see examples/consume_minimal.cm
     -   Enforces **Category Capture Unification** (`'a`) to strictly prune asymmetric functional branches during constraint matching.  TODO: write examples
     -   Expands Behaviors into a product space of valid implementations modeled as disjoint `Fn` Forests.
-3.  **Codegen (RealAST -> LLVM IR)**:
-    -   For each valid Forest in the product space, generate corresponding LLVM IR strings.
+3.  **Codegen (RealAST -> Rust code)**:
+    -   For each valid Forest in the product space, generate corresponding Rust code strings.
     -   The Forest is sampled and merged into a single execution graph. (DAG)
-4.  **Compilation (`llvm` / linker)**:
-    -   Compiles and links the generated LLVM code with the `stdlib` dynamic library (`.so`) into a high-performance executable strategy.
+4.  **Compilation (`cargo` / linker)**:
+    -   Compiles and links the generated Rust code with the `stdlib` dynamic library (`.so`) into a high-performance executable strategy.
 
 
-## 3. Compiler & LLVM Codegen Specifications
+## 3. Compiler & Rust Codegen Specifications
 
 1. **Primitive Literal Constraints**:
-    - When `RealAST` evaluates native literals (`Int`, `Float`), these should be injected into the LLVM IR as `constant` declarations explicitly compiled inside the variant's function execution block. 
+    - When `RealAST` evaluates native literals (`Int`, `Float`), these should be injected into the Rust code as `constant` declarations explicitly compiled inside the variant's function execution block. 
     - `String` literals (like `data("volume")`) must be saved in `StrategyMeta` tags. We are not sure how to use them yet, so its implementation is low priority.
 
-2. **Category Property LLVM Tags (Type Stripping)**:
+2. **Category Property Rust Tags (Type Stripping)**:
     - `CategoryExpr` boundaries (`'a`, `Normalized`, etc.) exist STRICTLY at compile-time to prune invalid Cartesian `Fn` forests. 
-    - Once `synthesis.rs` resolves a valid `RealAST`, the LLVM generator drops all Semantic Categories. LLVM exclusively recognizes base structural shapes (e.g. `DataFrame` -> `*double` arrays, `Int` -> `i64`).
+    - Once `synthesis.rs` resolves a valid `RealAST`, the Rust generator drops all Semantic Categories. Rust exclusively recognizes base structural shapes (e.g. `DataFrame` -> `*double` arrays, `Int` -> `i64`).
 
 3. **Execution Ring Buffer State Definition**:
     - The compiled `.so` C-ABI must explicitly define the passed `State`.
     - Passing state as a type-erased pointer: The state blob `*u8` passed by the caller should map directly into a static ring buffer struct.
-    - The LLVM IR will allocate offsets dynamically across the active `CallFn` nodes (e.g., `ts_mean` requires an `f64` rolling accumulator offset; `Diff` requires none). Thus, `State` sizes are deterministically precomputed during LLVM Generation.
+    - The Rust code will allocate offsets dynamically across the active `CallFn` nodes (e.g., `ts_mean` requires an `f64` rolling accumulator offset; `Diff` requires none). Thus, `State` sizes are deterministically precomputed during Rust Generation.
 
 ## 4. Generated Library API
 
@@ -90,9 +90,3 @@ The interface is stateless at the library level; state is passed in/out.
 -   **Output**:
     -   `Signal`: Signal for the new data points.
     -   `State`: Updated serialized state.
-
-### Why LLVM?
--   **Type Safety**: The LLVM IR generator enforces valid memory access and strict type passing with the `stdlib` components.
--   **Performance**: Combinatorial explosion requires native speed. LLVM's advanced optimization passes generate highly efficient machine code.
--   **Compatibility**: Direct linking with the Rust-generated `stdlib` `.so` library allows reusing complex stateful kernels easily without incurring FFI overhead during dynamic execution.
-

@@ -26,14 +26,41 @@ def run_test(filename):
     timesteps = 10
     feature_len = 2
     
-    input1 = np.arange(0, timesteps * feature_len, dtype=np.float64)
-    input2 = np.arange(100, 100 + timesteps * feature_len, dtype=np.float64)
-    
-    InputArrayType = ctypes.POINTER(ctypes.c_double) * 2
-    inputs_arr = InputArrayType(
-        input1.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-        input2.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    )
+    # Simulated data dictionary that replaces input1, input2
+    data_dict = {
+        "trade_count": np.arange(0, timesteps * feature_len, dtype=np.float64),
+        "close": np.arange(100, 100 + timesteps * feature_len, dtype=np.float64),
+        "volume": np.arange(200, 200 + timesteps * feature_len, dtype=np.float64),
+    }
+
+    try:
+        array_type_meta = ctypes.c_char * 1024
+        input_names_bytes = array_type_meta.in_dll(lib, "comet_input_names_0").value
+        input_names_str = input_names_bytes.decode("utf8")
+        input_names = [n.strip() for n in input_names_str.split(",") if n.strip()]
+    except ValueError:
+        print("comet_input_names_0 not found in library.")
+        input_names = []
+
+    print(f"Detected expected inputs: {input_names}")
+
+    num_inputs = len(input_names)
+    if num_inputs > 0:
+        InputArrayType = ctypes.POINTER(ctypes.c_double) * num_inputs
+        inputs_list = []
+        for name in input_names:
+            if name in data_dict:
+                inputs_list.append(data_dict[name].ctypes.data_as(ctypes.POINTER(ctypes.c_double)))
+            else:
+                print(f"Warning: expected input '{name}' not found in data_dict, using zeros.")
+                zeros = np.zeros(timesteps * feature_len, dtype=np.float64)
+                inputs_list.append(zeros.ctypes.data_as(ctypes.POINTER(ctypes.c_double)))
+                
+        inputs_arr = InputArrayType(*inputs_list)
+    else:
+        # Fallback if there are no inputs
+        InputArrayType = ctypes.POINTER(ctypes.c_double) * 0
+        inputs_arr = InputArrayType()
 
     num_outputs = 0
     while True:
@@ -58,7 +85,7 @@ def run_test(filename):
     lib.init_variant_0.argtypes = [ctypes.c_int64]
     lib.init_variant_0.restype = ctypes.c_void_p
     
-    print("Calling automated LLVM initializer")
+    print("Calling automated Rust initializer")
     state_blob_ptr = lib.init_variant_0(feature_len)
 
     for i in range(num_outputs):

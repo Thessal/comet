@@ -97,6 +97,22 @@ crate-type = ["cdylib"]
             });
         }
 
+        let mut input_names = Vec::new();
+        for node in &graph.nodes {
+            if let ExecutionNode::Source { name, .. } = node {
+                input_names.push(name.clone());
+            }
+        }
+        let input_names_str = input_names.join(",");
+        let input_names_bytes = format!("{}\0", input_names_str).into_bytes();
+        let input_names_len = input_names_bytes.len();
+        let input_names_ident = format_ident!("comet_input_names_0");
+        let input_names_byte_str = proc_macro2::Literal::byte_string(&input_names_bytes);
+        ast_exports.extend(quote! {
+            #[unsafe(no_mangle)]
+            pub static #input_names_ident: [u8; #input_names_len] = *#input_names_byte_str;
+        });
+
         let mut stateful_nodes = HashMap::new();
         let mut num_state_fields: usize = 0;
         let mut state_struct_fields = TokenStream::new();

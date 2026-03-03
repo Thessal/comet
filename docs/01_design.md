@@ -114,7 +114,7 @@ Calling a Behavior or Function requires **named** arguments set.
         ```
         - Given that days is a behavior `Behavior days() -> Days ("21" | "63")`, `data` is a stdlib function `Fn data(symbol: String) -> DataFrame`, `HistoricalVolume` is a behavior `Behavior HistoricalVolume(signal: DataFrame, lookback: Days) -> DataFrame`, `Compare` is a behavior `Behavior Compare(signal: DataFrame, reference: DataFrame Finite Positive) -> DataFrame Finite Indicator`
         - Compare, HistoricalVolume, days are behaviors or functions, so parenthesis is added.
-        - The `volume_spike` flow defined above, can be matched to a chain of functions, which can be translated into LLVM code.
+        - The `volume_spike` flow defined above, can be matched to a chain of functions, which can be translated into Rust code.
             - `rank_diff(a=data("volume"), b=ts_mean(a=data("volume"), period=21))`
             - `rank_diff(a=data("volume"), b=ts_mean(a=data("volume"), period=63))`
             - `divide(a=data("volume"), b=ts_mean(a=data("volume"), period=21))`

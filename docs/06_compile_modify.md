@@ -1,9 +1,9 @@
 # DAG-Based Optimization & Variant Sampling
 
-This plan outlines the optimization strategy for AST synthesis and compilation, replacing exhaustive LLVM code generation with targeted, multi-stage sampling and Graph-based CSE (Common Subexpression Elimination).
+This plan outlines the optimization strategy for AST synthesis and compilation, replacing exhaustive Rust code generation with targeted, multi-stage sampling and Graph-based CSE (Common Subexpression Elimination).
 
 ## 1. Decoupling Synthesis from Codegen & Multi-Stage Sampling
-As discussed, synthesizing exhaustive permutations of `AST`s in Rust is extremely fast and harmless. The bottleneck is strictly the LLVM Code Generation phase (`codegen`), which suffers when processing tens of thousands of variants into a single [.ll](file:///home/jongkook90/antigravity/comet/volume_spike.ll)/`.so` module.
+As discussed, synthesizing exhaustive permutations of `AST`s in Rust is extremely fast and harmless. The bottleneck is strictly the Rust code Generation phase (`codegen`), which suffers when processing tens of thousands of variants into a single `.so` module.
 
 We will keep the Synthesizer completely exhaustive, but we will introduce a filtering and sampling step immediately before Codegen.
 
@@ -54,12 +54,12 @@ Regardless of how the variants are selected for a specific `.so` stage, we must 
    - If the `Display` string exists in the HashMap, we reuse the existing `NodeId`.
    - If it doesn't, we insert the `Display` string into the HashMap, map it to a new `NodeId`, and push the node onto the `DagNode` array. This guarantees zero collisions for distinct operations.
 
-## 4. LLVM IR Generation & Threading Considerations
+## 4. Rust Code Generation & Threading Considerations
 By mapping the AST structures through the DAG array, iterating `0..len` provides a Topologically Sorted execution order.
-1. **Reduce Overhead:** We emit a single [.ll](file:///home/jongkook90/antigravity/comet/volume_spike.ll) instruction for a node calculation (like `%malloc_out_3 = call ptr @malloc...`), heavily reducing instruction bloat and runtime memory allocations. Reference counts will dictate when to emit `call void @free(...)` to manage memory safely.
+Operator states are managed via a `PipelineState` struct.
 
 **Threading the Execution DAG:**
-Because our end goal is to compile these static formulas into extremely portable C ABI libraries (`strat.so`), embedding dynamic Rust thread-pools (like `rayon`) inside the exported FFI functions is a technical anti-pattern and often impossible.
-Therefore, **the generated LLVM DAG will deliberately run as a single-threaded serial execution loop.** 
+Because our end goal is to compile these static formulas into portable native Rust dynamic libraries (`strat.so`).
+Therefore, **the generated Rust code will run as a single-threaded serial execution loop.** 
 
 While the nodes execute serially within a single variant's `execute` function, we achieve parallelization horizontally: The Python/Frontend architecture can deploy and execute 100 independent `.so` researches across 100 different worker processes in parallel. By combining memory-optimal, highly compressed `.so` files (thanks to CSE) with wide horizontal multi-processing, system throughput scales securely and predictably.
