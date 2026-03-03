@@ -1,13 +1,12 @@
 #[cfg(test)]
 mod tests {
+    use crate::DataType as CometDataType;
     use crate::max::MaxState;
     use crate::{BinaryOp, CometData};
-    use crate::DataType as CometDataType;
-    use polars::prelude::*;
 
     #[test]
     fn test_max_vs_polars() {
-        let period = 1; 
+        let period = 1;
         let len = 5;
 
         let input_data_a = vec![10.0, 20.0, 30.0, f64::NAN, 50.0];
@@ -15,7 +14,7 @@ mod tests {
 
         let mut state = MaxState::new(period, len);
         let mut our_output = vec![0.0; len];
-        
+
         let data_a = CometData {
             dtype: CometDataType::DataFrame,
             ptr: input_data_a.as_ptr(),
@@ -25,25 +24,28 @@ mod tests {
             ptr: input_data_b.as_ptr(),
         };
 
-        state.step(data_a, data_b, our_output.as_mut_ptr(), len);
+        state.step(data_a, data_b, our_output.as_mut_ptr());
 
         let expected_out = vec![
             10.0,
             25.0,
             30.0,
             f64::NAN, // NaN propagates
-            50.0
+            50.0,
         ];
 
         assert_eq!(our_output.len(), expected_out.len());
-        
+
         for (i, (ours, expected)) in our_output.iter().zip(expected_out.iter()).enumerate() {
             if f64::is_nan(*ours) && f64::is_nan(*expected) {
                 continue;
             }
             assert!(
-                (ours - expected).abs() < 1e-9, 
-                "Mismatch at {}: ours={}, expected={}", i, ours, expected
+                (ours - expected).abs() < 1e-9,
+                "Mismatch at {}: ours={}, expected={}",
+                i,
+                ours,
+                expected
             );
         }
     }

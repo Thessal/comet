@@ -31,3 +31,11 @@ pub extern "C" fn comet_tail_to_nan_step(
         out[0] = if v < lower || v > upper { f64::NAN } else { v };
     }
 }
+
+
+inventory::submit! {
+    crate::OperatorMeta {
+        name: "tail_to_nan",
+        output_shape: crate::OutputShape::DataFrame,
+    }
+}

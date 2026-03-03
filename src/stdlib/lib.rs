@@ -215,26 +215,48 @@ impl CometData {
 }
 
 // In src/stdlib/lib.rs
-pub trait ConstOp {
-    fn new(c: f64, len: usize) -> Self;
-    fn step(&mut self, out_ptr: *mut f64, len: usize);
+pub trait ZeroAryOp {
+    fn step(&mut self, out_ptr: *mut f64);
     fn drop_buffers(&mut self) {}
 }
 
 pub trait UnaryOp {
-    fn new(period: usize, len: usize) -> Self;
-    fn step(&mut self, a: CometData, out_ptr: *mut f64, len: usize);
+    fn step(&mut self, a: CometData, out_ptr: *mut f64);
     fn drop_buffers(&mut self) {}
 }
 
 pub trait BinaryOp {
-    fn new(period: usize, len: usize) -> Self;
-    fn step(&mut self, a: CometData, b: CometData, out_ptr: *mut f64, len: usize);
+    fn step(&mut self, a: CometData, b: CometData, out_ptr: *mut f64);
     fn drop_buffers(&mut self) {}
 }
 
 pub trait TernaryOp {
-    fn new(period: usize, len: usize) -> Self;
-    fn step(&mut self, a: CometData, b: CometData, c: CometData, out_ptr: *mut f64, len: usize);
+    fn step(&mut self, a: CometData, b: CometData, c: CometData, out_ptr: *mut f64);
     fn drop_buffers(&mut self) {}
 }
+
+pub trait DataFrameOp {
+    fn step(&mut self, a: CometData, out_ptr: *mut f64);
+    fn drop_buffers(&mut self) {}
+}
+
+pub trait MatrixOp {
+    fn step(&mut self, a: CometData, out_ptr: *mut f64);
+    fn drop_buffers(&mut self) {}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputShape {
+    Void,
+    TimeSeries, // 1 element per timestep
+    Vector,     // Variable elements (Iliffe vector)
+    DataFrame,  // len elements per timestep
+    Matrix,     // len * len elements per timestep
+}
+
+pub struct OperatorMeta {
+    pub name: &'static str,
+    pub output_shape: OutputShape,
+}
+
+inventory::collect!(OperatorMeta);

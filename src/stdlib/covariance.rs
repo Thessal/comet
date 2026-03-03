@@ -1,96 +1,92 @@
-use crate::{DequeState, PartialDeque};
+use crate::{CometData, DequeState, MatrixOp, PartialDeque};
 
 #[repr(C)]
 pub struct CovarianceState {
     pub history: DequeState,
     pub period: usize,
     pub time: usize,
+    pub len: usize,
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn comet_covariance_init(period: usize, len: usize) -> *mut CovarianceState {
-    let state = Box::new(CovarianceState {
-        history: DequeState::new(period, len),
-        period,
-        time: 0,
-    });
-    Box::into_raw(state)
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn comet_covariance_free(state: *mut CovarianceState) {
-    if !state.is_null() {
-        unsafe {
-            let mut s = Box::from_raw(state);
+impl CovarianceState {
+    pub fn new(period: usize, len: usize) -> Self {
+        CovarianceState {
+            history: DequeState::new(period, len),
+            period,
+            time: 0,
+            len,
         }
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn comet_covariance_step(
-    state: *mut CovarianceState,
-    returns_ptr: *const crate::CometData,
-    _lookback: usize,
-    out_ptr: *mut f64,
-    len: usize,
-) {
-    let s = unsafe { &mut *state };
-    let returns = unsafe { (*returns_ptr).as_slice(len) };
-    let out = unsafe { std::slice::from_raw_parts_mut(out_ptr, len * len) };
+// Calculates Sample Covariance Matrix
+impl MatrixOp for CovarianceState {
+    fn step(&mut self, returns: CometData, out_ptr: *mut f64) {
+        let len = self.len;
+        let returns_slice = unsafe { returns.as_slice(len) };
+        let out = unsafe { std::slice::from_raw_parts_mut(out_ptr, len * len) };
 
-    s.history.push(returns);
-    s.time += 1;
+        self.history.push(returns_slice);
+        self.time += 1;
 
-    if s.time < s.period {
-        for i in 0..(len * len) {
-            out[i] = f64::NAN;
-        }
-        return;
-    }
-
-    let mut means = vec![0.0; len];
-    let mut counts = vec![0.0; len];
-
-    for row in s.history.history.iter() {
-        for i in 0..len {
-            if !row[i].is_nan() {
-                means[i] += row[i];
-                counts[i] += 1.0;
+        if self.time < self.period {
+            for i in 0..(len * len) {
+                out[i] = f64::NAN;
             }
+            return;
         }
-    }
 
-    for i in 0..len {
-        if counts[i] > 0.0 {
-            means[i] /= counts[i];
-        } else {
-            means[i] = f64::NAN;
-        }
-    }
+        let mut means = vec![0.0; len];
+        let mut counts = vec![0.0; len];
 
-    for i in 0..len {
-        for j in 0..len {
-            let out_idx = i * len + j;
-            if means[i].is_nan() || means[j].is_nan() {
-                out[out_idx] = f64::NAN;
-                continue;
-            }
-
-            let mut cov = 0.0;
-            let mut pair_count = 0.0;
-
-            for row in s.history.history.iter() {
-                if !row[i].is_nan() && !row[j].is_nan() {
-                    cov += (row[i] - means[i]) * (row[j] - means[j]);
-                    pair_count += 1.0;
+        for row in self.history.history.iter() {
+            for i in 0..len {
+                if !row[i].is_nan() {
+                    means[i] += row[i];
+                    counts[i] += 1.0;
                 }
             }
+        }
 
-            if pair_count > 1.0 {
-                out[out_idx] = cov / (pair_count - 1.0);
+        for i in 0..len {
+            if counts[i] > 0.0 {
+                means[i] /= counts[i];
             } else {
-                out[out_idx] = f64::NAN;
+                means[i] = f64::NAN;
             }
         }
+
+        for i in 0..len {
+            for j in 0..len {
+                let out_idx = i * len + j;
+                if means[i].is_nan() || means[j].is_nan() {
+                    out[out_idx] = f64::NAN;
+                    continue;
+                }
+
+                let mut cov = 0.0;
+                let mut pair_count = 0.0;
+
+                for row in self.history.history.iter() {
+                    if !row[i].is_nan() && !row[j].is_nan() {
+                        cov += (row[i] - means[i]) * (row[j] - means[j]);
+                        pair_count += 1.0;
+                    }
+                }
+
+                if pair_count > 1.0 {
+                    out[out_idx] = cov / (pair_count - 1.0);
+                } else {
+                    out[out_idx] = f64::NAN;
+                }
+            }
+        }
+    }
+}
+
+inventory::submit! {
+    crate::OperatorMeta {
+        name: "covariance",
+        output_shape: crate::OutputShape::Matrix,
     }
 }

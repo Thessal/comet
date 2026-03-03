@@ -21,7 +21,7 @@ mod tests {
         };
 
         let mut state = ClipState::new(lower, upper, len);
-        state.step(data, our_output.as_mut_ptr(), len);
+        state.step(data, our_output.as_mut_ptr());
 
         let expected_out = vec![10.0, 10.0, 20.0, f64::NAN, 25.0];
 

@@ -8,20 +8,23 @@ pub struct TsMaxState {
     pub history: DequeState,
     pub time: usize,
     pub period: usize,
+    pub len: usize,
 }
 
-impl UnaryOp for TsMaxState {
-    fn new(period: usize, len: usize) -> Self {
+impl TsMaxState {
+    pub fn new(period: usize, len: usize) -> Self {
         TsMaxState {
             deques: vec![VecDeque::new(); len],
             valid_counts: vec![0; len],
             history: DequeState::new(period, len),
             time: 0,
-            period,
-        }
+            period, len }
     }
+}
+impl UnaryOp for TsMaxState {
     
-    fn step(&mut self, a: crate::CometData, out_ptr: *mut f64, len: usize) {
+    fn step(&mut self, a: crate::CometData, out_ptr: *mut f64) {
+        let len = self.len;
         let a_slice = unsafe { a.as_slice(len) };
         let out_slice = unsafe { std::slice::from_raw_parts_mut(out_ptr, len) };
         
@@ -77,5 +80,13 @@ impl UnaryOp for TsMaxState {
     fn drop_buffers(&mut self) {
         self.deques.clear();
         self.valid_counts.clear();
+    }
+}
+
+
+inventory::submit! {
+    crate::OperatorMeta {
+        name: "ts_max",
+        output_shape: crate::OutputShape::DataFrame,
     }
 }

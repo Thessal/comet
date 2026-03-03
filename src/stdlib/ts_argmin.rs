@@ -3,16 +3,19 @@ use crate::{PartialDeque, DequeState, UnaryOp};
 #[repr(C)]
 pub struct TsArgminState {
     pub history: DequeState,
+    pub len: usize,
 }
 
-impl UnaryOp for TsArgminState {
-    fn new(period: usize, len: usize) -> Self {
+impl TsArgminState {
+    pub fn new(period: usize, len: usize) -> Self {
         TsArgminState {
-            history: DequeState::new(period, len),
-        }
+            history: DequeState::new(period, len), len }
     }
+}
+impl UnaryOp for TsArgminState {
 
-    fn step(&mut self, a: crate::CometData, out_ptr: *mut f64, len: usize) {
+    fn step(&mut self, a: crate::CometData, out_ptr: *mut f64) {
+        let len = self.len;
         let a_slice = unsafe { a.as_slice(len) };
         let out_slice = unsafe { std::slice::from_raw_parts_mut(out_ptr, len) };
 
@@ -46,4 +49,12 @@ impl UnaryOp for TsArgminState {
     }
 
     fn drop_buffers(&mut self) {}
+}
+
+
+inventory::submit! {
+    crate::OperatorMeta {
+        name: "ts_argmin",
+        output_shape: crate::OutputShape::DataFrame,
+    }
 }

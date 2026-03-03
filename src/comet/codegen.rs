@@ -47,6 +47,7 @@ stdlib = {{ path = "{}", package = "comet" }}
         let status = Command::new("cargo")
             .arg("build")
             .arg("--release")
+            .env("CARGO_TARGET_DIR", current_dir.join("target"))
             .current_dir(&out_dir)
             .status()
             .map_err(|e| e.to_string())?;
@@ -56,7 +57,7 @@ stdlib = {{ path = "{}", package = "comet" }}
         }
 
         let so_name = format!("lib{}.so", self.module_name.replace("-", "_"));
-        let target_so = out_dir.join("target").join("release").join(&so_name);
+        let target_so = current_dir.join("target").join("release").join(&so_name);
 
         let dest_so = PathBuf::from(format!("{}.so", output_base));
         fs::copy(&target_so, &dest_so).map_err(|e| e.to_string())?;
@@ -242,11 +243,14 @@ stdlib = {{ path = "{}", package = "comet" }}
                     });
                     allocated_nodes.insert(node_id);
                 }
-                ExecutionNode::Operation { .. } => {
+                ExecutionNode::Operation { op, args } => {
                     let mut is_intermediate = false;
                     for other_node in &graph.nodes {
-                        if let ExecutionNode::Operation { args, .. } = other_node {
-                            if args.contains(&node_id) {
+                        if let ExecutionNode::Operation {
+                            args: other_args, ..
+                        } = other_node
+                        {
+                            if other_args.contains(&node_id) {
                                 is_intermediate = true;
                             }
                         }
@@ -258,8 +262,23 @@ stdlib = {{ path = "{}", package = "comet" }}
                         .count();
                     let needs_malloc = is_intermediate || out_len != 1;
                     if needs_malloc {
+                        let func_name = op.to_lowercase();
+
+                        let mut out_shape = stdlib::OutputShape::DataFrame;
+                        for meta in inventory::iter::<stdlib::OperatorMeta> {
+                            if meta.name == func_name.as_str() {
+                                out_shape = meta.output_shape;
+                                break;
+                            }
+                        }
+
+                        let out_width = match out_shape {
+                            stdlib::OutputShape::Matrix => quote! { (len * len) as usize },
+                            stdlib::OutputShape::TimeSeries => quote! { 1usize },
+                            _ => quote! { len as usize },
+                        };
                         init_allocs.extend(quote! {
-                            node_outputs.insert(#node_id, vec![0.0; len as usize]);
+                            node_outputs.insert(#node_id, vec![0.0; #out_width]);
                         });
                         allocated_nodes.insert(node_id);
                     }
@@ -321,6 +340,20 @@ stdlib = {{ path = "{}", package = "comet" }}
                     });
                 }
 
+                let mut out_shape = stdlib::OutputShape::DataFrame;
+                for meta in inventory::iter::<stdlib::OperatorMeta> {
+                    if meta.name == func_name.as_str() {
+                        out_shape = meta.output_shape;
+                        break;
+                    }
+                }
+
+                let out_width = match out_shape {
+                    stdlib::OutputShape::Matrix => quote! { (len * len) as usize },
+                    stdlib::OutputShape::TimeSeries => quote! { 1usize },
+                    _ => quote! { len as usize },
+                };
+
                 // Output pointer handling
                 let output_indices: Vec<usize> = graph
                     .output_nodes
@@ -334,7 +367,7 @@ stdlib = {{ path = "{}", package = "comet" }}
                     quote! { node_outputs.get_mut(&#node_id).unwrap().as_mut_ptr() }
                 } else if output_indices.len() == 1 {
                     let idx = output_indices[0];
-                    quote! { unsafe { out_ptrs[#idx].add(offset) } }
+                    quote! { unsafe { out_ptrs[#idx].add(t * (#out_width)) } }
                 } else {
                     quote! { std::ptr::null_mut::<f64>() }
                 };
@@ -342,9 +375,9 @@ stdlib = {{ path = "{}", package = "comet" }}
                 let mut memcpy_lines = TokenStream::new();
                 for &variant_idx in &output_indices {
                     memcpy_lines.extend(quote! {
-                        let final_ptr = unsafe { out_ptrs[#variant_idx].add(offset) };
+                        let final_ptr = unsafe { out_ptrs[#variant_idx].add(t * (#out_width)) };
                         if out_ptr != final_ptr && !out_ptr.is_null() {
-                            unsafe { std::ptr::copy_nonoverlapping(out_ptr, final_ptr, len as usize) };
+                            unsafe { std::ptr::copy_nonoverlapping(out_ptr, final_ptr, #out_width) };
                         }
                     });
                 }
@@ -352,7 +385,7 @@ stdlib = {{ path = "{}", package = "comet" }}
                 let field_ident = format_ident!("s{}", state_idx);
                 loop_body.extend(quote! {
                     let out_ptr = #out_ptr_expr;
-                    state.#field_ident.step(#step_args out_ptr, len as usize);
+                    state.#field_ident.step(#step_args out_ptr);
                     #memcpy_lines
                 });
             }
@@ -369,7 +402,7 @@ stdlib = {{ path = "{}", package = "comet" }}
 
         let code = quote! {
             extern crate stdlib;
-            use stdlib::{UnaryOp, BinaryOp, TernaryOp, ConstOp};
+            use stdlib::{UnaryOp, BinaryOp, TernaryOp, ZeroAryOp};
 
             #ast_exports
 

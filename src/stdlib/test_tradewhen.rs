@@ -31,7 +31,7 @@ mod tests {
             };
 
             let mut out = vec![0.0; len];
-            state.step(c_sig, c_ent, c_ext, out.as_mut_ptr(), len);
+            state.step(c_sig, c_ent, c_ext, out.as_mut_ptr());
             our_output.push(out[0]);
         }
 

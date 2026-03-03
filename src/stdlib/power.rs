@@ -1,14 +1,19 @@
 use crate::{BinaryOp, CometData, DataType};
 
 #[repr(C)]
-pub struct PowerState {}
+pub struct PowerState {
+    pub len: usize,
+}
 
-impl BinaryOp for PowerState {
-    fn new(_period: usize, _len: usize) -> Self {
-        PowerState {}
+impl PowerState {
+    pub fn new(_period: usize, len: usize) -> Self {
+        PowerState { len }
     }
+}
+impl BinaryOp for PowerState {
     
-    fn step(&mut self, a: CometData, b: CometData, out_ptr: *mut f64, len: usize) {
+    fn step(&mut self, a: CometData, b: CometData, out_ptr: *mut f64) {
+        let len = self.len;
         let out = unsafe { std::slice::from_raw_parts_mut(out_ptr, len) };
 
         match (a.dtype, b.dtype) {
@@ -37,5 +42,13 @@ impl BinaryOp for PowerState {
                 out[0] = unsafe { a.get_scalar().powf(b.get_scalar()) };
             }
         }
+    }
+}
+
+
+inventory::submit! {
+    crate::OperatorMeta {
+        name: "power",
+        output_shape: crate::OutputShape::DataFrame,
     }
 }

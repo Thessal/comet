@@ -25,7 +25,7 @@ mod tests {
             ptr: input_data_b.as_ptr(),
         };
 
-        state.step(data_a, data_b, our_output.as_mut_ptr(), len);
+        state.step(data_a, data_b, our_output.as_mut_ptr());
 
         let df = df!(
             "a" => &input_data_a,

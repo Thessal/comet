@@ -44,3 +44,11 @@ pub extern "C" fn comet_where_step(
         }
     }
 }
+
+
+inventory::submit! {
+    crate::OperatorMeta {
+        name: "where",
+        output_shape: crate::OutputShape::DataFrame,
+    }
+}

@@ -1,14 +1,19 @@
 use crate::{BinaryOp, CometData, DataType};
 
 #[repr(C)]
-pub struct GreaterState {}
+pub struct GreaterState {
+    pub len: usize,
+}
 
-impl BinaryOp for GreaterState {
-    fn new(_period: usize, _len: usize) -> Self {
-        GreaterState {}
+impl GreaterState {
+    pub fn new(_period: usize, len: usize) -> Self {
+        GreaterState { len }
     }
+}
+impl BinaryOp for GreaterState {
     
-    fn step(&mut self, a: CometData, b: CometData, out_ptr: *mut f64, len: usize) {
+    fn step(&mut self, a: CometData, b: CometData, out_ptr: *mut f64) {
+        let len = self.len;
         let out = unsafe { std::slice::from_raw_parts_mut(out_ptr, len) };
 
         match (a.dtype, b.dtype) {
@@ -37,5 +42,13 @@ impl BinaryOp for GreaterState {
                 out[0] = if unsafe { a.get_scalar() > b.get_scalar() } { 1.0 } else { 0.0 };
             }
         }
+    }
+}
+
+
+inventory::submit! {
+    crate::OperatorMeta {
+        name: "greater",
+        output_shape: crate::OutputShape::DataFrame,
     }
 }

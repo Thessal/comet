@@ -1,15 +1,19 @@
 // src/stdlib/cs_rank.rs
-use crate::{UnaryOp};
+use crate::UnaryOp;
 
 #[repr(C)]
-pub struct CsRankState;
+pub struct CsRankState {
+    pub len: usize,
+}
 
-impl UnaryOp for CsRankState {
-    fn new(_period: usize, _len: usize) -> Self {
-        CsRankState
+impl CsRankState {
+    pub fn new(_period: usize, len: usize) -> Self {
+        CsRankState { len }
     }
-
-    fn step(&mut self, a: crate::CometData, out_ptr: *mut f64, len: usize) {
+}
+impl UnaryOp for CsRankState {
+    fn step(&mut self, a: crate::CometData, out_ptr: *mut f64) {
+        let len = self.len;
         let a_slice = unsafe { a.as_slice(len) };
         let out_slice = unsafe { std::slice::from_raw_parts_mut(out_ptr, len) };
 
@@ -41,5 +45,13 @@ impl UnaryOp for CsRankState {
             }
             j = k;
         }
+    }
+}
+
+
+inventory::submit! {
+    crate::OperatorMeta {
+        name: "cs_rank",
+        output_shape: crate::OutputShape::DataFrame,
     }
 }

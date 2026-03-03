@@ -1,14 +1,19 @@
 use crate::{BinaryOp, CometData, DataType};
 
 #[repr(C)]
-pub struct MaxState {}
+pub struct MaxState {
+    pub len: usize,
+}
 
-impl BinaryOp for MaxState {
-    fn new(_period: usize, _len: usize) -> Self {
-        MaxState {}
+impl MaxState {
+    pub fn new(_period: usize, len: usize) -> Self {
+        MaxState { len }
     }
+}
+impl BinaryOp for MaxState {
     
-    fn step(&mut self, a: CometData, b: CometData, out_ptr: *mut f64, len: usize) {
+    fn step(&mut self, a: CometData, b: CometData, out_ptr: *mut f64) {
+        let len = self.len;
         let out = unsafe { std::slice::from_raw_parts_mut(out_ptr, len) };
 
         match (a.dtype, b.dtype) {
@@ -39,5 +44,13 @@ impl BinaryOp for MaxState {
                 out[0] = if a_val.is_nan() || b_val.is_nan() { f64::NAN } else { a_val.max(b_val) };
             }
         }
+    }
+}
+
+
+inventory::submit! {
+    crate::OperatorMeta {
+        name: "max",
+        output_shape: crate::OutputShape::DataFrame,
     }
 }

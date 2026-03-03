@@ -20,7 +20,7 @@ mod tests {
         // 1. Run our abs
         let mut state = AbsState::new(period, len);
         let mut our_output = vec![0.0; len];
-        state.step(crate::CometData { dtype: crate::DataType::DataFrame, ptr: input_data.as_ptr() }, our_output.as_mut_ptr(), len);
+        state.step(crate::CometData { dtype: crate::DataType::DataFrame, ptr: input_data.as_ptr() }, our_output.as_mut_ptr());
 
         // 2. Run polars standard abs
         let df = df!("input" => &input_data).unwrap();

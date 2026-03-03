@@ -16,7 +16,7 @@ mod tests {
         let b = CometData { dtype: DataType::DataFrame, ptr: b_vec.as_ptr() };
         
         let mut out = vec![0.0; len];
-        state.step(a, b, out.as_mut_ptr(), len);
+        state.step(a, b, out.as_mut_ptr());
 
         let expected = vec![20.0, 10.0, f64::NAN, f64::NAN];
         

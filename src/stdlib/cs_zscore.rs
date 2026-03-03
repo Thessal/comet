@@ -1,15 +1,19 @@
 // src/stdlib/cs_zscore.rs
-use crate::{UnaryOp};
+use crate::UnaryOp;
 
 #[repr(C)]
-pub struct CsZscoreState;
+pub struct CsZscoreState {
+    pub len: usize,
+}
 
-impl UnaryOp for CsZscoreState {
-    fn new(_period: usize, _len: usize) -> Self {
-        CsZscoreState
+impl CsZscoreState {
+    pub fn new(_period: usize, len: usize) -> Self {
+        CsZscoreState { len }
     }
-
-    fn step(&mut self, a: crate::CometData, out_ptr: *mut f64, len: usize) {
+}
+impl UnaryOp for CsZscoreState {
+    fn step(&mut self, a: crate::CometData, out_ptr: *mut f64) {
+        let len = self.len;
         let a_slice = unsafe { a.as_slice(len) };
         let out_slice = unsafe { std::slice::from_raw_parts_mut(out_ptr, len) };
 
@@ -31,7 +35,7 @@ impl UnaryOp for CsZscoreState {
 
         let mean = sum / (count as f64);
         let mut variance_sum = 0.0;
-        
+
         for &v in a_slice {
             if !v.is_nan() {
                 let diff = v - mean;
@@ -49,5 +53,13 @@ impl UnaryOp for CsZscoreState {
                 }
             }
         }
+    }
+}
+
+
+inventory::submit! {
+    crate::OperatorMeta {
+        name: "cs_zscore",
+        output_shape: crate::OutputShape::DataFrame,
     }
 }

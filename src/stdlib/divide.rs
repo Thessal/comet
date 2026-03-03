@@ -1,14 +1,19 @@
 use crate::{BinaryOp, CometData, DataType};
 
 #[repr(C)]
-pub struct DivideState {}
+pub struct DivideState {
+    pub len: usize,
+}
 
-impl BinaryOp for DivideState {
-    fn new(_period: usize, _len: usize) -> Self {
-        DivideState {}
+impl DivideState {
+    pub fn new(_period: usize, len: usize) -> Self {
+        DivideState { len }
     }
+}
+impl BinaryOp for DivideState {
     
-    fn step(&mut self, a: CometData, b: CometData, out_ptr: *mut f64, len: usize) {
+    fn step(&mut self, a: CometData, b: CometData, out_ptr: *mut f64) {
+        let len = self.len;
         let out = unsafe { std::slice::from_raw_parts_mut(out_ptr, len) };
 
         match (a.dtype, b.dtype) {
@@ -38,5 +43,13 @@ impl BinaryOp for DivideState {
                 out[0] = unsafe { a.get_scalar() / b.get_scalar() };
             }
         }
+    }
+}
+
+
+inventory::submit! {
+    crate::OperatorMeta {
+        name: "divide",
+        output_shape: crate::OutputShape::DataFrame,
     }
 }

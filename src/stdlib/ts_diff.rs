@@ -2,16 +2,19 @@ use crate::{DequeState, PartialDeque, UnaryOp};
 #[repr(C)]
 pub struct TsDiffState {
     pub history: DequeState,
+    pub len: usize,
 }
 
 // 1. Implement the generic trait
-impl UnaryOp for TsDiffState {
-    fn new(period: usize, len: usize) -> Self {
+impl TsDiffState {
+    pub fn new(period: usize, len: usize) -> Self {
         TsDiffState {
-            history: DequeState::new(period, len),
-        }
+            history: DequeState::new(period, len), len }
     }
-    fn step(&mut self, a: crate::CometData, out_ptr: *mut f64, len: usize) {
+}
+impl UnaryOp for TsDiffState {
+    fn step(&mut self, a: crate::CometData, out_ptr: *mut f64) {
+        let len = self.len;
         let a_slice = unsafe { a.as_slice(len) };
         let out_slice = unsafe { std::slice::from_raw_parts_mut(out_ptr, len) };
 
@@ -35,4 +38,12 @@ impl UnaryOp for TsDiffState {
     }
 
     fn drop_buffers(&mut self) {}
+}
+
+
+inventory::submit! {
+    crate::OperatorMeta {
+        name: "ts_diff",
+        output_shape: crate::OutputShape::DataFrame,
+    }
 }

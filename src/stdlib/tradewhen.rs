@@ -5,18 +5,21 @@ pub struct TradewhenState {
     pub last_val: Vec<f64>,
     pub time_since: Vec<usize>,
     pub period: usize,
+    pub len: usize,
 }
 
-impl TernaryOp for TradewhenState {
-    fn new(period: usize, len: usize) -> Self {
+impl TradewhenState {
+    pub fn new(period: usize, len: usize) -> Self {
         TradewhenState {
             last_val: vec![f64::NAN; len],
             time_since: vec![usize::MAX; len],
-            period,
-        }
+            period, len }
     }
+}
+impl TernaryOp for TradewhenState {
 
-    fn step(&mut self, signal: CometData, enter: CometData, exit: CometData, out_ptr: *mut f64, len: usize) {
+    fn step(&mut self, signal: CometData, enter: CometData, exit: CometData, out_ptr: *mut f64) {
+        let len = self.len;
         let is_sig_df = signal.dtype == DataType::DataFrame;
         let is_ent_df = enter.dtype == DataType::DataFrame;
         let is_ext_df = exit.dtype == DataType::DataFrame;
@@ -62,5 +65,13 @@ impl TernaryOp for TradewhenState {
                 out[i] = f64::NAN;
             }
         }
+    }
+}
+
+
+inventory::submit! {
+    crate::OperatorMeta {
+        name: "tradewhen",
+        output_shape: crate::OutputShape::DataFrame,
     }
 }
