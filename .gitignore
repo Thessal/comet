@@ -1,3 +1,5 @@
 /target
 /data
 /examples/data
+.comet_tmp_*
+*.so

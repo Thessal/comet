@@ -1,9 +1,9 @@
-use crate::{RingBufferF64, UnaryOp};
+use crate::{DequeState, PartialDeque, UnaryOp};
 
 #[repr(C)]
 pub struct TsRankState {
     pub buffers: Vec<Vec<f64>>,
-    pub history: RingBufferF64,
+    pub history: DequeState,
     pub time: usize,
     pub period: usize,
 }
@@ -12,7 +12,7 @@ impl UnaryOp for TsRankState {
     fn new(period: usize, len: usize) -> Self {
         TsRankState {
             buffers: vec![Vec::with_capacity(period); len],
-            history: RingBufferF64::new(period, len),
+            history: DequeState::new(period, len),
             time: 0,
             period,
         }
@@ -73,7 +73,6 @@ impl UnaryOp for TsRankState {
     }
     
     fn drop_buffers(&mut self) {
-        self.history.drop_inner();
         self.buffers.clear();
     }
 }

@@ -1,15 +1,15 @@
-use crate::{RingBufferF64, UnaryOp};
+use crate::{DequeState, PartialDeque, UnaryOp};
 
 #[repr(C)]
 pub struct TsDecayExpState {
-    pub ema: RingBufferF64,
+    pub ema: DequeState,
     pub period: usize,
 }
 
 impl UnaryOp for TsDecayExpState {
     fn new(period: usize, len: usize) -> Self {
         TsDecayExpState {
-            ema: RingBufferF64::new(1, len),
+            ema: DequeState::new(1, len),
             period,
         }
     }
@@ -49,6 +49,5 @@ impl UnaryOp for TsDecayExpState {
     }
     
     fn drop_buffers(&mut self) {
-        self.ema.drop_inner();
     }
 }

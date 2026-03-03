@@ -1,11 +1,11 @@
-use std::ffi::CStr;
-use std::os::raw::c_char;
-use std::fs::File;
-use flate2::read::GzDecoder;
+use crate::PartialDeque;
 use chrono::NaiveDateTime;
-
+use flate2::read::GzDecoder;
+use std::ffi::CStr;
+use std::fs::File;
+use std::os::raw::c_char;
 pub struct DataState {
-    pub rows: crate::RingBufferF64,
+    pub rows: crate::DequeState,
     pub columns: Vec<String>,
     pub index: Vec<NaiveDateTime>,
     pub current_step: usize,
@@ -35,14 +35,14 @@ impl DataState {
             row_count = rdr.records().count();
         }
 
-        let mut rows = crate::RingBufferF64::new(row_count, len);
-        
+        let mut rows = crate::DequeState::new(row_count, len);
+
         if let Ok(file) = File::open(&file_path) {
             let decoder = GzDecoder::new(file);
             let mut rdr = csv::ReaderBuilder::new()
                 .has_headers(false)
                 .from_reader(decoder);
-                
+
             for result in rdr.records() {
                 if let Ok(record) = result {
                     let mut row = vec![f64::NAN; len];
@@ -99,14 +99,12 @@ impl DataState {
             current_step: 0,
         }
     }
-    
+
     pub fn step(&mut self, out_ptr: *mut f64, len: usize) {
         let out_slice = unsafe { std::slice::from_raw_parts_mut(out_ptr, len) };
         if self.current_step < self.rows.count {
-            let rb_slice = unsafe { std::slice::from_raw_parts(self.rows.ptr, self.rows.cap * self.rows.len) };
-            let row_start = self.current_step * self.rows.len;
-            let row_slice = &rb_slice[row_start..row_start + len.min(self.rows.len)];
-            
+            let row_slice = &self.rows.history[self.current_step];
+
             for i in 0..len {
                 if i < row_slice.len() {
                     out_slice[i] = row_slice[i];
@@ -123,14 +121,17 @@ impl DataState {
     }
 
     pub fn drop_buffers(&mut self) {
-        self.rows.drop_inner();
         self.columns.clear();
         self.index.clear();
     }
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn comet_data_init(id_ptr: *const c_char, id_len: usize, len: usize) -> *mut DataState {
+pub extern "C" fn comet_data_init(
+    id_ptr: *const c_char,
+    id_len: usize,
+    len: usize,
+) -> *mut DataState {
     let id_str = if id_ptr.is_null() {
         String::new()
     } else {
@@ -159,11 +160,7 @@ pub extern "C" fn comet_data_free(state: *mut DataState) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn comet_data_step(
-    state: *mut DataState, 
-    out_ptr: *mut f64, 
-    len: usize
-) {
+pub extern "C" fn comet_data_step(state: *mut DataState, out_ptr: *mut f64, len: usize) {
     let s = unsafe { &mut *state };
     s.step(out_ptr, len)
 }

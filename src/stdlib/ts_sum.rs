@@ -1,18 +1,18 @@
-use crate::{RingBufferF64, UnaryOp};
+use crate::{DequeState, PartialDeque, UnaryOp};
 
 #[repr(C)]
 pub struct TsSumState {
-    pub sum: RingBufferF64,
-    pub count: RingBufferF64,
-    pub history: RingBufferF64,
+    pub sum: DequeState,
+    pub count: DequeState,
+    pub history: DequeState,
 }
 
 impl UnaryOp for TsSumState {
     fn new(period: usize, len: usize) -> Self {
         TsSumState {
-            sum: RingBufferF64::new(1, len),
-            count: RingBufferF64::new(1, len),
-            history: RingBufferF64::new(period, len),
+            sum: DequeState::new(1, len),
+            count: DequeState::new(1, len),
+            history: DequeState::new(period, len),
         }
     }
     fn step(&mut self, a: crate::CometData, out_ptr: *mut f64, len: usize) {
@@ -57,8 +57,5 @@ impl UnaryOp for TsSumState {
     }
     
     fn drop_buffers(&mut self) {
-        self.sum.drop_inner();
-        self.count.drop_inner();
-        self.history.drop_inner();
     }
 }

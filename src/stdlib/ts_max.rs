@@ -1,11 +1,11 @@
-use crate::{RingBufferF64, UnaryOp};
+use crate::{DequeState, PartialDeque, UnaryOp};
 use std::collections::VecDeque;
 
 #[repr(C)]
 pub struct TsMaxState {
     pub deques: Vec<VecDeque<(usize, f64)>>,
     pub valid_counts: Vec<usize>,
-    pub history: RingBufferF64,
+    pub history: DequeState,
     pub time: usize,
     pub period: usize,
 }
@@ -15,7 +15,7 @@ impl UnaryOp for TsMaxState {
         TsMaxState {
             deques: vec![VecDeque::new(); len],
             valid_counts: vec![0; len],
-            history: RingBufferF64::new(period, len),
+            history: DequeState::new(period, len),
             time: 0,
             period,
         }
@@ -75,7 +75,6 @@ impl UnaryOp for TsMaxState {
     }
     
     fn drop_buffers(&mut self) {
-        self.history.drop_inner();
         self.deques.clear();
         self.valid_counts.clear();
     }

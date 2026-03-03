@@ -1,8 +1,8 @@
-use crate::RingBufferF64;
+use crate::{DequeState, PartialDeque};
 
 #[repr(C)]
 pub struct CovarianceState {
-    pub history: RingBufferF64,
+    pub history: DequeState,
     pub period: usize,
     pub time: usize,
 }
@@ -10,7 +10,7 @@ pub struct CovarianceState {
 #[unsafe(no_mangle)]
 pub extern "C" fn comet_covariance_init(period: usize, len: usize) -> *mut CovarianceState {
     let state = Box::new(CovarianceState {
-        history: RingBufferF64::new(period, len),
+        history: DequeState::new(period, len),
         period,
         time: 0,
     });
@@ -20,9 +20,8 @@ pub extern "C" fn comet_covariance_init(period: usize, len: usize) -> *mut Covar
 #[unsafe(no_mangle)]
 pub extern "C" fn comet_covariance_free(state: *mut CovarianceState) {
     if !state.is_null() {
-        unsafe { 
-            let mut s = Box::from_raw(state); 
-            s.history.drop_inner(); 
+        unsafe {
+            let mut s = Box::from_raw(state);
         }
     }
 }
@@ -33,7 +32,7 @@ pub extern "C" fn comet_covariance_step(
     returns_ptr: *const crate::CometData,
     _lookback: usize,
     out_ptr: *mut f64,
-    len: usize
+    len: usize,
 ) {
     let s = unsafe { &mut *state };
     let returns = unsafe { (*returns_ptr).as_slice(len) };
@@ -43,19 +42,16 @@ pub extern "C" fn comet_covariance_step(
     s.time += 1;
 
     if s.time < s.period {
-        for i in 0..(len * len) { out[i] = f64::NAN; }
+        for i in 0..(len * len) {
+            out[i] = f64::NAN;
+        }
         return;
     }
-
-    let buf_ptr = s.history.ptr;
-    let cap = s.history.cap;
 
     let mut means = vec![0.0; len];
     let mut counts = vec![0.0; len];
 
-    for t in 0..cap {
-        let row_start = t * len;
-        let row = unsafe { std::slice::from_raw_parts(buf_ptr.add(row_start), len) };
+    for row in s.history.history.iter() {
         for i in 0..len {
             if !row[i].is_nan() {
                 means[i] += row[i];
@@ -63,7 +59,7 @@ pub extern "C" fn comet_covariance_step(
             }
         }
     }
-    
+
     for i in 0..len {
         if counts[i] > 0.0 {
             means[i] /= counts[i];
@@ -83,9 +79,7 @@ pub extern "C" fn comet_covariance_step(
             let mut cov = 0.0;
             let mut pair_count = 0.0;
 
-            for t in 0..cap {
-                let row_start = t * len;
-                let row = unsafe { std::slice::from_raw_parts(buf_ptr.add(row_start), len) };
+            for row in s.history.history.iter() {
                 if !row[i].is_nan() && !row[j].is_nan() {
                     cov += (row[i] - means[i]) * (row[j] - means[j]);
                     pair_count += 1.0;
