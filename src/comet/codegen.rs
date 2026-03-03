@@ -8,12 +8,14 @@ use std::process::Command;
 
 pub struct Codegen {
     pub module_name: String,
+    pub stdlib_path: Option<String>,
 }
 
 impl Codegen {
-    pub fn new(module_name: &str) -> Self {
+    pub fn new(module_name: &str, stdlib_path: Option<String>) -> Self {
         Codegen {
             module_name: module_name.to_string(),
+            stdlib_path,
         }
     }
 
@@ -23,6 +25,24 @@ impl Codegen {
         fs::create_dir_all(out_dir.join("src")).map_err(|e| e.to_string())?;
 
         let current_dir = std::env::current_dir().map_err(|e| e.to_string())?;
+
+        let stdlib_dep = if let Some(path) = &self.stdlib_path {
+            let p = std::path::Path::new(path);
+            let dir = if p.is_file() || path.ends_with(".so") {
+                p.parent()
+                    .unwrap_or(std::path::Path::new("."))
+                    .to_string_lossy()
+                    .to_string()
+            } else {
+                path.to_string()
+            };
+            format!(r#"stdlib = {{ path = "{}", package = "comet" }}"#, dir)
+        } else {
+            format!(
+                r#"stdlib = {{ path = "{}", package = "comet" }}"#,
+                current_dir.to_string_lossy()
+            )
+        };
 
         let cargo_toml = format!(
             r#"
@@ -35,10 +55,9 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-stdlib = {{ path = "{}", package = "comet" }}
+{}
 "#,
-            self.module_name,
-            current_dir.to_string_lossy()
+            self.module_name, stdlib_dep
         );
 
         fs::write(out_dir.join("Cargo.toml"), cargo_toml).map_err(|e| e.to_string())?;
