@@ -24,6 +24,23 @@ clap = { version = "4.4", features = ["derive"] }
 rand = "0.8"
 bevy_reflect = "0.18.0"
 inventory = "0.3.22"
+burn = { version = "0.20.1", features = [
+    "train",
+    "tui",
+    "metrics",
+    "cuda",
+    "rocm",
+    "ndarray",
+    "store",
+] }
 
 [dev-dependencies]
-polars = { version = "0.53.0", features = ["abs", "diff", "dtype-datetime", "lazy", "rank", "rolling_window", "temporal"] }
+polars = { version = "0.53.0", features = [
+    "abs",
+    "diff",
+    "dtype-datetime",
+    "lazy",
+    "rank",
+    "rolling_window",
+    "temporal",
+] }

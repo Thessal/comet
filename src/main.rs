@@ -139,44 +139,9 @@ fn main() {
                                             break;
                                         }
 
-                                        let mut weights = Vec::new();
-                                        for variant in &available_variants {
-                                            let w = comet::synthesis::Synthesizer::calculate_forest_weight(variant, &behaviors);
-                                            weights.push(w);
-                                            let s: Vec<String> =
-                                                variant.iter().map(|n| n.to_string()).collect();
-                                            // println!("Weight Evaluated: {} | Variant: {}", w, s.join("; "));
-                                        }
-
-                                        let mut sampled_forests = Vec::new();
-                                        if let Ok(dist) = WeightedIndex::new(&weights) {
-                                            let mut selected_indices =
-                                                std::collections::HashSet::new();
-                                            while selected_indices.len() < sample_size {
-                                                let idx = dist.sample(&mut rng);
-                                                if selected_indices.insert(idx) {
-                                                    sampled_forests
-                                                        .push(available_variants[idx].clone());
-                                                    //println!("Selected index: {}", idx);
-                                                    //println!("weight: {}", weights[idx]);
-                                                    //println!("expression: {:?}", available_variants[idx]);
-                                                }
-                                            }
-
-                                            let mut remaining = Vec::new();
-                                            for (i, v) in available_variants.into_iter().enumerate()
-                                            {
-                                                if !selected_indices.contains(&i) {
-                                                    remaining.push(v);
-                                                }
-                                            }
-                                            available_variants = remaining;
-                                        } else {
-                                            available_variants.shuffle(&mut rng);
-                                            sampled_forests =
-                                                available_variants.drain(..sample_size).collect();
-                                        }
-
+                                        available_variants.shuffle(&mut rng);
+                                        let sampled_forests: Vec<_> =
+                                            available_variants.drain(..sample_size).collect();
                                         println!(
                                             "--- Stage {} ({} samples) ---",
                                             stage,

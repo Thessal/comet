@@ -46,11 +46,8 @@ type_ref = { identifier }
 
 comma = _{ "," }
 
-// behavior Compare (A, B) -> Series { weights: { Rank: 0.8, *: 0.05 } }
-behavior_decl = { k_behavior ~ identifier ~ "(" ~ typed_arg_list ~ ")" ~ "->" ~ constraint ~ behavior_body? }
-behavior_body = { "{" ~ "weights" ~ ":" ~ "{" ~ weight_list? ~ "}" ~ "}" }
-weight_list = { weight_entry ~ ("," ~ weight_entry)* }
-weight_entry = { (identifier | "*") ~ ":" ~ float_literal }
+// behavior Compare (A, B) -> Series
+behavior_decl = { k_behavior ~ identifier ~ "(" ~ typed_arg_list ~ ")" ~ "->" ~ constraint }
 arg_list = { (identifier ~ (comma ~ identifier)*)? }
 typed_arg_list = { (typed_arg ~ (comma ~ typed_arg)*)? }
 typed_arg = { identifier ~ ":" ~ constraint }
@@ -71,12 +68,8 @@ assignment_stmt = { identifier ~ "=" ~ expr }
 expr_stmt = { expr }
 
 // Constraints
-// Series A B | C -> (A + B) | C
-constraint = { types ~ category_expr? }
-category_expr = { add_category ~ ("|" ~ add_category)* }
-add_category = { sub_category ~ (sub_category)* }
-sub_category = { atom_category ~ ("-" ~ atom_category)? }
-atom_category = { ("(" ~ category_expr ~ ")") | identifier | string_literal }
+constraint = { type_name }
+type_name = { "DataFrame" | "Matrix" | "Vector" | "String" | "Float" | "Bool" | "Void" }
 
 // Expressions
 expr = { or_expr }
@@ -112,6 +105,6 @@ primary = {
 path = ${ identifier ~ ("::" ~ identifier)* }
 paren_expr = { "(" ~ expr ~ ")" }
 range_literal = { "[" ~ expr ~ ".." ~ (expr ~ "..")? ~ expr ~ "]" }
-list_literal = { "[" ~ (expr ~ ("," ~ expr)*)? ~ "]" }
-arg_values = { (arg_value ~ ("," ~ arg_value)*)? }
-arg_value = { identifier ~ "=" ~ expr }
+list_literal = { "[" ~ (expr ~ (comma ~ expr)*)? ~ "]" }
+arg_values = { (arg_value ~ (comma ~ arg_value)*)? }
+arg_value = { expr }

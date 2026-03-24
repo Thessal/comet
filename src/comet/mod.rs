@@ -4,3 +4,5 @@ pub mod synthesis;
 pub mod ir;
 pub mod codegen;
 pub mod dag;
+pub mod sequence;
+pub mod search;

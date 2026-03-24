@@ -8,7 +8,7 @@ pub enum DagOp {
     Identifier(Ident),
     CallFn {
         func_name: Ident,
-        args: Vec<(Option<Ident>, usize)>, // References to NodeIds
+        args: Vec<usize>, // References to NodeIds
     }
 }
 
@@ -53,9 +53,9 @@ impl DagBuilder {
             }
             RealExpr::CallFn { func_name, args, .. } => {
                 let mut dag_args = Vec::new();
-                for (name_opt, arg_expr) in args {
+                for arg_expr in args {
                     let child_id = self.build_from_real_expr(arg_expr);
-                    dag_args.push((name_opt.clone(), child_id));
+                    dag_args.push(child_id);
                 }
                 self.insert_op(DagOp::CallFn {
                     func_name: func_name.clone(),

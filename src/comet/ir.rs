@@ -62,8 +62,8 @@ impl ExecutionGraph {
                 crate::comet::dag::DagOp::CallFn { func_name, args } => {
                     if func_name == "data" {
                         let mut src_name = "unknown".to_string();
-                        if let Some((_, arg_id)) = args.first() {
-                            if let crate::comet::dag::DagOp::Literal(crate::comet::ast::Literal::String(s)) = &builder.nodes[*arg_id].op {
+                        if let Some(&arg_id) = args.first() {
+                            if let crate::comet::dag::DagOp::Literal(crate::comet::ast::Literal::String(s)) = &builder.nodes[arg_id].op {
                                 src_name = s.clone();
                             }
                         }
@@ -73,8 +73,8 @@ impl ExecutionGraph {
                         }
                     } else {
                         let mut exec_args = Vec::new();
-                        for (_, arg_id) in args {
-                            let mapped_id = *dag_to_graph_id.get(arg_id).expect("DAG topological sort failed");
+                        for &arg_id in args {
+                            let mapped_id = *dag_to_graph_id.get(&arg_id).expect("DAG topological sort failed");
                             exec_args.push(mapped_id);
                         }
                         ExecutionNode::Operation {

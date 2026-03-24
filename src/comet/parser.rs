@@ -80,7 +80,7 @@ fn validate_expr(expr: &Expr, known_functions: &HashSet<String>) -> Result<(), P
                 return Err(ParserError::SemanticError(format!("Undefined function or behavior called: '{}'", func_name)));
             }
             for arg in args {
-                validate_expr(&arg.value, known_functions)?;
+                validate_expr(arg, known_functions)?;
             }
             Ok(())
         },
@@ -138,84 +138,21 @@ fn parse_constraint(pair: Pair<Rule>) -> Result<ConstraintDecl, ParserError> {
     let mut inner = pair.into_inner();
     let type_val = parse_types(inner.next().unwrap())?;
     
-    let category_expr = if let Some(cat_pair) = inner.next() {
-        Some(parse_category_expr(cat_pair)?)
-    } else {
-        None
-    };
-    
     Ok(ConstraintDecl {
         base_type: type_val,
-        category_expr,
     })
 }
 
 fn parse_types(pair: Pair<Rule>) -> Result<TypeDecl, ParserError> {
     match pair.as_str() {
-        "Series" => Ok(TypeDecl::Series),
         "DataFrame" => Ok(TypeDecl::DataFrame),
         "Matrix" => Ok(TypeDecl::Matrix),
         "Vector" => Ok(TypeDecl::Vector),
         "String" => Ok(TypeDecl::String),
-        "Int" => Ok(TypeDecl::Int),
         "Float" => Ok(TypeDecl::Float),
         "Bool" => Ok(TypeDecl::Bool),
         "Void" => Ok(TypeDecl::Void),
         _ => Err(ParserError::UnexpectedRule(pair.as_rule())),
-    }
-}
-
-fn parse_category_expr(pair: Pair<Rule>) -> Result<CategoryExpr, ParserError> {
-    let mut inner = pair.into_inner();
-    let first = parse_add_category(inner.next().unwrap())?;
-    
-    let mut categories = vec![first];
-    while let Some(next_pair) = inner.next() {
-        categories.push(parse_add_category(next_pair)?);
-    }
-    
-    if categories.len() == 1 {
-        Ok(categories.pop().unwrap())
-    } else {
-        Ok(CategoryExpr::Union(categories))
-    }
-}
-
-fn parse_add_category(pair: Pair<Rule>) -> Result<CategoryExpr, ParserError> {
-    let mut inner = pair.into_inner();
-    let first = parse_sub_category(inner.next().unwrap())?;
-    
-    let mut categories = vec![first];
-    while let Some(next_pair) = inner.next() {
-        categories.push(parse_sub_category(next_pair)?);
-    }
-    
-    if categories.len() == 1 {
-        Ok(categories.pop().unwrap())
-    } else {
-        Ok(CategoryExpr::Addition(categories))
-    }
-}
-
-fn parse_sub_category(pair: Pair<Rule>) -> Result<CategoryExpr, ParserError> {
-    let mut inner = pair.into_inner();
-    let lhs = parse_atom_category(inner.next().unwrap())?;
-    
-    if let Some(rhs_pair) = inner.next() {
-        let rhs = parse_atom_category(rhs_pair)?;
-        Ok(CategoryExpr::Subtraction(Box::new(lhs), Box::new(rhs)))
-    } else {
-        Ok(lhs)
-    }
-}
-
-fn parse_atom_category(pair: Pair<Rule>) -> Result<CategoryExpr, ParserError> {
-    let inner = pair.into_inner().next().unwrap();
-    match inner.as_rule() {
-        Rule::category_expr => parse_category_expr(inner),
-        Rule::identifier => Ok(CategoryExpr::Atom(parse_identifier(inner))),
-        Rule::string_literal => Ok(CategoryExpr::Atom(inner.as_str().trim_matches('"').to_string())),
-        _ => Err(ParserError::UnexpectedRule(inner.as_rule())),
     }
 }
 
@@ -243,35 +180,10 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
     let args = parse_typed_arg_list(inner.next().unwrap())?;
     let return_constraint = parse_constraint(inner.next().unwrap())?;
     
-    let mut weights = std::collections::HashMap::new();
-    if let Some(body_pair) = inner.next() {
-        if body_pair.as_rule() == Rule::behavior_body {
-            let mut body_inner = body_pair.into_inner();
-            if let Some(weight_list_pair) = body_inner.next() {
-                if weight_list_pair.as_rule() == Rule::weight_list {
-                    for weight_entry_pair in weight_list_pair.into_inner() {
-                        let mut entry_inner = weight_entry_pair.into_inner();
-                        let id_pair = entry_inner.next().unwrap();
-                        let id = if id_pair.as_rule() == Rule::identifier {
-                            parse_identifier(id_pair)
-                        } else {
-                            id_pair.as_str().to_string() // "*"
-                        };
-                        let val_pair = entry_inner.next().unwrap();
-                        let val: f64 = val_pair.as_str().parse().unwrap();
-                        weights.insert(id, val);
-                    }
-                }
-            }
-        }
-    }
-    
     Ok(BehaviorDecl {
         name,
         args,
         return_constraint,
-        depth: 1,
-        weights,
     })
 }
 
@@ -542,14 +454,11 @@ fn parse_primary(pair: Pair<Rule>) -> Result<Expr, ParserError> {
     }
 }
 
-fn parse_arg_values(pair: Pair<Rule>) -> Result<Vec<ArgValue>, ParserError> {
+fn parse_arg_values(pair: Pair<Rule>) -> Result<Vec<Expr>, ParserError> {
     let mut args = Vec::new();
     for inner in pair.into_inner() {
         if inner.as_rule() == Rule::arg_value {
-            let mut arg_inner = inner.into_inner();
-            let name = parse_identifier(arg_inner.next().unwrap());
-            let expr = parse_expr(arg_inner.next().unwrap())?;
-            args.push(ArgValue { name: Some(name), value: expr });
+            args.push(parse_expr(inner.into_inner().next().unwrap())?);
         }
     }
     Ok(args)

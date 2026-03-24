@@ -28,15 +28,13 @@ pub struct ImportDecl {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeDecl {
-    Series,
     DataFrame,
     Matrix,
     Vector,
     String,
-    Int,
     Float,
     Bool,
-    Void,
+    Void, // for statements that don't return values
 }
 
 // 3. Logic Definitions (Behaviors & Functions)
@@ -46,15 +44,13 @@ pub struct BehaviorDecl {
     pub name: Ident,
     // Spec: behavior Name(arg: Constraint, ...) -> Constraint
     pub args: Vec<TypedArg>,
-    pub return_constraint: ConstraintDecl, 
-    pub depth: u32,
-    pub weights: std::collections::HashMap<String, f64>,
+    pub return_constraint: ConstraintDecl,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FuncDecl {
     pub name: Ident,
-    pub params: Vec<TypedArg>, 
+    pub params: Vec<TypedArg>,
     pub return_constraint: ConstraintDecl,
 }
 
@@ -64,29 +60,14 @@ pub struct TypedArg {
     pub constraint: ConstraintDecl,
 }
 
-// Spec: Categories
-// Addition: (A B)
-// Union: (A | B)
-// Subtraction: (A - B)
-#[derive(Debug, Clone, PartialEq)]
-pub enum CategoryExpr {
-    Atom(Ident),           // "NonZero", "'a"
-    Addition(Vec<CategoryExpr>), // Intersection / Composition
-    Union(Vec<CategoryExpr>),    // Or
-    Subtraction(Box<CategoryExpr>, Box<CategoryExpr>), // A - B
-}
-
-// CategorySetDecl is currently unused
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConstraintDecl {
     pub base_type: TypeDecl,
-    pub category_expr: Option<CategoryExpr>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
-    pub stmts: Vec<Stmt>, 
+    pub stmts: Vec<Stmt>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -121,7 +102,10 @@ pub enum Expr {
     Identifier(Ident),
     BinaryOp { left: Box<Expr>, op: Op, right: Box<Expr> },
     UnaryOp { op: Op, target: Box<Expr> },
-    Call { path: Path, args: Vec<ArgValue> },
+    Call {
+        path: Path,
+        args: Vec<Expr>, // Function arguments (positional only)
+    },
     MemberAccess { target: Box<Expr>, field: Ident },
     List(Vec<Expr>),
     Range { start: Box<Expr>, step: Option<Box<Expr>>, end: Box<Expr> },
@@ -134,7 +118,7 @@ pub enum Op {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Path {
-    pub segments: Vec<Ident>, 
+    pub segments: Vec<Ident>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -208,45 +192,20 @@ impl fmt::Display for ImportDecl {
 impl fmt::Display for TypeDecl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TypeDecl::Series => write!(f, "Series"),
             TypeDecl::DataFrame => write!(f, "DataFrame"),
             TypeDecl::Matrix => write!(f, "Matrix"),
             TypeDecl::Vector => write!(f, "Vector"),
             TypeDecl::String => write!(f, "String"),
-            TypeDecl::Int => write!(f, "Int"),
             TypeDecl::Float => write!(f, "Float"),
             TypeDecl::Bool => write!(f, "Bool"),
-            TypeDecl::Void => write!(f, "()"),
-        }
-    }
-}
-
-impl fmt::Display for CategoryExpr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            CategoryExpr::Atom(name) => write!(f, "{}", name),
-            CategoryExpr::Addition(cats) => {
-                let s: Vec<String> = cats.iter().map(|c| c.to_string()).collect();
-                write!(f, "{}", s.join(" "))
-            },
-            CategoryExpr::Union(cats) => {
-                let s: Vec<String> = cats.iter().map(|c| c.to_string()).collect();
-                write!(f, "({})", s.join(" | "))
-            },
-            CategoryExpr::Subtraction(lhs, rhs) => {
-                write!(f, "{} - {}", lhs, rhs)
-            },
+            TypeDecl::Void => write!(f, "Void"),
         }
     }
 }
 
 impl fmt::Display for ConstraintDecl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.base_type)?;
-        if let Some(cat) = &self.category_expr {
-            write!(f, " {}", cat)?;
-        }
-        Ok(())
+        write!(f, "{}", self.base_type)
     }
 }
 
@@ -261,21 +220,7 @@ impl fmt::Display for TypedArg {
 impl fmt::Display for BehaviorDecl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let args: Vec<String> = self.args.iter().map(|a| a.to_string()).collect();
-        write!(f, "Behavior {}({}) -> {}", self.name, args.join(", "), self.return_constraint)?;
-        if !self.weights.is_empty() {
-            writeln!(f, " {{")?;
-            writeln!(f, "    weights: {{")?;
-            // Sort keys for deterministic output
-            let mut keys: Vec<&String> = self.weights.keys().collect();
-            keys.sort();
-            for k in keys {
-                writeln!(f, "        {}: {},", k, self.weights[k])?;
-            }
-            writeln!(f, "    }}")?;
-            writeln!(f, "}}")
-        } else {
-            writeln!(f, "")
-        }
+        writeln!(f, "Behavior {}({}) -> {}", self.name, args.join(", "), self.return_constraint)
     }
 }
 
@@ -343,8 +288,8 @@ impl fmt::Display for Expr {
             Expr::BinaryOp { left, op, right } => write!(f, "{} {} {}", left, op, right),
             Expr::UnaryOp { op, target } => write!(f, "{}{}", op, target),
             Expr::Call { path, args } => {
-                let a: Vec<String> = args.iter().map(|a| a.to_string()).collect();
-                write!(f, "{}({})", path, a.join(", "))
+                let formatted_args: Vec<String> = args.iter().map(|arg| arg.to_string()).collect();
+                write!(f, "{}({})", path, formatted_args.join(", "))
             },
             Expr::MemberAccess { target, field } => write!(f, "{}.{}", target, field),
             Expr::List(exprs) => {

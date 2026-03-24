@@ -59,7 +59,6 @@ pub struct BehaviorDecl {
     pub name: Ident,
     pub args: Vec<Param>, 
     pub return_constraint: ConstraintDecl,
-    pub depth: u32,
 }
 
 pub struct FuncDecl { // Used only to map stdlib functions
