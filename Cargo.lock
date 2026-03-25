@@ -1367,6 +1367,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
+name = "codegen"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "parser",
+ "proc-macro2",
+ "quote",
+ "stdlib",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "codespan-reporting"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1402,23 +1414,14 @@ dependencies = [
 name = "comet"
 version = "0.1.0"
 dependencies = [
- "bevy_reflect",
- "burn",
- "chrono",
  "clap",
- "csv",
- "either",
- "flate2",
+ "codegen",
  "inventory",
- "paste",
- "pest",
- "pest_derive",
- "polars",
- "proc-macro2",
- "quote",
+ "parser",
  "rand 0.8.5",
- "syn",
- "thiserror 1.0.69",
+ "rl",
+ "runtime",
+ "stdlib",
 ]
 
 [[package]]
@@ -4006,6 +4009,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lru"
+version = "0.16.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1dc47f592c06f33f8e3aea9591776ec7c9f9e4124778ff8a3c3b87159f7e593"
+dependencies = [
+ "hashbrown 0.16.1",
+]
+
+[[package]]
 name = "lru-slab"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4597,6 +4609,15 @@ dependencies = [
  "redox_syscall 0.5.18",
  "smallvec",
  "windows-link 0.2.1",
+]
+
+[[package]]
+name = "parser"
+version = "0.1.0"
+dependencies = [
+ "pest",
+ "pest_derive",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -5666,7 +5687,7 @@ dependencies = [
  "indoc",
  "instability",
  "itertools 0.13.0",
- "lru",
+ "lru 0.12.5",
  "paste",
  "strum 0.26.3",
  "time",
@@ -5927,6 +5948,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rl"
+version = "0.1.0"
+dependencies = [
+ "burn",
+ "codegen",
+ "inventory",
+ "parser",
+ "rand 0.8.5",
+ "runtime",
+ "stdlib",
+]
+
+[[package]]
 name = "rmp"
 version = "0.8.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5972,6 +6006,21 @@ dependencies = [
  "rustc_version",
  "syn",
  "unicode-ident",
+]
+
+[[package]]
+name = "runtime"
+version = "0.1.0"
+dependencies = [
+ "codegen",
+ "csv",
+ "flate2",
+ "inventory",
+ "lru 0.16.3",
+ "parser",
+ "rand 0.8.5",
+ "stdlib",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -6531,6 +6580,24 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "stdlib"
+version = "0.1.0"
+dependencies = [
+ "bevy_reflect",
+ "chrono",
+ "csv",
+ "either",
+ "flate2",
+ "inventory",
+ "lru 0.16.3",
+ "paste",
+ "polars",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "streaming-decompression"

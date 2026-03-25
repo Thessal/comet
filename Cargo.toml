@@ -1,46 +1,10 @@
-[package]
-name = "comet"
-version = "0.1.0"
-edition = "2024"
-
-[lib]
-name = "stdlib"
-path = "src/stdlib/lib.rs"
-crate-type = ["cdylib", "rlib"]
-
-[dependencies]
-pest = "2.6"
-pest_derive = "2.6"
-thiserror = "1.0"
-paste = "1.0"
-quote = "1.0"
-proc-macro2 = "1.0"
-syn = { version = "2.0", features = ["full", "extra-traits"] }
-either = "1.15.0"
-flate2 = "1.1.9"
-csv = "1.4.0"
-chrono = "0.4.39"
-clap = { version = "4.4", features = ["derive"] }
-rand = "0.8"
-bevy_reflect = "0.18.0"
-inventory = "0.3.22"
-burn = { version = "0.20.1", features = [
-    "train",
-    "tui",
-    "metrics",
-    "cuda",
-    "rocm",
-    "ndarray",
-    "store",
-] }
-
-[dev-dependencies]
-polars = { version = "0.53.0", features = [
-    "abs",
-    "diff",
-    "dtype-datetime",
-    "lazy",
-    "rank",
-    "rolling_window",
-    "temporal",
-] }
+[workspace]
+members = [
+    "parser",
+    "codegen",
+    "runtime",
+    "rl",
+    "stdlib",
+    "cli"
+]
+resolver = "2"

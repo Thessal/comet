@@ -1,0 +1,5 @@
+Flow volume_spike {
+    volume = data("volume")
+    mean_vol = ts_mean(volume, 10)
+    divide(volume, mean_vol)
+}

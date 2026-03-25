@@ -1,0 +1,21 @@
+[package]
+name = "rl"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+parser = { path = "../parser" }
+codegen = { path = "../codegen" }
+runtime = { path = "../runtime" }
+rand = "0.8"
+burn = { version = "0.20.1", features = [
+    "train",
+    "tui",
+    "metrics",
+    "cuda",
+    "rocm",
+    "ndarray",
+    "store",
+] }
+inventory = "0.3.22"
+stdlib = { version = "0.1.0", path = "../stdlib" }

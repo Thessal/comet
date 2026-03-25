@@ -82,7 +82,7 @@ Calling a Behavior or Function requires **named** arguments set.
     - Behavior is a mapping from input type constraints to output type constraints.
     - To prevent infinite loop, behaviors are not allowed to be recursive, and only one function can be matched for each behavior.
     - Behavior is defined by the following syntax : 
-        - `Behavior <behavior name> (<parameter name> : <input constraints>, ...) -> <output constraints>`
+        - `Behavior <behavior name> (<parameter name> : <input type>, ...) -> <output type>`
     - Example : 
         - `Behavior compare (signal: (DataFrame | Series) 'a, reference: (DataFrame | Series) Finite Positive) -> ('a Finite Indicator)`
             - Constraint variable 'a or 'b etc can be used to capture a constraint set.

@@ -1,0 +1,16 @@
+[package]
+name = "comet"
+version = "0.1.0"
+edition = "2024"
+default-run = "comet"
+
+[dependencies]
+parser = { path = "../parser" }
+codegen = { path = "../codegen" }
+runtime = { path = "../runtime" }
+rl = { path = "../rl" }
+stdlib = { path = "../stdlib" }
+
+clap = { version = "4.4", features = ["derive"] }
+rand = "0.8"
+inventory = "0.3.22"
