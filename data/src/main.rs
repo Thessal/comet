@@ -98,10 +98,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         c.map_or("".to_string(), |x| x.volume.to_string())
     })?;
 
-    // Derived return table (close / prev_close)
-    println!("Writing return.csv.gz ...");
+    // Derived return table (close / prev_close - 1)
+    println!("Writing returns.csv.gz ...");
     {
-        let file = File::create("return.csv.gz")?;
+        let file = File::create("returns.csv.gz")?;
         let encoder = GzEncoder::new(file, Compression::default());
         let mut wtr = WriterBuilder::new().has_headers(false).from_writer(encoder);
 

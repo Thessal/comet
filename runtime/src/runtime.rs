@@ -95,6 +95,34 @@ impl Runtime {
                             }
                             args.reverse();
 
+                            let mut type_mismatch = false;
+                            for (i, arg) in args.iter().enumerate() {
+                                let expected = &meta.inputs[i];
+                                let ok = match expected {
+                                    stdlib::OutputShape::Void => false,
+                                    stdlib::OutputShape::TimeSeries | stdlib::OutputShape::Vector => {
+                                        matches!(arg, ParamType::Vector(_))
+                                    }
+                                    stdlib::OutputShape::DataFrame => {
+                                        matches!(arg, ParamType::DataFrame(_))
+                                    }
+                                    stdlib::OutputShape::Matrix => false,
+                                    stdlib::OutputShape::ScalarFloat | stdlib::OutputShape::ScalarInt => {
+                                        matches!(arg, ParamType::Float(_))
+                                    }
+                                    stdlib::OutputShape::ScalarString => {
+                                        matches!(arg, ParamType::String(_))
+                                    }
+                                };
+                                if !ok {
+                                    type_mismatch = true;
+                                    break;
+                                }
+                            }
+                            if type_mismatch {
+                                return Err(format!("Type mismatch for {}", func_name));
+                            }
+
                             out = (meta.execute)(&args);
                             is_void = meta.output_shape == stdlib::OutputShape::Void;
                             found = true;
@@ -145,6 +173,16 @@ mod tests {
             "\"volume\"".to_string(),
         ];
 
+        // FIXME : if input is the following, it is divide(data(volume), ts_mean(10, data(volume))) , which is malformed and must generate error.
+        // let seq_bad = vec![
+        //     "!shift".to_string(),
+        //     "data".to_string(),
+        //     "!shift".to_string(),
+        //     "ts_mean".to_string(),
+        //     "!shift".to_string(),
+        //     "data".to_string(),
+        //     "divide".to_string(),
+        // ];
         let seq = vec![
             "!shift".to_string(),
             "data".to_string(),
@@ -172,5 +210,29 @@ mod tests {
                 todo!("Execution result is not a DataFrame");
             }
         }
+    }
+
+    #[test]
+    fn test_malformed_sequence_type_mismatch() {
+        let mut runtime = Runtime::new(100, "../data");
+
+        let param_names = vec![
+            "\"volume\"".to_string(),
+            "10".to_string(),
+            "\"volume\"".to_string(),
+        ];
+
+        let seq_bad = vec![
+            "!shift".to_string(),
+            "data".to_string(),
+            "!shift".to_string(),
+            "ts_mean".to_string(),
+            "!shift".to_string(),
+            "data".to_string(),
+            "divide".to_string(),
+        ];
+
+        let result = runtime.evaluate_sequence(&seq_bad, param_names);
+        assert!(result.is_err(), "Malformed sequence must generate an error");
     }
 }

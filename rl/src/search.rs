@@ -131,7 +131,7 @@ use stdlib::ParamType;
 #[derive(Clone, Debug)]
 pub struct EvaluatedSample {
     pub actions: Vec<String>,
-    pub fitness: f64,
+    pub fitness: Vec<f64>,
 }
 
 pub fn generate_top_k_samples(
@@ -219,15 +219,9 @@ pub fn generate_top_k_samples(
             let fitness =
                 match runtime.evaluate_sequence(&current_state.sequence, param_names.clone()) {
                     Ok(ParamType::DataFrame(output)) => {
-                        let returns = runtime.dmgr.get_data("volume");
-                        let target = if returns.is_empty() {
-                            vec![]
-                        } else {
-                            returns[0].clone()
-                        };
-                        runtime::fitness::evaluate_fitness(output, &target)
+                        runtime::fitness::evaluate_fitness(&mut runtime.dmgr, &output)
                     }
-                    _ => -1.0, // Penalize runtime failure
+                    _ => vec![-1.0], // Penalize runtime failure
                 };
 
             samples.push(EvaluatedSample {
@@ -241,9 +235,9 @@ pub fn generate_top_k_samples(
 
     // Sort descending by fitness
     samples.sort_by(|a, b| {
-        b.fitness
-            .partial_cmp(&a.fitness)
-            .unwrap_or(std::cmp::Ordering::Equal)
+        let f_a = a.fitness.first().copied().unwrap_or(-1.0);
+        let f_b = b.fitness.first().copied().unwrap_or(-1.0);
+        f_b.partial_cmp(&f_a).unwrap_or(std::cmp::Ordering::Equal)
     });
 
     if samples.len() > top_k {
@@ -379,7 +373,7 @@ mod tests {
         let samples = generate_top_k_samples(&behavior, &available_funcs, 3);
 
         for (i, sample) in samples.iter().enumerate() {
-            println!("Sample {}: Fitness = {:.2}", i + 1, sample.fitness);
+            println!("Sample {}: Fitness = {:?}", i + 1, sample.fitness);
             println!("  Actions: {:?}", sample.actions);
         }
 
