@@ -1,3 +1,6 @@
+## TODO 
+model lacks coefficient generation... maybe we could add coefficient tokens to the vocabulary, or add more float parameters to the behavior definition?
+
 ## 1. State Prompting (Input Tokens)
 
 Each token of the input sequence represents the **Current Evaluation State**. 

@@ -26,7 +26,7 @@ impl Backtester {
     }
 
     /// Run the backtest using a generated signal and return the results.
-    pub fn run_backtest(&self, signal: &[f64]) -> BacktestResult {
+    pub fn run_backtest(&self, signal: Vec<Vec<f64>>) -> BacktestResult {
         // Ensure lengths match. If not, pad or truncate.
         let len = signal.len().min(self.forward_returns.len());
 
@@ -45,7 +45,8 @@ impl Backtester {
         // Element-wise PnL generation: Signal * Return - Cost
         for i in 0..len {
             // Include cost logic later via tracking position changes
-            let period_pnl = signal[i] * self.forward_returns[i];
+            // let period_pnl = signal[i] * self.forward_returns[i];
+            let period_pnl = signal[i][0] * self.forward_returns[i]; // FIXME: signal is 2D array
             pnl.push(period_pnl);
             total_return += period_pnl;
         }
@@ -80,7 +81,7 @@ impl Backtester {
 }
 
 /// Central evaluation mapping for search tree scoring.
-pub fn evaluate_fitness(output: &[f64], actual_returns: &[f64]) -> f64 {
+pub fn evaluate_fitness(output: Vec<Vec<f64>>, actual_returns: &[f64]) -> f64 {
     // Basic skeleton - dummy data vector if nothing is injected by environment
     // In production, instantiate Backtester within search iteration with real historical data.
     let backtester = Backtester::new(

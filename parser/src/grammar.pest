@@ -10,7 +10,7 @@ declaration = {
     flow_decl
 }
 
-identifier = @{ !keyword ~ "'"? ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+identifier = @{ !keyword ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 
 keyword = _{ 
     k_type | k_behavior | k_flow | k_return | k_import 

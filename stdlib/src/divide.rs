@@ -38,7 +38,6 @@ impl BinaryOp for DivideState {
                     out[i] = a_val / b_sl[i];
                 }
             }
-            // TS / TS, TS / Const, Const / Const
              _ => {
                 out[0] = unsafe { a.get_scalar() / b.get_scalar() };
             }
@@ -46,10 +45,4 @@ impl BinaryOp for DivideState {
     }
 }
 
-
-inventory::submit! {
-    crate::OperatorMeta {
-        name: "divide",
-        output_shape: crate::OutputShape::DataFrame,
-    }
-}
+crate::register_binary_op!(DivideState, "divide");

@@ -45,10 +45,4 @@ impl BinaryOp for MultiplyState {
     }
 }
 
-
-inventory::submit! {
-    crate::OperatorMeta {
-        name: "multiply",
-        output_shape: crate::OutputShape::DataFrame,
-    }
-}
+crate::register_binary_op!(MultiplyState, "multiply");

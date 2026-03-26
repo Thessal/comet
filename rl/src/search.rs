@@ -70,7 +70,7 @@ impl SearchEnv {
             Action::Shift => {
                 if let Some(param) = new_state.unprocessed_params.pop() {
                     new_state.stack.push(param);
-                    new_state.sequence.push("shift".to_string());
+                    new_state.sequence.push("!shift".to_string());
                     Ok(new_state)
                 } else {
                     Err("Cannot shift: no unprocessed parameters remaining.".to_string())
@@ -126,6 +126,7 @@ impl SearchEnv {
 }
 
 use runtime::runtime::Runtime;
+use stdlib::ParamType;
 
 #[derive(Clone, Debug)]
 pub struct EvaluatedSample {
@@ -152,7 +153,13 @@ pub fn generate_top_k_samples(
         .args
         .iter()
         .rev()
-        .map(|arg| arg.name.clone())
+        .map(|arg| {
+            if arg.type_decl == TypeDecl::Float {
+                "1.0".to_string()
+            } else {
+                "volume".to_string() // guaranteed to exist from DataManager mocks internally natively mapped to Variable("volume")
+            }
+        })
         .collect();
 
     let initial_state = SearchState {
@@ -211,11 +218,16 @@ pub fn generate_top_k_samples(
         if hit_done {
             let fitness =
                 match runtime.evaluate_sequence(&current_state.sequence, param_names.clone()) {
-                    Ok(output) => {
-                        let returns = runtime.dmgr.get_data("return");
-                        runtime::fitness::evaluate_fitness(&output, &returns)
+                    Ok(ParamType::DataFrame(output)) => {
+                        let returns = runtime.dmgr.get_data("volume");
+                        let target = if returns.is_empty() {
+                            vec![]
+                        } else {
+                            returns[0].clone()
+                        };
+                        runtime::fitness::evaluate_fitness(output, &target)
                     }
-                    Err(_) => -1.0, // Penalize runtime failure
+                    _ => -1.0, // Penalize runtime failure
                 };
 
             samples.push(EvaluatedSample {

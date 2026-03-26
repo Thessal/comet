@@ -1,11 +1,15 @@
 // src/stdlib/lib.rs
+#![allow(clippy::not_unsafe_ptr_arg_deref, clippy::missing_safety_doc)]
 
 pub mod add;
+pub mod consume_float;
 pub mod cs_rank;
 pub mod data;
+pub mod divide;
+pub mod multiply;
 pub mod subtract;
 pub mod ts_diff;
-pub mod consume_float;
+pub mod ts_mean;
 
 #[cfg(test)]
 mod test_cs_rank;
@@ -101,14 +105,13 @@ macro_rules! register_data_op {
                 name: $name,
                 inputs: &[crate::OutputShape::ScalarString],
                 output_shape: crate::OutputShape::DataFrame,
-                execute: |_args: &[Vec<f64>]| -> Vec<f64> {
-                    vec![]
+                execute: |_args: &[crate::ParamType]| -> crate::ParamType {
+                    crate::ParamType::Vector(vec![])
                 }
             }
         }
     };
 }
-
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -176,12 +179,22 @@ pub enum OutputShape {
     ScalarString,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParamType {
+    // Used to evaluate parameters in runtime
+    Float(f64),
+    String(String),
+    Variable(String),
+    Vector(Vec<f64>),
+    DataFrame(Vec<Vec<f64>>),
+}
+
 #[derive(Clone)]
 pub struct OperatorMeta {
     pub name: &'static str,
     pub inputs: &'static [OutputShape],
     pub output_shape: OutputShape,
-    pub execute: fn(&[Vec<f64>]) -> Vec<f64>,
+    pub execute: fn(&[crate::ParamType]) -> crate::ParamType,
 }
 
 inventory::collect!(OperatorMeta);
@@ -194,16 +207,51 @@ macro_rules! register_unary_op {
                 name: $name,
                 inputs: &[crate::OutputShape::DataFrame],
                 output_shape: crate::OutputShape::DataFrame,
-                execute: |args: &[Vec<f64>]| -> Vec<f64> {
-                    let len = args[0].len();
-                    let mut state = $state::new(0, len);
-                    let mut output = vec![0.0; len];
-                    let a_data = crate::CometData {
-                        dtype: crate::DataType::DataFrame,
-                        ptr: args[0].as_ptr(),
-                    };
-                    state.step(a_data, output.as_mut_ptr());
-                    output
+                execute: |args: &[crate::ParamType]| -> crate::ParamType {
+                    match &args[0] {
+                        crate::ParamType::DataFrame(df) => {
+                            let t_len = df.len();
+                            let n_len = if t_len > 0 { df[0].len() } else { 0 };
+                            let mut state = $state::new(0, n_len);
+                            let mut outputs = Vec::with_capacity(t_len);
+                            for t in 0..t_len {
+                                let mut output = vec![0.0; n_len];
+                                let a_data = crate::CometData {
+                                    dtype: crate::DataType::DataFrame,
+                                    ptr: df[t].as_ptr(),
+                                };
+                                state.step(a_data, output.as_mut_ptr());
+                                outputs.push(output);
+                            }
+                            crate::ParamType::DataFrame(outputs)
+                        }
+                        crate::ParamType::Vector(v) => {
+                            let t_len = v.len();
+                            let mut state = $state::new(0, 1);
+                            let mut outputs = Vec::with_capacity(t_len);
+                            for t in 0..t_len {
+                                let mut output = vec![0.0; 1];
+                                let a_data = crate::CometData {
+                                    dtype: crate::DataType::DataFrame,
+                                    ptr: &v[t] as *const f64,
+                                };
+                                state.step(a_data, output.as_mut_ptr());
+                                outputs.push(output[0]);
+                            }
+                            crate::ParamType::Vector(outputs)
+                        }
+                        crate::ParamType::Float(f) => {
+                            let mut state = $state::new(0, 1);
+                            let mut output = vec![0.0; 1];
+                            let a_data = crate::CometData {
+                                dtype: crate::DataType::Constant,
+                                ptr: f as *const f64,
+                            };
+                            state.step(a_data, output.as_mut_ptr());
+                            crate::ParamType::Float(output[0])
+                        }
+                        _ => panic!("Expected Vector, DataFrame or Float"),
+                    }
                 }
             }
         }
@@ -218,20 +266,69 @@ macro_rules! register_binary_op {
                 name: $name,
                 inputs: &[crate::OutputShape::DataFrame, crate::OutputShape::DataFrame],
                 output_shape: crate::OutputShape::DataFrame,
-                execute: |args: &[Vec<f64>]| -> Vec<f64> {
-                    let len = args[0].len();
-                    let mut state = $state::new(0, len);
-                    let mut output = vec![0.0; len];
-                    let a_data = crate::CometData {
-                        dtype: crate::DataType::DataFrame,
-                        ptr: args[0].as_ptr(),
+                execute: |args: &[crate::ParamType]| -> crate::ParamType {
+                    let t_len = match &args[0] {
+                        crate::ParamType::DataFrame(df) => df.len(),
+                        crate::ParamType::Vector(v) => v.len(),
+                        _ => match &args[1] {
+                            crate::ParamType::DataFrame(df) => df.len(),
+                            crate::ParamType::Vector(v) => v.len(),
+                            _ => 1,
+                        }
                     };
-                    let b_data = crate::CometData {
-                        dtype: crate::DataType::DataFrame,
-                        ptr: args[1].as_ptr(),
+                    let n_len = match &args[0] {
+                        crate::ParamType::DataFrame(df) => if t_len > 0 { df[0].len() } else { 0 },
+                        _ => match &args[1] {
+                            crate::ParamType::DataFrame(df) => if t_len > 0 { df[0].len() } else { 0 },
+                            _ => 1,
+                        }
                     };
-                    state.step(a_data, b_data, output.as_mut_ptr());
-                    output
+
+                    let is_output_df = matches!(&args[0], crate::ParamType::DataFrame(_)) || matches!(&args[1], crate::ParamType::DataFrame(_));
+
+                    let mut state = $state::new(0, n_len);
+                    let mut df_out = Vec::with_capacity(t_len);
+                    let mut vec_out = Vec::with_capacity(t_len);
+
+                    for t in 0..t_len {
+                        let (a_ptr, a_const) = match &args[0] {
+                            crate::ParamType::DataFrame(df) => (df[t].as_ptr(), false),
+                            crate::ParamType::Vector(v) => (&v[t] as *const f64, true),
+                            crate::ParamType::Float(f) => (f as *const f64, true),
+                            _ => panic!("Expected Vector/DataFrame/Float"),
+                        };
+                        let (b_ptr, b_const) = match &args[1] {
+                            crate::ParamType::DataFrame(df) => (df[t].as_ptr(), false),
+                            crate::ParamType::Vector(v) => (&v[t] as *const f64, true),
+                            crate::ParamType::Float(f) => (f as *const f64, true),
+                            _ => panic!("Expected Vector/DataFrame/Float"),
+                        };
+
+                        let mut output = vec![0.0; n_len];
+                        let a_data = crate::CometData {
+                            dtype: if a_const { crate::DataType::Constant } else { crate::DataType::DataFrame },
+                            ptr: a_ptr,
+                        };
+                        let b_data = crate::CometData {
+                            dtype: if b_const { crate::DataType::Constant } else { crate::DataType::DataFrame },
+                            ptr: b_ptr,
+                        };
+                        state.step(a_data, b_data, output.as_mut_ptr());
+
+                        if is_output_df {
+                            df_out.push(output);
+                        } else {
+                            vec_out.push(output[0]);
+                        }
+                    }
+
+                    if is_output_df {
+                        crate::ParamType::DataFrame(df_out)
+                    } else if t_len == 1 && matches!(&args[0], crate::ParamType::Float(_)) && matches!(&args[1], crate::ParamType::Float(_)) {
+                        crate::ParamType::Float(vec_out[0])
+                    } else {
+                        crate::ParamType::Vector(vec_out)
+                    }
                 }
             }
         }
@@ -246,17 +343,62 @@ macro_rules! register_period_unary_op {
                 name: $name,
                 inputs: &[crate::OutputShape::ScalarInt, crate::OutputShape::DataFrame],
                 output_shape: crate::OutputShape::DataFrame,
-                execute: |args: &[Vec<f64>]| -> Vec<f64> {
-                    let len = args[1].len();
-                    let period = if args[0].len() > 0 { args[0][0] as usize } else { 0 };
-                    let mut state = $state::new(period, len);
-                    let mut output = vec![0.0; len];
-                    let a_data = crate::CometData {
-                        dtype: crate::DataType::DataFrame,
-                        ptr: args[1].as_ptr(),
+                execute: |args: &[crate::ParamType]| -> crate::ParamType {
+                    let t_len = match &args[1] {
+                        crate::ParamType::DataFrame(df) => df.len(),
+                        crate::ParamType::Vector(v) => v.len(),
+                        crate::ParamType::Float(_) => 1,
+                        _ => panic!("Expected Vector/DataFrame/Float"),
                     };
-                    state.step(a_data, output.as_mut_ptr());
-                    output
+                    let n_len = match &args[1] {
+                        crate::ParamType::DataFrame(df) => if t_len > 0 { df[0].len() } else { 0 },
+                        _ => 1,
+                    };
+
+                    let is_output_df = matches!(&args[1], crate::ParamType::DataFrame(_));
+
+                    let period = match &args[0] {
+                        crate::ParamType::DataFrame(df) => {
+                            if !df.is_empty() && !df[0].is_empty() { df[0][0] as usize } else { 0 }
+                        }
+                        crate::ParamType::Vector(v) => if !v.is_empty() { v[0] as usize } else { 0 },
+                        crate::ParamType::Float(f) => *f as usize,
+                        _ => panic!("Expected period as Vector/DataFrame/Float"),
+                    };
+
+                    let mut state = $state::new(period, n_len);
+                    let mut df_out = Vec::with_capacity(t_len);
+                    let mut vec_out = Vec::with_capacity(t_len);
+
+                    for t in 0..t_len {
+                        let (b_ptr, b_const) = match &args[1] {
+                            crate::ParamType::DataFrame(df) => (df[t].as_ptr(), false),
+                            crate::ParamType::Vector(v) => (&v[t] as *const f64, true),
+                            crate::ParamType::Float(f) => (f as *const f64, true),
+                            _ => panic!("Expected Vector/DataFrame/Float"),
+                        };
+
+                        let mut output = vec![0.0; n_len];
+                        let a_data = crate::CometData {
+                            dtype: if b_const { crate::DataType::Constant } else { crate::DataType::DataFrame },
+                            ptr: b_ptr,
+                        };
+                        state.step(a_data, output.as_mut_ptr());
+
+                        if is_output_df {
+                            df_out.push(output);
+                        } else {
+                            vec_out.push(output[0]);
+                        }
+                    }
+
+                    if is_output_df {
+                        crate::ParamType::DataFrame(df_out)
+                    } else if t_len == 1 && matches!(&args[1], crate::ParamType::Float(_)) {
+                        crate::ParamType::Float(vec_out[0])
+                    } else {
+                        crate::ParamType::Vector(vec_out)
+                    }
                 }
             }
         }
