@@ -1,5 +1,5 @@
 Behavior Comparator(signal: DataFrame, eps: Float, reference: DataFrame) {
-    weights="behavior_1_compare.pth", train=true, supervised_samples=100
+    weights="behavior_1_compare.pth", train=true, supervised_samples=10
 } -> DataFrame
 
 Flow volume_spike {

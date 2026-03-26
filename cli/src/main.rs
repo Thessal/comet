@@ -71,10 +71,45 @@ fn main() {
 
     // 5) Evaluate the polish sequence using runtime
     // 6) Calculate fitness
-    let param_names: Vec<String> = behavior.args.iter().map(|arg| arg.name.clone()).collect();
-    let mut runtime = runtime::runtime::Runtime::new(100, "../data");
+    // Extract bound parameter values from the Flow call syntax
+    let mut call_args = behavior
+        .args
+        .iter()
+        .map(|_arg| "volume".to_string())
+        .collect::<Vec<_>>();
 
-    match runtime.evaluate_sequence(&generated_sequence, param_names) {
+    for decl in &program.declarations {
+        if let Declaration::Flow(f) = decl {
+            for stmt in &f.body {
+                if let parser::program::FlowStmt::Expr(parser::program::Expr::Call { path, args }) =
+                    stmt
+                {
+                    if path.segments.join("::") == behavior.name {
+                        let mut p = Vec::new();
+                        for arg in args {
+                            match arg {
+                                parser::program::Expr::Identifier(name) => p.push(name.clone()),
+                                parser::program::Expr::Literal(
+                                    parser::program::Literal::Float(f),
+                                ) => p.push(f.to_string()),
+                                parser::program::Expr::Literal(
+                                    parser::program::Literal::Integer(i),
+                                ) => p.push(i.to_string()),
+                                _ => p.push("volume".to_string()),
+                            }
+                        }
+                        call_args = p;
+                    }
+                }
+            }
+        }
+    }
+    // `evaluate_sequence` pops from the end, so we MUST reverse `call_args` to match the Shift order!
+    call_args.reverse();
+
+    let mut runtime = runtime::runtime::Runtime::new(100, "data");
+
+    match runtime.evaluate_sequence(&generated_sequence, call_args) {
         Ok(stdlib::ParamType::DataFrame(output)) => {
             let fitness = runtime::fitness::evaluate_fitness(&mut runtime.dmgr, &output);
             println!("Inference Sample Fitness = {:?}", fitness);

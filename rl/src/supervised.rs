@@ -349,7 +349,7 @@ pub fn train_and_sample(
         sequence: vec![],
     };
 
-    loop {
+    for step_count in 0..100 {
         let valid_actions = env.get_valid_actions(&state, available_funcs);
         if valid_actions.is_empty() {
             break;
@@ -374,15 +374,40 @@ pub fn train_and_sample(
         );
 
         let logits = inference_model.forward(input_tensor);
-        let _probs = burn::tensor::activation::softmax(logits, 2);
+        let probs = burn::tensor::activation::softmax(logits, 2);
+        
+        // Extract softmax probabilities. For NdArray backend, into_data().to_vec::<f32>() is safe.
+        let probs_data = probs.into_data().to_vec::<f32>().unwrap();
 
-        let action = valid_actions
-            .iter()
-            .find(|a| **a != crate::search::Action::Done)
-            .unwrap()
-            .clone();
+        let valid_non_done: Vec<_> = valid_actions
+            .into_iter()
+            .filter(|a| *a != crate::search::Action::Done)
+            .collect();
+            
+        if valid_non_done.is_empty() {
+            break;
+        }
 
-        state = env.step(&state, action, available_funcs).unwrap();
+        // Action selection: Using the Transformer's learned probabilities -> Argmax over Valid Actions
+        let best_action = valid_non_done
+            .into_iter()
+            .max_by(|a, b| {
+                let id_a = action_to_id(a, available_funcs);
+                let id_b = action_to_id(b, available_funcs);
+                
+                // Ensure we don't out-of-bounds index since vocab config might differ.
+                let p_a = probs_data.get(id_a).copied().unwrap_or(0.0);
+                let p_b = probs_data.get(id_b).copied().unwrap_or(0.0);
+                
+                p_a.partial_cmp(&p_b).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap();
+
+        state = env.step(&state, best_action, available_funcs).unwrap();
+        
+        if step_count == 99 {
+            println!("Warning: Inference loop hit 100 max iterations.");
+        }
     }
 
     state.sequence
