@@ -1,5 +1,5 @@
 use crate::ir::RealExpr;
-use parser::ast::{Ident, Literal};
+use parser::program::{Ident, Literal};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -9,7 +9,7 @@ pub enum DagOp {
     CallFn {
         func_name: Ident,
         args: Vec<usize>, // References to NodeIds
-    }
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -37,7 +37,10 @@ impl DagBuilder {
         }
 
         let new_id = self.nodes.len();
-        self.nodes.push(DagNode { id: new_id, op: op.clone() });
+        self.nodes.push(DagNode {
+            id: new_id,
+            op: op.clone(),
+        });
         self.hash_cons.insert(op, new_id);
         new_id
     }
@@ -45,13 +48,11 @@ impl DagBuilder {
     /// Converts a RealExpr tree into a DAG. Recursively processes children.
     pub fn build_from_real_expr(&mut self, expr: &RealExpr) -> usize {
         match expr {
-            RealExpr::Literal(lit) => {
-                self.insert_op(DagOp::Literal(lit.clone()))
-            }
-            RealExpr::Identifier(ident) => {
-                self.insert_op(DagOp::Identifier(ident.clone()))
-            }
-            RealExpr::CallFn { func_name, args, .. } => {
+            RealExpr::Literal(lit) => self.insert_op(DagOp::Literal(lit.clone())),
+            RealExpr::Identifier(ident) => self.insert_op(DagOp::Identifier(ident.clone())),
+            RealExpr::CallFn {
+                func_name, args, ..
+            } => {
                 let mut dag_args = Vec::new();
                 for arg_expr in args {
                     let child_id = self.build_from_real_expr(arg_expr);

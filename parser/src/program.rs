@@ -1,4 +1,4 @@
-// Abstract Syntax Tree Definitions
+// Program Definitions
 // Based on docs/ast.md & docs/spec.md
 
 pub type Ident = String;
@@ -102,20 +102,20 @@ pub enum Expr {
     },
 } // Question : do we allow expressions in list like [ multiply(1,2), 3 ]? should we allow or not?
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Op {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Eq,
-    Neq,
-    Lt,
-    Gt,
-    And,
-    Or,
-    Not,
-}
+// #[derive(Debug, Clone, PartialEq)]
+// pub enum Op {
+//     Add,
+//     Sub,
+//     Mul,
+//     Div,
+//     Eq,
+//     Neq,
+//     Lt,
+//     Gt,
+//     And,
+//     Or,
+//     Not,
+// }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Path {
@@ -203,8 +203,6 @@ impl fmt::Display for TypeDecl {
         }
     }
 }
-
-
 
 impl fmt::Display for TypedArg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

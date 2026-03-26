@@ -13,8 +13,8 @@ pub struct CometRlEnv {
     pub search_env: SearchEnv,
     pub available_funcs: Vec<(
         String,
-        Vec<parser::ast::TypeDecl>,
-        parser::ast::TypeDecl,
+        Vec<parser::program::TypeDecl>,
+        parser::program::TypeDecl,
     )>,
     pub max_length: usize,
     pub param_names: Vec<String>,
@@ -22,11 +22,11 @@ pub struct CometRlEnv {
 
 impl CometRlEnv {
     pub fn new(
-        target: parser::ast::TypeDecl,
+        target: parser::program::TypeDecl,
         funcs: Vec<(
             String,
-            Vec<parser::ast::TypeDecl>,
-            parser::ast::TypeDecl,
+            Vec<parser::program::TypeDecl>,
+            parser::program::TypeDecl,
         )>,
         param_names: Vec<String>,
         cache_capacity: usize,
@@ -74,12 +74,12 @@ impl RlEnvironment for CometRlEnv {
                     && self.state.stack[0] == self.search_env.target_return
                 {
                     // Natively evaluate Stack sequence without intermediate AST/DAG compilation
-                    match self.runtime.evaluate_sequence(
-                        &self.state.sequence,
-                        self.param_names.clone(),
-                    ) {
+                    match self
+                        .runtime
+                        .evaluate_sequence(&self.state.sequence, self.param_names.clone())
+                    {
                         Ok(_output) => {
-                            // Sequence execution successful! 
+                            // Sequence execution successful!
                             // Normally calculate fitness or cross entropy here
                             (self.state.clone(), 1.0, true)
                         }
@@ -101,7 +101,11 @@ impl RlEnvironment for CometRlEnv {
     }
 }
 
-pub fn get_available_funcs() -> Vec<(String, Vec<parser::ast::TypeDecl>, parser::ast::TypeDecl)> {
+pub fn get_available_funcs() -> Vec<(
+    String,
+    Vec<parser::program::TypeDecl>,
+    parser::program::TypeDecl,
+)> {
     let mut funcs = Vec::new();
     for meta in inventory::iter::<stdlib::OperatorMeta> {
         let name = meta.name.to_string();
@@ -111,25 +115,25 @@ pub fn get_available_funcs() -> Vec<(String, Vec<parser::ast::TypeDecl>, parser:
         let mut inputs = Vec::new();
         for input in meta.inputs {
             inputs.push(match input {
-                stdlib::OutputShape::DataFrame => parser::ast::TypeDecl::DataFrame,
-                stdlib::OutputShape::TimeSeries => parser::ast::TypeDecl::DataFrame,
-                stdlib::OutputShape::Vector => parser::ast::TypeDecl::Vector,
-                stdlib::OutputShape::Matrix => parser::ast::TypeDecl::Matrix,
-                stdlib::OutputShape::Void => parser::ast::TypeDecl::Void,
-                stdlib::OutputShape::ScalarFloat => parser::ast::TypeDecl::Float,
-                stdlib::OutputShape::ScalarInt => parser::ast::TypeDecl::Float,
-                stdlib::OutputShape::ScalarString => parser::ast::TypeDecl::String,
+                stdlib::OutputShape::DataFrame => parser::program::TypeDecl::DataFrame,
+                stdlib::OutputShape::TimeSeries => parser::program::TypeDecl::DataFrame,
+                stdlib::OutputShape::Vector => parser::program::TypeDecl::Vector,
+                stdlib::OutputShape::Matrix => parser::program::TypeDecl::Matrix,
+                stdlib::OutputShape::Void => parser::program::TypeDecl::Void,
+                stdlib::OutputShape::ScalarFloat => parser::program::TypeDecl::Float,
+                stdlib::OutputShape::ScalarInt => parser::program::TypeDecl::Float,
+                stdlib::OutputShape::ScalarString => parser::program::TypeDecl::String,
             });
         }
         let output = match meta.output_shape {
-            stdlib::OutputShape::DataFrame => parser::ast::TypeDecl::DataFrame,
-            stdlib::OutputShape::TimeSeries => parser::ast::TypeDecl::DataFrame,
-            stdlib::OutputShape::Vector => parser::ast::TypeDecl::Vector,
-            stdlib::OutputShape::Matrix => parser::ast::TypeDecl::Matrix,
-            stdlib::OutputShape::Void => parser::ast::TypeDecl::Void,
-            stdlib::OutputShape::ScalarFloat => parser::ast::TypeDecl::Float,
-            stdlib::OutputShape::ScalarInt => parser::ast::TypeDecl::Float,
-            stdlib::OutputShape::ScalarString => parser::ast::TypeDecl::String,
+            stdlib::OutputShape::DataFrame => parser::program::TypeDecl::DataFrame,
+            stdlib::OutputShape::TimeSeries => parser::program::TypeDecl::DataFrame,
+            stdlib::OutputShape::Vector => parser::program::TypeDecl::Vector,
+            stdlib::OutputShape::Matrix => parser::program::TypeDecl::Matrix,
+            stdlib::OutputShape::Void => parser::program::TypeDecl::Void,
+            stdlib::OutputShape::ScalarFloat => parser::program::TypeDecl::Float,
+            stdlib::OutputShape::ScalarInt => parser::program::TypeDecl::Float,
+            stdlib::OutputShape::ScalarString => parser::program::TypeDecl::String,
         };
         funcs.push((name, inputs, output));
     }
@@ -137,4 +141,3 @@ pub fn get_available_funcs() -> Vec<(String, Vec<parser::ast::TypeDecl>, parser:
     funcs.sort_by(|a, b| a.0.cmp(&b.0));
     funcs
 }
-

@@ -1,4 +1,4 @@
-use crate::ast::*;
+use crate::program::*;
 use pest::Parser;
 use pest::iterators::Pair;
 use pest_derive::Parser;
@@ -305,10 +305,11 @@ mod tests {
                         let ast_dump = format!("{:#?}", ast);
                         let mut rs_path = path.clone();
                         rs_path.set_extension("rs");
-                        
-                        fs::write(&rs_path, ast_dump)
-                            .unwrap_or_else(|e| panic!("Failed to write AST to {:?}: {}", rs_path, e));
-                            
+
+                        fs::write(&rs_path, ast_dump).unwrap_or_else(|e| {
+                            panic!("Failed to write AST to {:?}: {}", rs_path, e)
+                        });
+
                         println!("AST successfully dumped to {:?}", rs_path);
                     }
                     Err(e) => {

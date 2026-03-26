@@ -1,4 +1,4 @@
-use parser::ast::{Ident, TypeDecl};
+use parser::program::{Ident, TypeDecl};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SearchState {
@@ -135,7 +135,7 @@ pub struct EvaluatedSample {
 }
 
 pub fn generate_top_k_samples(
-    behavior: &parser::ast::BehaviorDecl,
+    behavior: &parser::program::BehaviorDecl,
     available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
     top_k: usize,
 ) -> Vec<EvaluatedSample> {
@@ -345,8 +345,8 @@ mod tests {
 
     #[test]
     fn test_consume_minimal_integration() {
-        use parser::ast::{BehaviorDecl, Declaration};
         use parser::parser::parse;
+        use parser::program::{BehaviorDecl, Declaration};
 
         let src = std::fs::read_to_string("../examples/behavior_1.cm").expect("Read failed");
         let program = parse(&src).expect("Failed to parse behavior_1.cm");

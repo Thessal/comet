@@ -1,5 +1,5 @@
-use parser::ast::Literal;
 use crate::dag::{DagBuilder, DagOp};
+use parser::program::Literal;
 
 /// Converts a DAG expression into a Polish notation sequence.
 /// `root_id` is the starting node in the DagBuilder.
@@ -97,7 +97,7 @@ pub fn parse_sequence_impl(
     }
 }
 
-use parser::ast::TypeDecl;
+use parser::program::TypeDecl;
 
 // ... parsing old prefix standard ...
 
@@ -138,7 +138,7 @@ pub fn action_sequence_to_dag(
                 func_name: func_name.clone(),
                 args,
             });
-            
+
             if ret_type != TypeDecl::Void {
                 stack.push(node_id);
             }

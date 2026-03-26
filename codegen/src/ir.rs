@@ -1,4 +1,4 @@
-use parser::ast::{Ident, Literal, TypeDecl};
+use parser::program::{Ident, Literal, TypeDecl};
 
 #[derive(Debug, Clone)]
 pub enum RealExpr {
@@ -21,14 +21,18 @@ impl std::fmt::Display for RealExpr {
                 Literal::String(s) => write!(f, "\"{}\"", s),
                 Literal::Boolean(b) => write!(f, "{}", b),
             },
-            RealExpr::CallFn { func_name, args, .. } => {
+            RealExpr::CallFn {
+                func_name, args, ..
+            } => {
                 write!(f, "{}(", func_name)?;
                 for (i, arg_expr) in args.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", arg_expr)?;
                 }
                 write!(f, ")")
-            },
+            }
         }
     }
 }
@@ -50,7 +54,11 @@ pub struct ExecutionGraph {
 
 impl ExecutionGraph {
     pub fn new() -> Self {
-        ExecutionGraph { nodes: Vec::new(), ast_strings: Vec::new(), output_nodes: Vec::new() }
+        ExecutionGraph {
+            nodes: Vec::new(),
+            ast_strings: Vec::new(),
+            output_nodes: Vec::new(),
+        }
     }
 
     pub fn add_node(&mut self, node: ExecutionNode) -> usize {
@@ -61,42 +69,42 @@ impl ExecutionGraph {
     pub fn from_variants(variants: &[Vec<RealExpr>]) -> Self {
         let mut graph = ExecutionGraph::new();
         let mut builder = crate::dag::DagBuilder::new();
-        
+
         let mut variant_roots = Vec::new();
         for variant in variants {
             let s: Vec<String> = variant.iter().map(|t| t.to_string()).collect();
             graph.ast_strings.push(s.join("; "));
-            
+
             let roots = builder.build_from_forest(variant);
             if let Some(&root_id) = roots.first() {
                 variant_roots.push(root_id);
             }
         }
-        
+
         let mut dag_to_graph_id = std::collections::HashMap::new();
-        
+
         for node in &builder.nodes {
             let eq_node = match &node.op {
                 crate::dag::DagOp::Literal(lit) => {
                     let cv = match lit {
-                        parser::ast::Literal::Integer(i) => ConstantValue::Integer(*i),
-                        parser::ast::Literal::Float(f) => ConstantValue::Float(*f),
-                        parser::ast::Literal::String(_) => ConstantValue::String,
-                        parser::ast::Literal::Boolean(_) => ConstantValue::Boolean,
+                        parser::program::Literal::Integer(i) => ConstantValue::Integer(*i),
+                        parser::program::Literal::Float(f) => ConstantValue::Float(*f),
+                        parser::program::Literal::String(_) => ConstantValue::String,
+                        parser::program::Literal::Boolean(_) => ConstantValue::Boolean,
                     };
                     ExecutionNode::Constant { value: cv }
-                },
-                crate::dag::DagOp::Identifier(name) => {
-                    ExecutionNode::Source {
-                        name: name.clone(),
-                        type_name: "TimeSeries".to_string(),
-                    }
+                }
+                crate::dag::DagOp::Identifier(name) => ExecutionNode::Source {
+                    name: name.clone(),
+                    type_name: "TimeSeries".to_string(),
                 },
                 crate::dag::DagOp::CallFn { func_name, args } => {
                     if func_name == "data" {
                         let mut src_name = "unknown".to_string();
                         if let Some(&arg_id) = args.first() {
-                            if let crate::dag::DagOp::Literal(parser::ast::Literal::String(s)) = &builder.nodes[arg_id].op {
+                            if let crate::dag::DagOp::Literal(parser::program::Literal::String(s)) =
+                                &builder.nodes[arg_id].op
+                            {
                                 src_name = s.clone();
                             }
                         }
@@ -107,7 +115,9 @@ impl ExecutionGraph {
                     } else {
                         let mut exec_args = Vec::new();
                         for &arg_id in args {
-                            let mapped_id = *dag_to_graph_id.get(&arg_id).expect("DAG topological sort failed");
+                            let mapped_id = *dag_to_graph_id
+                                .get(&arg_id)
+                                .expect("DAG topological sort failed");
                             exec_args.push(mapped_id);
                         }
                         ExecutionNode::Operation {
@@ -117,15 +127,17 @@ impl ExecutionGraph {
                     }
                 }
             };
-            
+
             let id = graph.add_node(eq_node);
             dag_to_graph_id.insert(node.id, id);
         }
-        
+
         for root_id in variant_roots {
-             graph.output_nodes.push(*dag_to_graph_id.get(&root_id).unwrap_or(&0));
+            graph
+                .output_nodes
+                .push(*dag_to_graph_id.get(&root_id).unwrap_or(&0));
         }
-        
+
         graph
     }
 }

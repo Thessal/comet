@@ -1,10 +1,5 @@
-# Fn data(symbol: String) -> DataFrame
-# Fn consume_float(b: Float) -> Void
-# Fn cs_rank(a: DataFrame) -> DataFrame
-# Fn divide(a: DataFrame, b: DataFrame) -> DataFrame
-
 Behavior Comparator(signal: DataFrame, eps: Float, reference: DataFrame) {
-    weights="behavior_1_compare.pth", train=false, supervised_samples=100
+    weights="behavior_1_compare.pth", train=true, supervised_samples=100
 } -> DataFrame
 
 Flow volume_spike {
