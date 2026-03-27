@@ -1,0 +1,83 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug unit tests in library 'stdlib'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test"
+                ]
+            }
+        },
+        {
+            "name": "Debug executable 'comet'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    //"--bin=comet",
+                    "--",
+                    "examples/behavior_1.cm",
+                ]
+            },
+            "args": []
+        },
+        {
+            "name": "Debug unit tests in executable 'comet'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bin=comet"
+                ]
+            }
+        },
+        {
+            "name": "Integration test",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=comet"
+                ],
+                "filter": {
+                    "name": "comet",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "test_consume_minimal_integration",
+                "--nocapture"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug selected unit test",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                ],
+                "filter": {
+                    "name": "libthat",
+                    "kind": "lib"
+                }
+            },
+            "args": [
+                "${selectedText}"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+    ]
+}

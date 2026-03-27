@@ -74,7 +74,8 @@ fn sample_trajectory<B: Backend>(
                 }),
             );
             traj.states.push(encoded);
-            let action_id = crate::supervised::action_to_id(&Action::Done, behavior, available_funcs);
+            let action_id =
+                crate::supervised::action_to_id(&Action::Done, behavior, available_funcs);
             traj.actions.push(action_id);
             break; // Stop immediately upon reaching Done state natively.
         }
@@ -92,10 +93,8 @@ fn sample_trajectory<B: Backend>(
 
         // Forward pass
         let encoded_i32: Vec<i32> = encoded.iter().map(|&x| x as i32).collect();
-        let input_tensor = Tensor::<B, 3, Int>::from_data(
-            TensorData::new(encoded_i32, [1, 1, 8]),
-            device,
-        );
+        let input_tensor =
+            Tensor::<B, 3, Int>::from_data(TensorData::new(encoded_i32, [1, 1, 8]), device);
         let logits = inference_model.forward(input_tensor);
         let probs = burn::tensor::activation::softmax(logits / temperature, 2);
         let probs_data = probs.into_data().to_vec::<f32>().unwrap();
@@ -166,7 +165,13 @@ where
 
         let mut trajs = Vec::new();
         for _ in 0..batch_size {
-            trajs.push(sample_trajectory(&inference_model, behavior, available_funcs, &device, 1.0));
+            trajs.push(sample_trajectory(
+                &inference_model,
+                behavior,
+                available_funcs,
+                &device,
+                1.0,
+            ));
         }
 
         let mut rewards = Vec::new();
@@ -187,7 +192,12 @@ where
             trajs.get(0).map(|t| t.sequence.len()).unwrap_or(0)
         );
 
-        let max_seq_len = trajs.iter().map(|t| t.states.len()).max().unwrap_or(1).max(1);
+        let max_seq_len = trajs
+            .iter()
+            .map(|t| t.states.len())
+            .max()
+            .unwrap_or(1)
+            .max(1);
 
         let mut inputs_data = Vec::with_capacity(batch_size * max_seq_len * 8);
         let mut actions_data = Vec::with_capacity(batch_size * max_seq_len);
@@ -213,7 +223,13 @@ where
         }
 
         let inputs_tensor = Tensor::<B, 3, Int>::from_data(
-            TensorData::new(inputs_data.into_iter().map(|v| v as i32).collect::<Vec<_>>(), [batch_size, max_seq_len, 8]),
+            TensorData::new(
+                inputs_data
+                    .into_iter()
+                    .map(|v| v as i32)
+                    .collect::<Vec<_>>(),
+                [batch_size, max_seq_len, 8],
+            ),
             &device,
         );
 
@@ -238,23 +254,35 @@ where
         let log_probs = burn::tensor::activation::log_softmax(logits, 2);
 
         // Select the log prob of the action taken
-        let selected_log_probs = log_probs.clone().gather(2, action_tensor).reshape([batch_size, max_seq_len]);
+        let selected_log_probs = log_probs
+            .clone()
+            .gather(2, action_tensor)
+            .reshape([batch_size, max_seq_len]);
 
         // Policy Loss = -1 * log_prob * advantage
-        let policy_loss = (selected_log_probs * advantages_tensor * mask_tensor.clone()).mul_scalar(-1.0_f32);
+        let policy_loss =
+            (selected_log_probs * advantages_tensor * mask_tensor.clone()).mul_scalar(-1.0_f32);
         let policy_loss_mean = policy_loss.sum_dim(1).mean();
 
-        // Entropy Bonus = - sum( p * log(p) ) 
-        let entropy = (probs * log_probs).sum_dim(2).mul_scalar(-1.0_f32).reshape([batch_size, max_seq_len]);
+        // Entropy Bonus = - sum( p * log(p) )
+        let entropy = (probs * log_probs)
+            .sum_dim(2)
+            .mul_scalar(-1.0_f32)
+            .reshape([batch_size, max_seq_len]);
         let entropy_mean = (entropy * mask_tensor).sum_dim(1).mean();
 
         // Total Loss to minimize
         let total_loss = policy_loss_mean - entropy_mean.mul_scalar(entropy_weight as f32);
 
         // Perform gradient update step
-        model = update_parameters(total_loss.reshape([1]), model, &mut optimizer, learning_rate);
+        model = update_parameters(
+            total_loss.reshape([1]),
+            model,
+            &mut optimizer,
+            learning_rate,
+        );
     }
-    
+
     println!("--- RL Training Completed ---");
     model
 }

@@ -621,7 +621,8 @@ mod tests {
             ],
             fitness: vec![1.0],
         };
-        let trained = train(
+        type Backend = burn::backend::Autodiff<burn::backend::ndarray::NdArray>;
+        let trained = train::<Backend>(
             &behavior,
             &available_funcs,
             &[sample.clone(), sample],
