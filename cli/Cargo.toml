@@ -14,3 +14,4 @@ stdlib = { path = "../stdlib" }
 clap = { version = "4.4", features = ["derive"] }
 rand = "0.8"
 inventory = "0.3.22"
+burn = "0.20.1"

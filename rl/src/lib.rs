@@ -3,3 +3,4 @@ pub mod synthesis;
 pub mod env;
 pub mod model;
 pub mod supervised;
+pub mod rl;

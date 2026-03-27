@@ -1414,6 +1414,7 @@ dependencies = [
 name = "comet"
 version = "0.1.0"
 dependencies = [
+ "burn",
  "clap",
  "codegen",
  "inventory",

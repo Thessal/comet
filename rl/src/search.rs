@@ -188,8 +188,9 @@ pub fn generate_top_k_samples(
     behavior: &parser::program::BehaviorDecl,
     available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
     top_k: usize,
+    selection_rule: fn(&Vec<f64>) -> bool,
 ) -> Vec<EvaluatedSample> {
-    let num_samples = behavior.supervised_samples.unwrap_or(100);
+    let num_samples = top_k;
     let target_type = behavior.return_type.clone();
 
     let unprocessed_params: Vec<TypeDecl> = behavior
@@ -232,7 +233,7 @@ pub fn generate_top_k_samples(
 
     let mut sample_count = 0;
     let mut attempts = 0;
-    while sample_count < num_samples && attempts < 50000 {
+    while sample_count < num_samples && attempts < 50000 * top_k {
         print!("Attempt: {}\r", attempts);
         let _ = std::io::stdout().flush();
         attempts += 1;
@@ -280,12 +281,13 @@ pub fn generate_top_k_samples(
                     }
                     _ => vec![-1.0], // Penalize runtime failure
                 };
-
-            samples.push(EvaluatedSample {
-                actions: current_state.sequence.clone(),
-                fitness,
-            });
-            sample_count += 1;
+            if selection_rule(&fitness) {
+                samples.push(EvaluatedSample {
+                    actions: current_state.sequence.clone(),
+                    fitness,
+                });
+                sample_count += 1;
+            }
         }
     }
     println!();
@@ -300,6 +302,7 @@ pub fn generate_top_k_samples(
     if samples.len() > top_k {
         samples.truncate(top_k);
     }
+    //TODO: drop duplicates
 
     samples
 }
@@ -427,7 +430,8 @@ mod tests {
         }
 
         println!("\nGenerating sample expression trees and evaluating using runtime...");
-        let samples = generate_top_k_samples(&behavior, &available_funcs, 3);
+        let samples =
+            generate_top_k_samples(&behavior, &available_funcs, 3, |fitness| fitness[0] > 0.0);
 
         for (i, sample) in samples.iter().enumerate() {
             println!("Sample {}: Fitness = {:?}", i + 1, sample.fitness);

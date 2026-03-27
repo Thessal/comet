@@ -18,14 +18,16 @@ fn generate_valid_expressions(
         Vec<parser::program::TypeDecl>,
         parser::program::TypeDecl,
     )>,
+    k: usize,
 ) -> Vec<rl::search::EvaluatedSample> {
+    // TODO: generate top k and drop duplicate samples. the result count may be smaller than k
     println!("Inferring action candidates from the code:");
     for f in available_funcs {
         println!("- {}({:?}) -> {:?}", f.0, f.1, f.2);
     }
 
     println!("\nGenerating sample expression trees and evaluating using runtime...");
-    let samples = rl::search::generate_top_k_samples(&behavior, available_funcs, 3);
+    let samples = rl::search::generate_top_k_samples(&behavior, available_funcs, k, |_| true);
 
     for (i, sample) in samples.iter().enumerate() {
         println!("Sample {}: Fitness = {:?}", i + 1, sample.fitness);
@@ -71,14 +73,14 @@ fn main() {
     println!("--- Available functions : {:?} ---", available_funcs);
 
     // 1) Build dataset, 2) Train transformer,
-    let sample = generate_valid_expressions(&behavior, &available_funcs);
+    let sample = generate_valid_expressions(&behavior, &available_funcs, 100);
     let trained = rl::supervised::train(
         &behavior,
         &available_funcs,
         &sample,
         behavior.supervised_samples.unwrap(),
-        2, //bs
-        1, //nw
+        32, //bs
+        16, //num_worker
     );
     let _ = std::io::stdout().flush();
 
@@ -118,14 +120,71 @@ fn main() {
         }
     }
 
+    // `evaluate_sequence` pops from the end, so we MUST reverse `call_args` to match the Shift order!
+    call_args.reverse();
+
+    // -- RL Fine-Tuning Step --
+    println!("--- Starting RL Fine-Tuning ---");
+    use burn::module::{AutodiffModule, Module};
+    use burn::record::Recorder;
+    let record = trained.into_record();
+    let type_vocab_size = 1 + parser::program::TYPE_DECL_LENGTH;
+    let action_vocab_size = 2 // Done, Shift
+        + behavior.floats.as_ref().map_or(0, |v| v.len())
+        + behavior.integers.as_ref().map_or(0, |v| v.len())
+        + behavior.strings.as_ref().map_or(0, |v| v.len())
+        + available_funcs.len();
+
+    type BackendAutoDiff = burn::backend::Autodiff<burn::backend::ndarray::NdArray>;
+    let device = Default::default();
+    let config = rl::model::ModelSize::Small.get_config(type_vocab_size, action_vocab_size);
+
+    use burn::record::{BinBytesRecorder, FullPrecisionSettings};
+    let bytes = BinBytesRecorder::<FullPrecisionSettings>::default()
+        .record(record, ())
+        .unwrap();
+    let rl_record: rl::model::TransformerModelRecord<BackendAutoDiff> =
+        BinBytesRecorder::<FullPrecisionSettings>::default()
+            .load(bytes, &device)
+            .unwrap();
+
+    let rl_model = config
+        .init::<BackendAutoDiff>(&device)
+        .load_record(rl_record);
+
+    let eval_fn = |sequence: &[String]| -> f64 {
+        let mut runtime = runtime::runtime::Runtime::new(100, "data");
+        match runtime.evaluate_sequence(sequence, call_args.clone()) {
+            Ok(stdlib::ParamType::DataFrame(output)) => {
+                let fitness = runtime::fitness::evaluate_fitness(&mut runtime.dmgr, &output);
+                // Multi-objective fitness returns a vector; use the first metric
+                100. * fitness.first().copied().unwrap_or(0.0)
+            }
+            _ => 0.0, // Failed runtime evaluations score 0
+        }
+    };
+
+    let target_epochs = 100;
+    let rl_trained = rl::rl::train_rl(
+        rl_model,
+        &behavior,
+        &available_funcs,
+        eval_fn,
+        target_epochs, // epochs
+        32,            // batch_size
+        1e-3,          // lr
+        0.05,          // lambda_complexity (parsimony pressure)
+        0.02,          // entropy_weight (exploration bonus)
+    );
+
+    let final_model = rl_trained.valid();
+
     for _ in 0..10 {
-        let temperature: f64 = 20.;
+        let temperature: f64 = 1.0;
         let generated_sequence =
-            rl::supervised::generate(&behavior, &available_funcs, &trained, temperature);
+            rl::supervised::generate(&behavior, &available_funcs, &final_model, temperature);
 
         // 6) Calculate fitness
-        // `evaluate_sequence` pops from the end, so we MUST reverse `call_args` to match the Shift order!
-        call_args.reverse();
         println!("Call Args: {:?}", call_args);
         let mut runtime = runtime::runtime::Runtime::new(100, "data");
         println!("Generated Sequence: {:?}", generated_sequence);
