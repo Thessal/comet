@@ -1,21 +1,24 @@
 use crate::dmgr::DataManager;
+use lru::LruCache;
+use std::num::NonZeroUsize;
 use stdlib::ParamType;
+
+const CACHE_SIZE: usize = 1000;
 
 pub struct Runtime {
     pub dmgr: DataManager,
+    pub expr_cache: LruCache<String, ParamType>,
+    pub expr_lookups: usize,
+    pub expr_hits: usize,
 }
-
-// #[derive(Debug, Clone, PartialEq)]
-// pub enum ParamType {
-//     Numeric(f64),
-//     String(String),
-//     Data(String),
-// }
 
 impl Runtime {
     pub fn new<P: AsRef<std::path::Path>>(_capacity: usize, data_dir: P) -> Self {
         Runtime {
             dmgr: DataManager::new(data_dir),
+            expr_cache: LruCache::new(NonZeroUsize::new(CACHE_SIZE).unwrap()), // TODO : evict only when memory is full
+            expr_lookups: 0,
+            expr_hits: 0,
         }
     }
 
@@ -24,7 +27,7 @@ impl Runtime {
         seq: &[String],
         mut param_names: Vec<String>,
     ) -> Result<ParamType, String> {
-        let mut stack: Vec<ParamType> = Vec::new();
+        let mut stack: Vec<(String, ParamType)> = Vec::new();
 
         for token in seq {
             if token == "!shift" {
@@ -32,13 +35,14 @@ impl Runtime {
                     let first_char = param_name.chars().next().unwrap_or('\0');
                     if first_char.is_ascii_digit() || first_char == '-' || first_char == '.' {
                         let number = param_name.parse::<f64>().map_err(|e| e.to_string())?;
-                        stack.push(ParamType::Float(number));
+                        stack.push((param_name.clone(), ParamType::Float(number)));
                     } else if first_char == '"' || first_char == '\'' {
-                        stack.push(ParamType::String(
-                            param_name[1..param_name.len() - 1].to_string(),
+                        stack.push((
+                            param_name.clone(),
+                            ParamType::String(param_name[1..param_name.len() - 1].to_string()),
                         ));
                     } else if first_char.is_ascii_alphabetic() {
-                        stack.push(ParamType::Variable(param_name));
+                        stack.push((param_name.clone(), ParamType::Variable(param_name)));
                     } else {
                         return Err(format!(
                             "Unrecognized boundary format for param: {}",
@@ -49,13 +53,22 @@ impl Runtime {
                     return Err("Shift without available parameters".into());
                 }
             } else if token == "data" {
-                if let Some(ParamType::String(name)) = stack.pop() {
-                    let data = self.dmgr.get_data(&name);
-                    if data.len() == 1 {
-                        stack.push(ParamType::Vector(data.into_iter().next().unwrap()));
-                    } else {
-                        stack.push(ParamType::DataFrame(data));
+                if let Some((repr, ParamType::String(name))) = stack.pop() {
+                    let expr_key = format!("data({})", repr);
+                    self.expr_lookups += 1;
+                    if let Some(cached) = self.expr_cache.get(&expr_key) {
+                        self.expr_hits += 1;
+                        stack.push((expr_key, cached.clone()));
+                        continue;
                     }
+                    let data = self.dmgr.get_data(&name);
+                    let res = if data.len() == 1 {
+                        ParamType::Vector(data.into_iter().next().unwrap())
+                    } else {
+                        ParamType::DataFrame(data)
+                    };
+                    self.expr_cache.put(expr_key.clone(), res.clone());
+                    stack.push((expr_key, res));
                 } else {
                     return Err("Data operator expects String on stack".into());
                 }
@@ -63,13 +76,14 @@ impl Runtime {
                 let first_char = token.chars().next().unwrap_or('\0');
                 if first_char.is_ascii_digit() || first_char == '-' || first_char == '.' {
                     let f = token.parse::<f64>().map_err(|e| e.to_string())?;
-                    stack.push(ParamType::Float(f));
+                    stack.push((token.clone(), ParamType::Float(f)));
                 } else if first_char == '"' || first_char == '\'' {
                     return Err(format!("String sequence tokens unsupported: {}", token));
                 } else if first_char.is_ascii_alphabetic() {
                     let func_name = token;
 
                     let mut out = ParamType::Vector(vec![]);
+                    let mut out_repr = String::new();
                     let mut is_void = false;
                     let mut found = false;
 
@@ -80,9 +94,10 @@ impl Runtime {
                                 return Err(format!("Stack underflow for {}", func_name));
                             }
 
-                            let mut args = Vec::with_capacity(arity);
+                            let mut args_repr = Vec::with_capacity(arity);
+                            let mut args_val = Vec::with_capacity(arity);
                             for _ in 0..arity {
-                                let mut arg = stack.pop().unwrap();
+                                let (repr, mut arg) = stack.pop().unwrap();
                                 if let ParamType::Variable(name) = &arg {
                                     let data = self.dmgr.get_data(name);
                                     if data.len() == 1 {
@@ -91,23 +106,38 @@ impl Runtime {
                                         arg = ParamType::DataFrame(data);
                                     }
                                 }
-                                args.push(arg);
+                                args_repr.push(repr);
+                                args_val.push(arg);
                             }
-                            args.reverse();
+                            args_repr.reverse();
+                            args_val.reverse();
+
+                            let expr_key = format!("{}({})", func_name, args_repr.join(","));
+                            self.expr_lookups += 1;
+                            if let Some(cached) = self.expr_cache.get(&expr_key) {
+                                self.expr_hits += 1;
+                                out = cached.clone();
+                                out_repr = expr_key;
+                                is_void = false;
+                                found = true;
+                                break;
+                            }
 
                             let mut type_mismatch = false;
-                            for (i, arg) in args.iter().enumerate() {
+                            for (i, arg) in args_val.iter().enumerate() {
                                 let expected = &meta.inputs[i];
                                 let ok = match expected {
                                     stdlib::OutputShape::Void => false,
-                                    stdlib::OutputShape::TimeSeries | stdlib::OutputShape::Vector => {
+                                    stdlib::OutputShape::TimeSeries
+                                    | stdlib::OutputShape::Vector => {
                                         matches!(arg, ParamType::Vector(_))
                                     }
                                     stdlib::OutputShape::DataFrame => {
                                         matches!(arg, ParamType::DataFrame(_))
                                     }
                                     stdlib::OutputShape::Matrix => false,
-                                    stdlib::OutputShape::ScalarFloat | stdlib::OutputShape::ScalarInt => {
+                                    stdlib::OutputShape::ScalarFloat
+                                    | stdlib::OutputShape::ScalarInt => {
                                         matches!(arg, ParamType::Float(_))
                                     }
                                     stdlib::OutputShape::ScalarString => {
@@ -123,8 +153,12 @@ impl Runtime {
                                 return Err(format!("Type mismatch for {}", func_name));
                             }
 
-                            out = (meta.execute)(&args);
+                            out = (meta.execute)(&args_val);
                             is_void = meta.output_shape == stdlib::OutputShape::Void;
+                            out_repr = expr_key.clone();
+                            if !is_void {
+                                self.expr_cache.put(expr_key, out.clone());
+                            }
                             found = true;
                             break;
                         }
@@ -135,7 +169,7 @@ impl Runtime {
                     }
 
                     if !is_void {
-                        stack.push(out);
+                        stack.push((out_repr, out));
                     }
                 } else {
                     return Err(format!("Unrecognized sequence token: {}", token));
@@ -150,7 +184,8 @@ impl Runtime {
             ));
         }
 
-        stack.pop().ok_or("Stack is empty".to_string())
+        let (_, val) = stack.pop().unwrap();
+        Ok(val)
     }
 }
 

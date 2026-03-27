@@ -19,6 +19,7 @@ fn generate_valid_expressions(
         parser::program::TypeDecl,
     )>,
     k: usize,
+    runtime: &mut runtime::runtime::Runtime,
 ) -> Vec<rl::search::EvaluatedSample> {
     // TODO: generate top k and drop duplicate samples. the result count may be smaller than k
     println!("Inferring action candidates from the code:");
@@ -27,7 +28,13 @@ fn generate_valid_expressions(
     }
 
     println!("\nGenerating sample expression trees and evaluating using runtime...");
-    let samples = rl::search::generate_top_k_samples(&behavior, available_funcs, k, |_| true);
+    let samples = rl::search::generate_top_k_samples(
+        &behavior,
+        available_funcs,
+        k,
+        |fitness| fitness[0] > 0.,
+        runtime,
+    );
 
     for (i, sample) in samples.iter().enumerate() {
         println!("Sample {}: Fitness = {:?}", i + 1, sample.fitness);
@@ -72,8 +79,11 @@ fn main() {
     };
     println!("--- Available functions : {:?} ---", available_funcs);
 
+    // Initialize central runtime
+    let mut runtime = runtime::runtime::Runtime::new(100, "data");
+
     // 1) Build dataset, 2) Train transformer,
-    let sample = generate_valid_expressions(&behavior, &available_funcs, 100);
+    let sample = generate_valid_expressions(&behavior, &available_funcs, 100, &mut runtime);
     let trained = rl::supervised::train(
         &behavior,
         &available_funcs,
@@ -83,6 +93,10 @@ fn main() {
         16, //num_worker
     );
     let _ = std::io::stdout().flush();
+    println!(
+        "Cache hit rate: {} / {}",
+        runtime.expr_hits, runtime.expr_lookups
+    );
 
     // 3) Sample a behavior using trained transformer
     // 4) Evaluate the polish sequence using runtime ## TODO: wrap this, and write a test for this.
@@ -152,8 +166,7 @@ fn main() {
         .init::<BackendAutoDiff>(&device)
         .load_record(rl_record);
 
-    let eval_fn = |sequence: &[String]| -> f64 {
-        let mut runtime = runtime::runtime::Runtime::new(100, "data");
+    let mut eval_fn = |sequence: &[String]| -> f64 {
         match runtime.evaluate_sequence(sequence, call_args.clone()) {
             Ok(stdlib::ParamType::DataFrame(output)) => {
                 let fitness = runtime::fitness::evaluate_fitness(&mut runtime.dmgr, &output);
@@ -186,7 +199,6 @@ fn main() {
 
         // 6) Calculate fitness
         println!("Call Args: {:?}", call_args);
-        let mut runtime = runtime::runtime::Runtime::new(100, "data");
         println!("Generated Sequence: {:?}", generated_sequence);
 
         match runtime.evaluate_sequence(&generated_sequence, call_args.clone()) {
@@ -203,4 +215,9 @@ fn main() {
     println!("");
     println!("");
     println!("");
+
+    println!(
+        "Cache hit rate: {} / {}",
+        runtime.expr_hits, runtime.expr_lookups
+    );
 }

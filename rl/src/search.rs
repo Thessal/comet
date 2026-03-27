@@ -189,6 +189,7 @@ pub fn generate_top_k_samples(
     available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
     top_k: usize,
     selection_rule: fn(&Vec<f64>) -> bool,
+    runtime: &mut Runtime,
 ) -> Vec<EvaluatedSample> {
     let num_samples = top_k;
     let target_type = behavior.return_type.clone();
@@ -229,7 +230,6 @@ pub fn generate_top_k_samples(
         behavior.strings.clone().unwrap_or_default(),
         true,
     );
-    let mut runtime = Runtime::new(0, "data");
 
     let mut sample_count = 0;
     let mut attempts = 0;
@@ -430,8 +430,9 @@ mod tests {
         }
 
         println!("\nGenerating sample expression trees and evaluating using runtime...");
+        let mut runtime = Runtime::new(100, "../data");
         let samples =
-            generate_top_k_samples(&behavior, &available_funcs, 3, |fitness| fitness[0] > 0.0);
+            generate_top_k_samples(&behavior, &available_funcs, 3, |_| true, &mut runtime);
 
         for (i, sample) in samples.iter().enumerate() {
             println!("Sample {}: Fitness = {:?}", i + 1, sample.fitness);
