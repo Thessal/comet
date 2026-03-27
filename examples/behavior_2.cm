@@ -7,7 +7,7 @@
 # Fn divide(a: DataFrame 'a, b: DataFrame 'a Nonzero) -> DataFrame 'a Indicator
 
 Behavior Comparator(signal: DataFrame, eps: Float, reference: DataFrame) {
-    weights="behavior_2_compare.pth", train=true, supervised_samples=100
+    weights="behavior_2_compare.pth", train=true, supervised_epochs=100
 } -> DataFrame
 
 Flow volume_spike {

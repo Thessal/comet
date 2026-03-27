@@ -4,7 +4,7 @@
 # Fn subtract(signal: DataFrame, reference: DataFrame) -> DataFrame
 
 Behavior Compare(signal: DataFrame, reference: DataFrame) {
-    weights="context_1_compare.pth", train=false, supervised_samples=100
+    weights="context_1_compare.pth", train=false, supervised_epochs=100
 } -> DataFrame
 
 Flow volume_spike {

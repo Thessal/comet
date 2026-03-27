@@ -24,7 +24,7 @@ Program {
                 train: Some(
                     true,
                 ),
-                supervised_samples: Some(
+                supervised_epochs: Some(
                     10,
                 ),
                 operators: Some(

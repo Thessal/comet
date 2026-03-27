@@ -20,7 +20,7 @@ Program {
                 train: Some(
                     false,
                 ),
-                supervised_samples: Some(
+                supervised_epochs: Some(
                     100,
                 ),
                 operators: None,

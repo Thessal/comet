@@ -46,7 +46,7 @@ pub struct BehaviorDecl {
     pub return_type: TypeDecl,
     pub weights: Option<String>,
     pub train: Option<bool>,
-    pub supervised_samples: Option<usize>,
+    pub supervised_epochs: Option<usize>,
     pub operators: Option<Vec<Ident>>,
     pub integers: Option<Vec<i64>>,
     pub floats: Option<Vec<f64>>,
@@ -225,8 +225,8 @@ impl fmt::Display for BehaviorDecl {
         if let Some(t) = self.train {
             props.push(format!("train = {}", t));
         }
-        if let Some(ss) = self.supervised_samples {
-            props.push(format!("supervised_samples = {}", ss));
+        if let Some(ss) = self.supervised_epochs {
+            props.push(format!("supervised_epochs = {}", ss));
         }
         if let Some(ops) = &self.operators {
             props.push(format!("operators = [{}]", ops.join(", ")));

@@ -92,7 +92,7 @@ fn main() {
         &behavior,
         &available_funcs,
         &sample,
-        behavior.supervised_samples.unwrap(),
+        behavior.supervised_epochs.unwrap(),
         32, //bs
         16, //num_worker
     );
@@ -194,6 +194,13 @@ fn main() {
     );
 
     let final_model = rl_trained.valid();
+
+    println!("--- Saving Trained Model Weights ---");
+    let record_to_save = final_model.clone().into_record();
+    let model_path = format!("{}_weights.bin", behavior.name);
+    burn::record::BinFileRecorder::<burn::record::FullPrecisionSettings>::default()
+        .record(record_to_save, model_path.into())
+        .expect("Failed to save model weights");
 
     for _ in 0..10 {
         let temperature: f64 = 1.0;

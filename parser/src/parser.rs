@@ -160,7 +160,7 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
 
     let mut weights = None;
     let mut train = None;
-    let mut supervised_samples = None;
+    let mut supervised_epochs = None;
     let mut operators = None;
     let mut integers = None;
     let mut floats = None;
@@ -196,12 +196,12 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
                             ));
                         }
                     }
-                    "supervised_samples" => {
+                    "supervised_epochs" => {
                         if let Expr::Literal(Literal::Integer(i)) = expr {
-                            supervised_samples = Some(i as usize);
+                            supervised_epochs = Some(i as usize);
                         } else {
                             return Err(ParserError::SemanticError(
-                                "supervised_samples must be an integer".into(),
+                                "supervised_epochs must be an integer".into(),
                             ));
                         }
                     }
@@ -212,12 +212,16 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
                                 if let Expr::Identifier(ident) = e {
                                     ops.push(ident);
                                 } else {
-                                    return Err(ParserError::SemanticError("operators must be a list of identifiers".into()));
+                                    return Err(ParserError::SemanticError(
+                                        "operators must be a list of identifiers".into(),
+                                    ));
                                 }
                             }
                             operators = Some(ops);
                         } else {
-                            return Err(ParserError::SemanticError("operators must be a list".into()));
+                            return Err(ParserError::SemanticError(
+                                "operators must be a list".into(),
+                            ));
                         }
                     }
                     "integers" => {
@@ -227,12 +231,16 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
                                 if let Expr::Literal(Literal::Integer(i)) = e {
                                     ints.push(i);
                                 } else {
-                                    return Err(ParserError::SemanticError("integers must be a list of integers".into()));
+                                    return Err(ParserError::SemanticError(
+                                        "integers must be a list of integers".into(),
+                                    ));
                                 }
                             }
                             integers = Some(ints);
                         } else {
-                            return Err(ParserError::SemanticError("integers must be a list".into()));
+                            return Err(ParserError::SemanticError(
+                                "integers must be a list".into(),
+                            ));
                         }
                     }
                     "floats" => {
@@ -242,7 +250,9 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
                                 if let Expr::Literal(Literal::Float(f)) = e {
                                     flts.push(f);
                                 } else {
-                                    return Err(ParserError::SemanticError("floats must be a list of floats".into()));
+                                    return Err(ParserError::SemanticError(
+                                        "floats must be a list of floats".into(),
+                                    ));
                                 }
                             }
                             floats = Some(flts);
@@ -257,12 +267,16 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
                                 if let Expr::Literal(Literal::String(s)) = e {
                                     strs.push(s);
                                 } else {
-                                    return Err(ParserError::SemanticError("strings must be a list of strings".into()));
+                                    return Err(ParserError::SemanticError(
+                                        "strings must be a list of strings".into(),
+                                    ));
                                 }
                             }
                             strings = Some(strs);
                         } else {
-                            return Err(ParserError::SemanticError("strings must be a list".into()));
+                            return Err(ParserError::SemanticError(
+                                "strings must be a list".into(),
+                            ));
                         }
                     }
                     _ => {
@@ -285,7 +299,7 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
         return_type,
         weights,
         train,
-        supervised_samples,
+        supervised_epochs,
         operators,
         integers,
         floats,
