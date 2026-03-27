@@ -49,7 +49,7 @@ comma = _{ "," }
 behavior_decl = { k_behavior ~ identifier ~ "(" ~ typed_arg_list ~ ")" ~ behavior_props_block? ~ "->" ~ type_name }
 behavior_props_block = { "{" ~ behavior_props? ~ "}" }
 behavior_props = { behavior_prop ~ (comma ~ behavior_prop)* }
-behavior_prop = { identifier ~ "=" ~ literal }
+behavior_prop = { identifier ~ "=" ~ expr }
 arg_list = { (identifier ~ (comma ~ identifier)*)? }
 typed_arg_list = { (typed_arg ~ (comma ~ typed_arg)*)? }
 typed_arg = { identifier ~ ":" ~ type_name }

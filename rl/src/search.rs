@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use parser::program::{Ident, TypeDecl};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -9,7 +11,10 @@ pub struct SearchState {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Action {
-    Shift,         // Increase order (move parameter from unprocessed to stack)
+    Shift, // Increase order (move parameter from unprocessed to stack)
+    ShiftInteger(i64),
+    ShiftFloat(f64),
+    ShiftString(String),
     Reduce(Ident), // Apply function/behavior and reduce stack
     Done,          // Successfully matched exit condition
 }
@@ -17,11 +22,27 @@ pub enum Action {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SearchEnv {
     pub target_return: TypeDecl,
+    pub available_integers: Vec<i64>,
+    pub available_floats: Vec<f64>,
+    pub available_strings: Vec<String>,
+    pub limit_introducing_constants: bool,
 }
 
 impl SearchEnv {
-    pub fn new(target_return: TypeDecl) -> Self {
-        SearchEnv { target_return }
+    pub fn new(
+        target_return: TypeDecl,
+        available_integers: Vec<i64>,
+        available_floats: Vec<f64>,
+        available_strings: Vec<String>,
+        limit_introducing_constants: bool,
+    ) -> Self {
+        SearchEnv {
+            target_return,
+            available_integers,
+            available_floats,
+            available_strings,
+            limit_introducing_constants,
+        }
     }
 
     pub fn get_valid_actions(
@@ -40,6 +61,19 @@ impl SearchEnv {
 
         if !state.unprocessed_params.is_empty() {
             actions.push(Action::Shift);
+        }
+
+        // We limit random constant generation depth to keep searches feasible.
+        if self.limit_introducing_constants && (state.stack.len() < 3) {
+            for &i in &self.available_integers {
+                actions.push(Action::ShiftInteger(i));
+            }
+            for &f in &self.available_floats {
+                actions.push(Action::ShiftFloat(f));
+            }
+            for s in &self.available_strings {
+                actions.push(Action::ShiftString(s.clone()));
+            }
         }
 
         for (name, param_types, _ret_type) in available_funcs {
@@ -75,6 +109,22 @@ impl SearchEnv {
                 } else {
                     Err("Cannot shift: no unprocessed parameters remaining.".to_string())
                 }
+            }
+            Action::ShiftInteger(val) => {
+                // Technically it maps to Int or Float. We push Float per runtime/stdlib types.
+                new_state.stack.push(TypeDecl::Float);
+                new_state.sequence.push(val.to_string());
+                Ok(new_state)
+            }
+            Action::ShiftFloat(val) => {
+                new_state.stack.push(TypeDecl::Float);
+                new_state.sequence.push(val.to_string());
+                Ok(new_state)
+            }
+            Action::ShiftString(val) => {
+                new_state.stack.push(TypeDecl::String);
+                new_state.sequence.push(format!("\"{}\"", val));
+                Ok(new_state)
             }
             Action::Reduce(func_name) => {
                 let func_def = available_funcs
@@ -171,13 +221,20 @@ pub fn generate_top_k_samples(
     let mut samples = Vec::with_capacity(num_samples);
     let mut rng = rand::thread_rng();
 
-    let env = SearchEnv::new(target_type);
+    let env = SearchEnv::new(
+        target_type,
+        behavior.integers.clone().unwrap_or_default(),
+        behavior.floats.clone().unwrap_or_default(),
+        behavior.strings.clone().unwrap_or_default(),
+        true,
+    );
     let mut runtime = Runtime::new(0, "data");
 
     let mut sample_count = 0;
     let mut attempts = 0;
-    while sample_count < num_samples && attempts < 1000 {
+    while sample_count < num_samples && attempts < 50000 {
         print!("Attempt: {}\r", attempts);
+        let _ = std::io::stdout().flush();
         attempts += 1;
         let mut current_state = initial_state.clone();
         let mut hit_done = false;
@@ -269,7 +326,7 @@ mod tests {
             sequence: vec![],
         };
 
-        let env = SearchEnv::new(TypeDecl::DataFrame); // Target return: DataFrame
+        let env = SearchEnv::new(TypeDecl::DataFrame, vec![], vec![], vec![], true); // Target return: DataFrame
 
         let available_funcs = vec![
             (

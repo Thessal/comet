@@ -22,10 +22,39 @@ Program {
                     "behavior_1_compare.pth",
                 ),
                 train: Some(
-                    false,
+                    true,
                 ),
                 supervised_samples: Some(
-                    100,
+                    10,
+                ),
+                operators: Some(
+                    [
+                        "add",
+                        "divide",
+                        "ts_mean",
+                        "cs_rank",
+                        "ts_diff",
+                    ],
+                ),
+                integers: Some(
+                    [
+                        5,
+                        21,
+                        252,
+                    ],
+                ),
+                floats: Some(
+                    [
+                        0.1,
+                        0.5,
+                        0.9,
+                    ],
+                ),
+                strings: Some(
+                    [
+                        "volume",
+                        "adv20",
+                    ],
                 ),
             },
         ),

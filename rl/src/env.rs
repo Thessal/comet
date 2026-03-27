@@ -38,7 +38,7 @@ impl CometRlEnv {
                 stack: vec![],
                 sequence: vec![],
             },
-            search_env: SearchEnv::new(target),
+            search_env: SearchEnv::new(target, vec![], vec![], vec![], true),
             available_funcs: funcs,
             max_length: 50,
             param_names,
@@ -140,4 +140,18 @@ pub fn get_available_funcs() -> Vec<(
     // Sort consistently
     funcs.sort_by(|a, b| a.0.cmp(&b.0));
     funcs
+}
+
+pub fn get_available_func(target_name: &str) -> (
+    String,
+    Vec<parser::program::TypeDecl>,
+    parser::program::TypeDecl,
+) {
+    let funcs = get_available_funcs();
+    for f in funcs {
+        if f.0 == target_name {
+            return f;
+        }
+    }
+    panic!("Function {} not found in standard library", target_name);
 }

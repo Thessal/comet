@@ -161,6 +161,10 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
     let mut weights = None;
     let mut train = None;
     let mut supervised_samples = None;
+    let mut operators = None;
+    let mut integers = None;
+    let mut floats = None;
+    let mut strings = None;
 
     let mut next_pair = inner.next().unwrap();
 
@@ -170,13 +174,13 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
             for prop in props.into_inner() {
                 let mut prop_inner = prop.into_inner();
                 let key = parse_identifier(prop_inner.next().unwrap());
-                let val_pair = prop_inner.next().unwrap(); // Rule::literal
-                let lit_inner = val_pair.into_inner().next().unwrap();
+                let val_pair = prop_inner.next().unwrap(); // Rule::expr
+                let expr = parse_expr(val_pair)?;
 
                 match key.as_str() {
                     "weights" => {
-                        if lit_inner.as_rule() == Rule::string_literal {
-                            weights = Some(lit_inner.as_str().trim_matches('"').to_string());
+                        if let Expr::Literal(Literal::String(s)) = expr {
+                            weights = Some(s);
                         } else {
                             return Err(ParserError::SemanticError(
                                 "weights must be a string".into(),
@@ -184,8 +188,8 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
                         }
                     }
                     "train" => {
-                        if lit_inner.as_rule() == Rule::bool_literal {
-                            train = Some(lit_inner.as_str() == "true");
+                        if let Expr::Literal(Literal::Boolean(b)) = expr {
+                            train = Some(b);
                         } else {
                             return Err(ParserError::SemanticError(
                                 "train must be a boolean".into(),
@@ -193,15 +197,72 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
                         }
                     }
                     "supervised_samples" => {
-                        if lit_inner.as_rule() == Rule::int_literal {
-                            supervised_samples =
-                                Some(lit_inner.as_str().parse().map_err(|_| {
-                                    ParserError::SemanticError("Invalid supervised_samples".into())
-                                })?);
+                        if let Expr::Literal(Literal::Integer(i)) = expr {
+                            supervised_samples = Some(i as usize);
                         } else {
                             return Err(ParserError::SemanticError(
                                 "supervised_samples must be an integer".into(),
                             ));
+                        }
+                    }
+                    "operators" => {
+                        if let Expr::List(list) = expr {
+                            let mut ops = Vec::new();
+                            for e in list {
+                                if let Expr::Identifier(ident) = e {
+                                    ops.push(ident);
+                                } else {
+                                    return Err(ParserError::SemanticError("operators must be a list of identifiers".into()));
+                                }
+                            }
+                            operators = Some(ops);
+                        } else {
+                            return Err(ParserError::SemanticError("operators must be a list".into()));
+                        }
+                    }
+                    "integers" => {
+                        if let Expr::List(list) = expr {
+                            let mut ints = Vec::new();
+                            for e in list {
+                                if let Expr::Literal(Literal::Integer(i)) = e {
+                                    ints.push(i);
+                                } else {
+                                    return Err(ParserError::SemanticError("integers must be a list of integers".into()));
+                                }
+                            }
+                            integers = Some(ints);
+                        } else {
+                            return Err(ParserError::SemanticError("integers must be a list".into()));
+                        }
+                    }
+                    "floats" => {
+                        if let Expr::List(list) = expr {
+                            let mut flts = Vec::new();
+                            for e in list {
+                                if let Expr::Literal(Literal::Float(f)) = e {
+                                    flts.push(f);
+                                } else {
+                                    return Err(ParserError::SemanticError("floats must be a list of floats".into()));
+                                }
+                            }
+                            floats = Some(flts);
+                        } else {
+                            return Err(ParserError::SemanticError("floats must be a list".into()));
+                        }
+                    }
+                    "strings" => {
+                        if let Expr::List(list) = expr {
+                            let mut strs = Vec::new();
+                            for e in list {
+                                if let Expr::Literal(Literal::String(s)) = e {
+                                    strs.push(s);
+                                } else {
+                                    return Err(ParserError::SemanticError("strings must be a list of strings".into()));
+                                }
+                            }
+                            strings = Some(strs);
+                        } else {
+                            return Err(ParserError::SemanticError("strings must be a list".into()));
                         }
                     }
                     _ => {
@@ -225,6 +286,10 @@ fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
         weights,
         train,
         supervised_samples,
+        operators,
+        integers,
+        floats,
+        strings,
     })
 }
 

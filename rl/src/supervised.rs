@@ -1,14 +1,17 @@
 use burn::{
-    data::dataloader::batcher::Batcher,
-    data::dataset::Dataset,
+    backend::NdArray,
+    data::{dataloader::batcher::Batcher, dataset::Dataset},
     nn::loss::CrossEntropyLossConfig,
-    tensor::{Int, Tensor, TensorData, backend::AutodiffBackend, backend::Backend},
-    train::{ClassificationOutput, InferenceStep, TrainOutput, TrainStep},
+    tensor::{
+        Int, Tensor, TensorData,
+        backend::{AutodiffBackend, Backend},
+    },
+    train::{ClassificationOutput, InferenceStep, LearningResult, TrainOutput, TrainStep},
 };
 
 use crate::model::TransformerModel;
 use crate::search::{Action, EvaluatedSample, SearchEnv, SearchState};
-use parser::program::{BehaviorDecl, Ident, TypeDecl};
+use parser::program::{BehaviorDecl, Ident, TYPE_DECL_LENGTH, TypeDecl};
 
 /// The input batch provided to the model during training.
 #[derive(Clone, Debug)]
@@ -94,11 +97,48 @@ pub fn type_to_id(t: &TypeDecl) -> usize {
 
 pub fn action_to_id(
     action: &Action,
+    behavior: &parser::program::BehaviorDecl,
     available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
 ) -> usize {
+    let ints = behavior
+        .integers
+        .as_ref()
+        .map(|v| v.as_slice())
+        .unwrap_or(&[]);
+    let floats = behavior
+        .floats
+        .as_ref()
+        .map(|v| v.as_slice())
+        .unwrap_or(&[]);
+    let strings = behavior
+        .strings
+        .as_ref()
+        .map(|v| v.as_slice())
+        .unwrap_or(&[]);
+
+    let base_ints = 2; // Done is 0, Shift is 1
+    let base_floats = base_ints + ints.len();
+    let base_strings = base_floats + floats.len();
+    let base_funcs = base_strings + strings.len();
+
     match action {
         Action::Done => 0,
         Action::Shift => 1,
+        Action::ShiftInteger(v) => {
+            let idx = ints.iter().position(|x| x == v).unwrap_or(0);
+            base_ints + idx
+        }
+        Action::ShiftFloat(v) => {
+            let idx = floats
+                .iter()
+                .position(|x| (x - v).abs() < 1e-6)
+                .unwrap_or(0);
+            base_floats + idx
+        }
+        Action::ShiftString(v) => {
+            let idx = strings.iter().position(|x| x == v).unwrap_or(0);
+            base_strings + idx
+        }
         Action::Reduce(func_name) => {
             let idx = available_funcs
                 .iter()
@@ -107,7 +147,7 @@ pub fn action_to_id(
                     "Function {} not found in available_funcs",
                     func_name
                 ));
-            2 + idx
+            base_funcs + idx
         }
     }
 }
@@ -117,6 +157,12 @@ pub fn string_to_action(s: &str) -> Action {
         Action::Shift
     } else if s == "!done" {
         Action::Done
+    } else if s.starts_with("\"") {
+        Action::ShiftString(s.trim_matches('"').to_string())
+    } else if let Ok(i) = s.parse::<i64>() {
+        Action::ShiftInteger(i)
+    } else if let Ok(f) = s.parse::<f64>() {
+        Action::ShiftFloat(f)
     } else {
         Action::Reduce(s.to_string())
     }
@@ -179,7 +225,13 @@ impl ProgramSequenceDataset {
             sequence: vec![],
         };
 
-        let env = SearchEnv::new(target_type);
+        let env = SearchEnv::new(
+            target_type,
+            behavior.integers.clone().unwrap_or_default(),
+            behavior.floats.clone().unwrap_or_default(),
+            behavior.strings.clone().unwrap_or_default(),
+            false,
+        );
 
         for sample in samples {
             // Replay the sample sequence to extract state action pairs
@@ -189,9 +241,9 @@ impl ProgramSequenceDataset {
 
             let mut prev_action_id = 0; // Pad/Unknown for first step
 
-            for action_str in &sample.actions {
-                let action = string_to_action(action_str);
-                let target_id = action_to_id(&action, available_funcs);
+            for a in &sample.actions {
+                let action = string_to_action(a);
+                let target_id = action_to_id(&action, behavior, available_funcs);
 
                 let state_tensor = encode_state(&current_state, prev_action_id);
                 states.push(state_tensor);
@@ -206,7 +258,7 @@ impl ProgramSequenceDataset {
             }
 
             // Finally, add the Done action target!
-            let target_id = action_to_id(&Action::Done, available_funcs);
+            let target_id = action_to_id(&Action::Done, behavior, available_funcs);
             let state_tensor = encode_state(&current_state, prev_action_id);
             states.push(state_tensor);
             targets.push(target_id);
@@ -278,12 +330,18 @@ impl<B: Backend> Batcher<B, TransformerBatchItem, TransformerBatch<B>> for Trans
     }
 }
 
-pub fn train_and_sample(
-    behavior: &BehaviorDecl,
-    available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
-    samples: &[EvaluatedSample],
+pub fn train(
+    behavior: &parser::program::BehaviorDecl,
+    available_funcs: &[(
+        parser::program::Ident,
+        Vec<parser::program::TypeDecl>,
+        parser::program::TypeDecl,
+    )],
+    samples: &[crate::search::EvaluatedSample],
     num_epochs: usize,
-) -> Vec<String> {
+    batch_size: usize,
+    num_workers: usize,
+) -> crate::model::TransformerModel<burn::backend::ndarray::NdArray> {
     use crate::model::ModelSize;
     use burn::backend::Autodiff;
     use burn::backend::ndarray::NdArray;
@@ -296,7 +354,7 @@ pub fn train_and_sample(
     println!("--- Building Program Sequence Dataset ---");
     let dataset = ProgramSequenceDataset::new(samples, behavior, available_funcs);
 
-    type BackendBase = NdArray<f32>;
+    type BackendBase = NdArray<f32>; // TODO: move this to model configuration (model.rs or config.rs)
     type BackendAutoDiff = Autodiff<BackendBase>;
     let device = <BackendBase as Backend>::Device::default();
 
@@ -304,17 +362,23 @@ pub fn train_and_sample(
     let batcher_valid = TransformerBatcher::new(32);
 
     let dataloader_train = DataLoaderBuilder::new(batcher_train)
-        .batch_size(2)
-        .num_workers(1)
+        .batch_size(batch_size)
+        .num_workers(num_workers)
         .build(dataset.clone());
 
     let dataloader_valid = DataLoaderBuilder::new(batcher_valid)
-        .batch_size(2)
-        .num_workers(1)
+        .batch_size(batch_size)
+        .num_workers(num_workers)
         .build(dataset);
 
     println!("--- Initializing Transformer Model ---");
-    let config = ModelSize::Small.get_config(15, 20);
+    let type_vocab_size = 1 + TYPE_DECL_LENGTH; // 0 = PAD
+    let action_vocab_size = 2 // Done and Shift
+        + behavior.floats.as_ref().map_or(0, |v| v.len())
+        + behavior.integers.as_ref().map_or(0, |v| v.len())
+        + behavior.strings.as_ref().map_or(0, |v| v.len())
+        + available_funcs.len();
+    let config = ModelSize::Small.get_config(type_vocab_size, action_vocab_size);
     let model = config.init::<BackendAutoDiff>(&device);
     let config_optim = AdamConfig::new();
 
@@ -331,13 +395,33 @@ pub fn train_and_sample(
     println!("--- Launching Target Supervised Training ---");
     let trained = training.launch(Learner::new(model, config_optim.init(), 1e-4));
     println!("--- Training Completed ---");
+    trained.model
+}
+
+pub fn generate(
+    behavior: &parser::program::BehaviorDecl,
+    available_funcs: &[(
+        parser::program::Ident,
+        Vec<parser::program::TypeDecl>,
+        parser::program::TypeDecl,
+    )],
+    inference_model: &crate::model::TransformerModel<burn::backend::ndarray::NdArray>,
+    temperature: f64, // 1.0 is base, <1.0 is more deterministic, >1.0 is more random
+) -> Vec<String> {
+    type BackendBase = NdArray<f32>; // TODO: move this to model configuration (model.rs or config.rs
+    let device = <BackendBase as burn::tensor::backend::Backend>::Device::default();
 
     println!("--- Running Inference Test ---");
-    let inference_model = trained.model;
 
     use burn::tensor::Tensor;
 
-    let env = crate::search::SearchEnv::new(behavior.return_type.clone());
+    let env = crate::search::SearchEnv::new(
+        behavior.return_type.clone(),
+        behavior.integers.clone().unwrap_or_default(),
+        behavior.floats.clone().unwrap_or_default(),
+        behavior.strings.clone().unwrap_or_default(),
+        true, // insert constants only when unprocessed param length < 3
+    );
     let mut state = crate::search::SearchState {
         unprocessed_params: behavior
             .args
@@ -362,7 +446,9 @@ pub fn train_and_sample(
         let prev_action_id = state
             .sequence
             .last()
-            .map(|action_str| action_to_id(&string_to_action(action_str), available_funcs))
+            .map(|action_str| {
+                action_to_id(&string_to_action(action_str), behavior, available_funcs)
+            })
             .unwrap_or(0);
 
         let encoded = encode_state(&state, prev_action_id);
@@ -374,37 +460,55 @@ pub fn train_and_sample(
         );
 
         let logits = inference_model.forward(input_tensor);
-        let probs = burn::tensor::activation::softmax(logits, 2);
-        
+        println!("Logits: {:?}", logits);
+        println!("Logits / temperature: {:?}", logits.clone() / temperature);
+        let probs = burn::tensor::activation::softmax(logits / temperature, 2);
+        println!("Probs: {:?}", probs);
+
         // Extract softmax probabilities. For NdArray backend, into_data().to_vec::<f32>() is safe.
         let probs_data = probs.into_data().to_vec::<f32>().unwrap();
 
-        let valid_non_done: Vec<_> = valid_actions
-            .into_iter()
-            .filter(|a| *a != crate::search::Action::Done)
-            .collect();
-            
-        if valid_non_done.is_empty() {
+        let valid_candidates = valid_actions;
+        if valid_candidates.is_empty() {
             break;
         }
 
-        // Action selection: Using the Transformer's learned probabilities -> Argmax over Valid Actions
-        let best_action = valid_non_done
-            .into_iter()
-            .max_by(|a, b| {
-                let id_a = action_to_id(a, available_funcs);
-                let id_b = action_to_id(b, available_funcs);
-                
-                // Ensure we don't out-of-bounds index since vocab config might differ.
-                let p_a = probs_data.get(id_a).copied().unwrap_or(0.0);
-                let p_b = probs_data.get(id_b).copied().unwrap_or(0.0);
-                
-                p_a.partial_cmp(&p_b).unwrap_or(std::cmp::Ordering::Equal)
+        // Action selection: Using the Transformer's learned probabilities -> Weighted Sampling
+        let mut valid_probs: Vec<f32> = valid_candidates
+            .iter()
+            .map(|a| {
+                let id = action_to_id(a, behavior, available_funcs);
+                probs_data.get(id).copied().unwrap_or(0.0)
             })
-            .unwrap();
+            .collect();
 
-        state = env.step(&state, best_action, available_funcs).unwrap();
-        
+        // Rescale sum of valid probabilities to 1
+        let sum: f32 = valid_probs.iter().sum();
+        if sum > 1e-6 {
+            for p in &mut valid_probs {
+                *p /= sum;
+            }
+        } else {
+            let uniform = 1.0 / valid_candidates.len() as f32;
+            for p in &mut valid_probs {
+                *p = uniform;
+            }
+        }
+        println!("valid_candidates: {:?}", valid_candidates);
+        println!("valid_probs: {:?}", valid_probs);
+
+        use rand::distributions::WeightedIndex;
+        use rand::prelude::*;
+        let dist = WeightedIndex::new(&valid_probs).unwrap();
+        let mut rng = thread_rng();
+        let chosen_action = valid_candidates[dist.sample(&mut rng)].clone();
+
+        if chosen_action == crate::search::Action::Done {
+            break;
+        }
+
+        state = env.step(&state, chosen_action, available_funcs).unwrap();
+
         if step_count == 99 {
             println!("Warning: Inference loop hit 100 max iterations.");
         }
@@ -445,6 +549,10 @@ mod tests {
             weights: None,
             train: None,
             supervised_samples: None,
+            operators: None,
+            integers: None,
+            floats: None,
+            strings: None,
         };
 
         // We simulate a valid generation
@@ -498,6 +606,10 @@ mod tests {
             weights: None,
             train: None,
             supervised_samples: None,
+            operators: None,
+            integers: None,
+            floats: None,
+            strings: None,
         };
         let sample = EvaluatedSample {
             actions: vec![
@@ -507,7 +619,14 @@ mod tests {
             ],
             fitness: vec![1.0],
         };
-        let _generated =
-            train_and_sample(&behavior, &available_funcs, &[sample.clone(), sample], 1);
+        let trained = train(
+            &behavior,
+            &available_funcs,
+            &[sample.clone(), sample],
+            1, //epoch
+            2, //bs
+            1, //worker
+        );
+        let _generated = generate(&behavior, &available_funcs, &trained, 1.0);
     }
 }

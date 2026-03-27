@@ -25,6 +25,7 @@ pub struct ImportDecl {
 
 // (User-defined Type nodes are no longer used. See primitives.)
 
+pub const TYPE_DECL_LENGTH: usize = 7;
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeDecl {
     DataFrame,
@@ -46,6 +47,10 @@ pub struct BehaviorDecl {
     pub weights: Option<String>,
     pub train: Option<bool>,
     pub supervised_samples: Option<usize>,
+    pub operators: Option<Vec<Ident>>,
+    pub integers: Option<Vec<i64>>,
+    pub floats: Option<Vec<f64>>,
+    pub strings: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -222,6 +227,21 @@ impl fmt::Display for BehaviorDecl {
         }
         if let Some(ss) = self.supervised_samples {
             props.push(format!("supervised_samples = {}", ss));
+        }
+        if let Some(ops) = &self.operators {
+            props.push(format!("operators = [{}]", ops.join(", ")));
+        }
+        if let Some(ints) = &self.integers {
+            let s: Vec<String> = ints.iter().map(|i| i.to_string()).collect();
+            props.push(format!("integers = [{}]", s.join(", ")));
+        }
+        if let Some(flts) = &self.floats {
+            let s: Vec<String> = flts.iter().map(|f| f.to_string()).collect();
+            props.push(format!("floats = [{}]", s.join(", ")));
+        }
+        if let Some(strs) = &self.strings {
+            let s: Vec<String> = strs.iter().map(|s| format!("\"{}\"", s)).collect();
+            props.push(format!("strings = [{}]", s.join(", ")));
         }
 
         if props.is_empty() {

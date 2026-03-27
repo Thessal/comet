@@ -2,6 +2,7 @@ use clap::Parser;
 use parser::parser::parse;
 use parser::program::{BehaviorDecl, Declaration};
 use std::fs;
+use std::io::Write;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -45,7 +46,6 @@ fn main() {
 
     println!("--- Parsing file: {:?} ---", filename);
     let program = parse(&src).expect(format!("Failed to parse {:?}", filename).as_str());
-    let available_funcs = rl::env::get_available_funcs();
 
     // Select first train=True Behavior
     let mut target_behavior = None;
@@ -59,18 +59,31 @@ fn main() {
     let behavior = target_behavior.expect("No train=True behavior found");
     println!("--- Selected behavior : {:?} ---", behavior.name);
 
-    let sample = generate_valid_expressions(&behavior, &available_funcs);
+    let available_funcs = if let Some(available_funcs_str) = &behavior.operators {
+        let mut available_funcs = Vec::new();
+        for func_str in available_funcs_str {
+            available_funcs.push(rl::env::get_available_func(&func_str));
+        }
+        available_funcs
+    } else {
+        rl::env::get_available_funcs()
+    };
+    println!("--- Available functions : {:?} ---", available_funcs);
 
-    // 1) Build dataset, 2) Train transformer, 3) Sample a behavior using trained transformer
-    let generated_sequence = rl::supervised::train_and_sample(
+    // 1) Build dataset, 2) Train transformer,
+    let sample = generate_valid_expressions(&behavior, &available_funcs);
+    let trained = rl::supervised::train(
         &behavior,
         &available_funcs,
         &sample,
         behavior.supervised_samples.unwrap(),
+        2, //bs
+        1, //nw
     );
+    let _ = std::io::stdout().flush();
 
-    // 5) Evaluate the polish sequence using runtime
-    // 6) Calculate fitness
+    // 3) Sample a behavior using trained transformer
+    // 4) Evaluate the polish sequence using runtime ## TODO: wrap this, and write a test for this.
     // Extract bound parameter values from the Flow call syntax
     let mut call_args = behavior
         .args
@@ -104,18 +117,31 @@ fn main() {
             }
         }
     }
-    // `evaluate_sequence` pops from the end, so we MUST reverse `call_args` to match the Shift order!
-    call_args.reverse();
 
-    let mut runtime = runtime::runtime::Runtime::new(100, "data");
+    for _ in 0..10 {
+        let temperature: f64 = 20.;
+        let generated_sequence =
+            rl::supervised::generate(&behavior, &available_funcs, &trained, temperature);
 
-    match runtime.evaluate_sequence(&generated_sequence, call_args) {
-        Ok(stdlib::ParamType::DataFrame(output)) => {
-            let fitness = runtime::fitness::evaluate_fitness(&mut runtime.dmgr, &output);
-            println!("Inference Sample Fitness = {:?}", fitness);
-        }
-        _ => {
-            println!("Inference Sample Runtime Execution Failed.");
-        }
-    };
+        // 6) Calculate fitness
+        // `evaluate_sequence` pops from the end, so we MUST reverse `call_args` to match the Shift order!
+        call_args.reverse();
+        println!("Call Args: {:?}", call_args);
+        let mut runtime = runtime::runtime::Runtime::new(100, "data");
+        println!("Generated Sequence: {:?}", generated_sequence);
+
+        match runtime.evaluate_sequence(&generated_sequence, call_args.clone()) {
+            Ok(stdlib::ParamType::DataFrame(output)) => {
+                let fitness = runtime::fitness::evaluate_fitness(&mut runtime.dmgr, &output);
+                println!("Inference Sample Fitness = {:?}", fitness);
+                break;
+            }
+            _ => {
+                println!("Inference Sample Runtime Execution Failed.");
+            }
+        };
+    }
+    println!("");
+    println!("");
+    println!("");
 }

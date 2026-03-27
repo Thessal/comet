@@ -27,6 +27,10 @@ Program {
                 supervised_samples: Some(
                     100,
                 ),
+                operators: None,
+                integers: None,
+                floats: None,
+                strings: None,
             },
         ),
         Flow(
