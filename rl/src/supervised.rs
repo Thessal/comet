@@ -330,7 +330,7 @@ impl<B: Backend> Batcher<B, TransformerBatchItem, TransformerBatch<B>> for Trans
     }
 }
 
-pub fn train(
+pub fn train<B: burn::tensor::backend::AutodiffBackend>(
     behavior: &parser::program::BehaviorDecl,
     available_funcs: &[(
         parser::program::Ident,
@@ -341,10 +341,8 @@ pub fn train(
     num_epochs: usize,
     batch_size: usize,
     num_workers: usize,
-) -> crate::model::TransformerModel<burn::backend::ndarray::NdArray> {
+) -> crate::model::TransformerModel<B::InnerBackend> {
     use crate::model::ModelSize;
-    use burn::backend::Autodiff;
-    use burn::backend::ndarray::NdArray;
     use burn::data::dataloader::DataLoaderBuilder;
     use burn::optim::{AdamConfig, Optimizer};
     use burn::tensor::backend::Backend;
@@ -354,9 +352,7 @@ pub fn train(
     println!("--- Building Program Sequence Dataset ---");
     let dataset = ProgramSequenceDataset::new(samples, behavior, available_funcs);
 
-    type BackendBase = NdArray<f32>; // TODO: move this to model configuration (model.rs or config.rs)
-    type BackendAutoDiff = Autodiff<BackendBase>;
-    let device = <BackendBase as Backend>::Device::default();
+    let device = <B as Backend>::Device::default();
 
     let batcher_train = TransformerBatcher::new(32);
     let batcher_valid = TransformerBatcher::new(32);
@@ -379,7 +375,7 @@ pub fn train(
         + behavior.strings.as_ref().map_or(0, |v| v.len())
         + available_funcs.len();
     let config = ModelSize::Small.get_config(type_vocab_size, action_vocab_size);
-    let model = config.init::<BackendAutoDiff>(&device);
+    let model = config.init::<B>(&device);
     let config_optim = AdamConfig::new();
 
     let timestamp = std::time::SystemTime::now()
@@ -405,18 +401,17 @@ pub fn train(
     trained.model
 }
 
-pub fn generate(
+pub fn generate<B: burn::tensor::backend::Backend>(
     behavior: &parser::program::BehaviorDecl,
     available_funcs: &[(
         parser::program::Ident,
         Vec<parser::program::TypeDecl>,
         parser::program::TypeDecl,
     )],
-    inference_model: &crate::model::TransformerModel<burn::backend::ndarray::NdArray>,
+    inference_model: &crate::model::TransformerModel<B>,
     temperature: f64, // 1.0 is base, <1.0 is more deterministic, >1.0 is more random
 ) -> Vec<String> {
-    type BackendBase = NdArray<f32>; // TODO: move this to model configuration (model.rs or config.rs
-    let device = <BackendBase as burn::tensor::backend::Backend>::Device::default();
+    let device = <B as burn::tensor::backend::Backend>::Device::default();
 
     println!("--- Running Inference Test ---");
 
@@ -461,7 +456,7 @@ pub fn generate(
         let encoded = encode_state(&state, prev_action_id);
         let encoded_i32: Vec<i32> = encoded.iter().map(|&x| x as i32).collect();
 
-        let input_tensor = Tensor::<BackendBase, 3, burn::tensor::Int>::from_data(
+        let input_tensor = Tensor::<B, 3, burn::tensor::Int>::from_data(
             burn::tensor::TensorData::new(encoded_i32, [1, 1, 8]),
             &device,
         );
@@ -527,10 +522,10 @@ pub fn generate(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use burn::backend::NdArray;
+    use burn::backend::Cuda;
     use parser::program::TypedArg;
 
-    type B = NdArray<f32>;
+    type B = Cuda;
 
     #[test]
     fn test_encode_and_batch() {

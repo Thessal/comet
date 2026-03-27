@@ -82,9 +82,13 @@ fn main() {
     // Initialize central runtime
     let mut runtime = runtime::runtime::Runtime::new(100, "data");
 
+    // type BackendAutoDiff = burn::backend::Autodiff<burn::backend::Cuda>;
+    // type BackendAutoDiff = burn::backend::Autodiff<burn::backend::Rocm>;
+    type BackendAutoDiff = burn::backend::Autodiff<burn::backend::ndarray::NdArray>;
+
     // 1) Build dataset, 2) Train transformer,
     let sample = generate_valid_expressions(&behavior, &available_funcs, 100, &mut runtime);
-    let trained = rl::supervised::train(
+    let trained_model = rl::supervised::train::<BackendAutoDiff>(
         &behavior,
         &available_funcs,
         &sample,
@@ -141,7 +145,7 @@ fn main() {
     println!("--- Starting RL Fine-Tuning ---");
     use burn::module::{AutodiffModule, Module};
     use burn::record::Recorder;
-    let record = trained.into_record();
+    let record = trained_model.into_record();
     let type_vocab_size = 1 + parser::program::TYPE_DECL_LENGTH;
     let action_vocab_size = 2 // Done, Shift
         + behavior.floats.as_ref().map_or(0, |v| v.len())
@@ -149,7 +153,6 @@ fn main() {
         + behavior.strings.as_ref().map_or(0, |v| v.len())
         + available_funcs.len();
 
-    type BackendAutoDiff = burn::backend::Autodiff<burn::backend::ndarray::NdArray>;
     let device = Default::default();
     let config = rl::model::ModelSize::Small.get_config(type_vocab_size, action_vocab_size);
 
