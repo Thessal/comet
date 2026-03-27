@@ -382,7 +382,14 @@ pub fn train(
     let model = config.init::<BackendAutoDiff>(&device);
     let config_optim = AdamConfig::new();
 
-    let artifact_dir = "/tmp/comet-supervised-rl-test";
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let mut artifact_path = std::env::temp_dir();
+    artifact_path.push(format!("comet-{}-{}", behavior.name, timestamp));
+    let artifact_dir_string = artifact_path.to_string_lossy().into_owned();
+    let artifact_dir = artifact_dir_string.as_str();
     std::fs::remove_dir_all(artifact_dir).ok();
 
     let training = SupervisedTraining::new(artifact_dir, dataloader_train, dataloader_valid)
@@ -460,10 +467,10 @@ pub fn generate(
         );
 
         let logits = inference_model.forward(input_tensor);
-        println!("Logits: {:?}", logits);
-        println!("Logits / temperature: {:?}", logits.clone() / temperature);
+        // println!("Logits: {:?}", logits);
+        // println!("Logits / temperature: {:?}", logits.clone() / temperature);
         let probs = burn::tensor::activation::softmax(logits / temperature, 2);
-        println!("Probs: {:?}", probs);
+        // println!("Probs: {:?}", probs);
 
         // Extract softmax probabilities. For NdArray backend, into_data().to_vec::<f32>() is safe.
         let probs_data = probs.into_data().to_vec::<f32>().unwrap();
@@ -494,8 +501,8 @@ pub fn generate(
                 *p = uniform;
             }
         }
-        println!("valid_candidates: {:?}", valid_candidates);
-        println!("valid_probs: {:?}", valid_probs);
+        // println!("valid_candidates: {:?}", valid_candidates);
+        // println!("valid_probs: {:?}", valid_probs);
 
         use rand::distributions::WeightedIndex;
         use rand::prelude::*;
