@@ -80,14 +80,14 @@ fn main() {
     println!("--- Available functions : {:?} ---", available_funcs);
 
     // Initialize central runtime
-    let mut runtime = runtime::runtime::Runtime::new(100, "data");
+    let mut runtime = runtime::runtime::Runtime::new(10000, "data");
 
-    // type BackendAutoDiff = burn::backend::Autodiff<burn::backend::Cuda>;
+    type BackendAutoDiff = burn::backend::Autodiff<burn::backend::Cuda>;
     // type BackendAutoDiff = burn::backend::Autodiff<burn::backend::Rocm>;
-    type BackendAutoDiff = burn::backend::Autodiff<burn::backend::ndarray::NdArray>;
+    // type BackendAutoDiff = burn::backend::Autodiff<burn::backend::ndarray::NdArray>;
 
     // 1) Build dataset, 2) Train transformer,
-    let sample = generate_valid_expressions(&behavior, &available_funcs, 100, &mut runtime);
+    let sample = generate_valid_expressions(&behavior, &available_funcs, 1000, &mut runtime);
     let trained_model = rl::supervised::train::<BackendAutoDiff>(
         &behavior,
         &available_funcs,
@@ -180,7 +180,7 @@ fn main() {
         }
     };
 
-    let target_epochs = 100;
+    let target_epochs = 1000;
     let rl_trained = rl::rl::train_rl(
         rl_model,
         &behavior,
@@ -188,7 +188,7 @@ fn main() {
         eval_fn,
         target_epochs, // epochs
         32,            // batch_size
-        1e-3,          // lr
+        1e-4,          // lr
         0.05,          // lambda_complexity (parsimony pressure)
         0.02,          // entropy_weight (exploration bonus)
     );

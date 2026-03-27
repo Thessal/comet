@@ -13,7 +13,7 @@ burn = { version = "0.20.1", features = [
     "tui",
     "metrics",
     "cuda",
-    "rocm",
+    # "rocm",
     "ndarray",
     "store",
 ] }
