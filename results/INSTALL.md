@@ -1,0 +1,1 @@
+cargo run --release --bin soln_sample

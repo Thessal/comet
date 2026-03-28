@@ -2,3 +2,4 @@
 /examples/data
 .comet_tmp_*
 *.so
+*.bin

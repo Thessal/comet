@@ -5929,6 +5929,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "results"
+version = "0.1.0"
+dependencies = [
+ "burn",
+ "clap",
+ "parser",
+ "rl",
+ "runtime",
+ "stdlib",
+]
+
+[[package]]
 name = "rgb"
 version = "0.8.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
