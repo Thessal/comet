@@ -30,11 +30,11 @@ Detection of transformer's reward hacking.
 ### Methods
 
 * Environment : shift-reduce sequence parser (See Astudillo 2020)
-* Policy : REINFOCE
+* Policy : Transformer based sequence generation, random sampling. (maybe setting temperature=0 is better to contrast the effect of EM vs risk-seeking choice)
+* Policy gradient : REINFORCE
 * State : shift-reduce parse stack and lookahead tokens (See Petersen 2021, Kamienny 2022)
 * Actions : shift [next, 5, 21, 252, 0.1, 0.5, 0.9, "volume", "adv20"], reduce [add, divide, ts_mean, ts_diff, consume_float, cs_rank], done (See Kamienny 2022)
 * Reward : Entropy adjusted position correlation
-* Architecture : Transformer
 
 
 ### Equation space 

@@ -82,12 +82,12 @@ fn main() {
     // Initialize central runtime
     let mut runtime = runtime::runtime::Runtime::new(10000, "data");
 
-    type BackendAutoDiff = burn::backend::Autodiff<burn::backend::Cuda>;
+    // type BackendAutoDiff = burn::backend::Autodiff<burn::backend::Cuda>;
     // type BackendAutoDiff = burn::backend::Autodiff<burn::backend::Rocm>;
-    // type BackendAutoDiff = burn::backend::Autodiff<burn::backend::ndarray::NdArray>;
+    type BackendAutoDiff = burn::backend::Autodiff<burn::backend::ndarray::NdArray>;
 
     // 1) Build dataset, 2) Train transformer,
-    let sample = generate_valid_expressions(&behavior, &available_funcs, 1000, &mut runtime);
+    let sample = generate_valid_expressions(&behavior, &available_funcs, 100, &mut runtime);
     let trained_model = rl::supervised::train::<BackendAutoDiff>(
         &behavior,
         &available_funcs,
