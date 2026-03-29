@@ -1,5 +1,9 @@
 ## Symbolic regession 
 
+* Genetic Algorithm use mutation to traverse in the expression space. \footfullcite{koza1989hierarchical}
+* Link prediction or RL approach genarates meaningful expressions by learning how to build good equation. \footfullcite{petersen2019deep}
+* End-to-end methods embeds input data distribution, and transform it into token sequence. \footfullcite{kamienny2022end}
+
 ### Introduction
 
 Using sequence generation model for polish notation of equation involves two step: 
