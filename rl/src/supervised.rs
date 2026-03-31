@@ -18,11 +18,20 @@ use parser::program::{BehaviorDecl, Ident, TYPE_DECL_LENGTH, TypeDecl};
 pub struct TransformerBatch<B: Backend> {
     pub inputs: Tensor<B, 3, Int>,
     pub targets: Tensor<B, 2, Int>,
+    pub available_actions: Tensor<B, 3, burn::tensor::Bool>,
 }
 
 impl<B: Backend> TransformerBatch<B> {
-    pub fn new(inputs: Tensor<B, 3, Int>, targets: Tensor<B, 2, Int>) -> Self {
-        Self { inputs, targets }
+    pub fn new(
+        inputs: Tensor<B, 3, Int>,
+        targets: Tensor<B, 2, Int>,
+        available_actions: Tensor<B, 3, burn::tensor::Bool>,
+    ) -> Self {
+        Self {
+            inputs,
+            targets,
+            available_actions,
+        }
     }
 }
 
@@ -31,13 +40,15 @@ impl<B: AutodiffBackend> TrainStep for TransformerModel<B> {
     type Output = ClassificationOutput<B>;
 
     fn step(&self, batch: TransformerBatch<B>) -> TrainOutput<ClassificationOutput<B>> {
-        let output = self.forward(batch.inputs);
+        let output = self.forward(batch.inputs, batch.available_actions);
         let [batch_size, seq_length, vocab_size] = output.dims();
         let device = output.device();
 
         // Flatten sequence dimension
         let output_flat = output.reshape([batch_size * seq_length, vocab_size]);
         let targets_flat = batch.targets.reshape([batch_size * seq_length]);
+        // println!("output_flat {:?}", output_flat);
+        // println!("targets_flat {:?}", targets_flat);
 
         let loss = CrossEntropyLossConfig::new()
             .init(&device)
@@ -60,7 +71,7 @@ impl<B: Backend> InferenceStep for TransformerModel<B> {
     type Output = ClassificationOutput<B>;
 
     fn step(&self, batch: TransformerBatch<B>) -> ClassificationOutput<B> {
-        let output = self.forward(batch.inputs);
+        let output = self.forward(batch.inputs, batch.available_actions);
         let [batch_size, seq_length, vocab_size] = output.dims();
         let device = output.device();
 
@@ -116,14 +127,14 @@ pub fn action_to_id(
         .map(|v| v.as_slice())
         .unwrap_or(&[]);
 
-    let base_ints = 2; // Done is 0, Shift is 1
+    let base_ints = 3; // Pad is 0, Done is 1, Shift is 2
     let base_floats = base_ints + ints.len();
     let base_strings = base_floats + floats.len();
     let base_funcs = base_strings + strings.len();
 
     match action {
-        Action::Done => 0,
-        Action::Shift => 1,
+        Action::Done => 1,
+        Action::Shift => 2,
         Action::ShiftInteger(v) => {
             let idx = ints.iter().position(|x| x == v).unwrap_or(0);
             base_ints + idx
@@ -196,6 +207,7 @@ pub fn encode_state(state: &SearchState, prev_action_id: usize) -> [usize; 8] {
 pub struct TransformerBatchItem {
     pub states: Vec<[usize; 8]>,
     pub targets: Vec<usize>,
+    pub available_actions: Vec<Vec<bool>>,
 }
 
 #[derive(Clone)]
@@ -230,18 +242,35 @@ impl ProgramSequenceDataset {
             behavior.integers.clone().unwrap_or_default(),
             behavior.floats.clone().unwrap_or_default(),
             behavior.strings.clone().unwrap_or_default(),
-            false,
+            true,
         );
+
+        let action_vocab_size = 3 // Pad, Done, Shift
+            + behavior.floats.as_ref().map_or(0, |v| v.len())
+            + behavior.integers.as_ref().map_or(0, |v| v.len())
+            + behavior.strings.as_ref().map_or(0, |v| v.len())
+            + available_funcs.len();
 
         for sample in samples {
             // Replay the sample sequence to extract state action pairs
             let mut current_state = initial_state.clone();
             let mut states = Vec::new();
             let mut targets = Vec::new();
+            let mut available_actions_seq = Vec::new();
 
             let mut prev_action_id = 0; // Pad/Unknown for first step
 
             for a in &sample.actions {
+                let valid_actions = env.get_valid_actions(&current_state, available_funcs);
+                let mut available_mask = vec![false; action_vocab_size];
+                for valid_a in &valid_actions {
+                    let id = action_to_id(valid_a, behavior, available_funcs);
+                    if id < action_vocab_size {
+                        available_mask[id] = true;
+                    }
+                }
+                available_actions_seq.push(available_mask);
+
                 let action = string_to_action(a);
                 let target_id = action_to_id(&action, behavior, available_funcs);
 
@@ -258,12 +287,26 @@ impl ProgramSequenceDataset {
             }
 
             // Finally, add the Done action target!
+            let valid_actions = env.get_valid_actions(&current_state, available_funcs);
+            let mut available_mask = vec![false; action_vocab_size];
+            for valid_a in &valid_actions {
+                let id = action_to_id(valid_a, behavior, available_funcs);
+                if id < action_vocab_size {
+                    available_mask[id] = true;
+                }
+            }
+            available_actions_seq.push(available_mask);
+
             let target_id = action_to_id(&Action::Done, behavior, available_funcs);
             let state_tensor = encode_state(&current_state, prev_action_id);
             states.push(state_tensor);
             targets.push(target_id);
 
-            items.push(TransformerBatchItem { states, targets });
+            items.push(TransformerBatchItem {
+                states,
+                targets,
+                available_actions: available_actions_seq,
+            });
         }
 
         Self { items }
@@ -282,11 +325,15 @@ impl Dataset<TransformerBatchItem> for ProgramSequenceDataset {
 #[derive(Clone)]
 pub struct TransformerBatcher {
     max_seq_len: usize,
+    action_vocab_size: usize,
 }
 
 impl TransformerBatcher {
-    pub fn new(max_seq_len: usize) -> Self {
-        Self { max_seq_len }
+    pub fn new(max_seq_len: usize, action_vocab_size: usize) -> Self {
+        Self {
+            max_seq_len,
+            action_vocab_size,
+        }
     }
 }
 
@@ -296,6 +343,8 @@ impl<B: Backend> Batcher<B, TransformerBatchItem, TransformerBatch<B>> for Trans
 
         let mut inputs_data = Vec::with_capacity(batch_size * self.max_seq_len * 8);
         let mut targets_data = Vec::with_capacity(batch_size * self.max_seq_len);
+        let mut available_masks_data =
+            Vec::with_capacity(batch_size * self.max_seq_len * self.action_vocab_size);
 
         for item in items.iter() {
             let seq_len = item.states.len();
@@ -303,10 +352,14 @@ impl<B: Backend> Batcher<B, TransformerBatchItem, TransformerBatch<B>> for Trans
                 if t < seq_len {
                     inputs_data.extend_from_slice(&item.states[t]);
                     targets_data.push(item.targets[t] as i32);
+                    available_masks_data.extend_from_slice(&item.available_actions[t]);
                 } else {
-                    // Padding: states = [0; 8], target = 0 (Done, or some ignore index)
+                    // Padding: states = [0; 8], target = 0 (Pad index)
                     inputs_data.extend_from_slice(&[0; 8]);
                     targets_data.push(0);
+                    let mut mask = vec![false; self.action_vocab_size];
+                    mask[0] = true; // Allow Pad action safely so Softmax distribution doesn't collapse to NaN
+                    available_masks_data.extend(mask);
                 }
             }
         }
@@ -325,8 +378,15 @@ impl<B: Backend> Batcher<B, TransformerBatchItem, TransformerBatch<B>> for Trans
             TensorData::new(targets_data, [batch_size, self.max_seq_len]),
             device,
         );
+        let available_actions_tensor = burn::tensor::Tensor::<B, 3, burn::tensor::Bool>::from_bool(
+            burn::tensor::TensorData::new(
+                available_masks_data,
+                [batch_size, self.max_seq_len, self.action_vocab_size],
+            ),
+            device,
+        );
 
-        TransformerBatch::new(inputs_tensor, targets_tensor)
+        TransformerBatch::new(inputs_tensor, targets_tensor, available_actions_tensor)
     }
 }
 
@@ -354,8 +414,14 @@ pub fn train<B: burn::tensor::backend::AutodiffBackend>(
 
     let device = <B as Backend>::Device::default();
 
-    let batcher_train = TransformerBatcher::new(32);
-    let batcher_valid = TransformerBatcher::new(32);
+    let action_vocab_size = 3 // Pad, Done, Shift
+        + behavior.floats.as_ref().map_or(0, |v| v.len())
+        + behavior.integers.as_ref().map_or(0, |v| v.len())
+        + behavior.strings.as_ref().map_or(0, |v| v.len())
+        + available_funcs.len();
+
+    let batcher_train = TransformerBatcher::new(32, action_vocab_size);
+    let batcher_valid = TransformerBatcher::new(32, action_vocab_size);
 
     let dataloader_train = DataLoaderBuilder::new(batcher_train)
         .batch_size(batch_size)
@@ -369,12 +435,12 @@ pub fn train<B: burn::tensor::backend::AutodiffBackend>(
 
     println!("--- Initializing Transformer Model ---");
     let type_vocab_size = 1 + TYPE_DECL_LENGTH; // 0 = PAD
-    let action_vocab_size = 2 // Done and Shift
+    let action_vocab_size2 = 3 // Pad, Done, Shift
         + behavior.floats.as_ref().map_or(0, |v| v.len())
         + behavior.integers.as_ref().map_or(0, |v| v.len())
         + behavior.strings.as_ref().map_or(0, |v| v.len())
         + available_funcs.len();
-    let config = ModelSize::Small.get_config(type_vocab_size, action_vocab_size);
+    let config = ModelSize::Small.get_config(type_vocab_size, action_vocab_size2);
     let model = config.init::<B>(&device);
     let config_optim = AdamConfig::new();
 
@@ -422,7 +488,7 @@ pub fn generate<B: burn::tensor::backend::Backend>(
         behavior.integers.clone().unwrap_or_default(),
         behavior.floats.clone().unwrap_or_default(),
         behavior.strings.clone().unwrap_or_default(),
-        true, // insert constants only when unprocessed param length < 3
+        true, // insert constants only when unprocessed param length < 5
     );
     let mut state = crate::search::SearchState {
         unprocessed_params: behavior
@@ -456,12 +522,30 @@ pub fn generate<B: burn::tensor::backend::Backend>(
         let encoded = encode_state(&state, prev_action_id);
         let encoded_i32: Vec<i32> = encoded.iter().map(|&x| x as i32).collect();
 
+        let action_vocab_size = 3 // Pad, Done, Shift
+            + behavior.floats.as_ref().map_or(0, |v| v.len())
+            + behavior.integers.as_ref().map_or(0, |v| v.len())
+            + behavior.strings.as_ref().map_or(0, |v| v.len())
+            + available_funcs.len();
+
+        let mut available_mask = vec![false; action_vocab_size];
+        for a in &valid_actions {
+            let id = action_to_id(a, behavior, available_funcs);
+            if id < action_vocab_size {
+                available_mask[id] = true;
+            }
+        }
+        let available_tensor = burn::tensor::Tensor::<B, 3, burn::tensor::Bool>::from_bool(
+            burn::tensor::TensorData::new(available_mask, [1, 1, action_vocab_size]),
+            &device,
+        );
+
         let input_tensor = Tensor::<B, 3, burn::tensor::Int>::from_data(
             burn::tensor::TensorData::new(encoded_i32, [1, 1, 8]),
             &device,
         );
 
-        let logits = inference_model.forward(input_tensor);
+        let logits = inference_model.forward(input_tensor, available_tensor);
         // println!("Logits: {:?}", logits);
         // println!("Logits / temperature: {:?}", logits.clone() / temperature);
         let probs = burn::tensor::activation::softmax(logits / temperature, 2);
@@ -577,7 +661,8 @@ mod tests {
         assert_eq!(item.targets.len(), 4);
 
         let device = <B as burn::tensor::backend::Backend>::Device::default();
-        let batcher = TransformerBatcher::new(8); // pad to 8
+        let action_vocab_size = 3 + 1; // Pad, Done, Shift, "add"
+        let batcher = TransformerBatcher::new(8, action_vocab_size); // pad to 8
 
         let batch: TransformerBatch<B> = batcher.batch(vec![item], &device);
 

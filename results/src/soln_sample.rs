@@ -1,6 +1,7 @@
 use parser::parser::parse;
 use parser::program::Declaration;
 use runtime::backtest::mockbacktester;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -8,13 +9,20 @@ fn evaluate_samples(
     samples_seqs: Vec<Vec<String>>,
     call_args: Vec<String>,
     runtime: &mut runtime::runtime::Runtime,
-) -> Vec<(Vec<String>, Vec<f64>, Vec<f64>)> {
+) -> Vec<(
+    Vec<std::string::String>,
+    Vec<HashMap<std::string::String, f64>>,
+    Vec<f64>,
+)> {
     let mut results = Vec::new();
     for seq in samples_seqs {
         match runtime.evaluate_sequence(&seq, call_args.clone()) {
             Ok(stdlib::ParamType::DataFrame(output)) => {
                 let pnl = runtime::backtest::mockbacktester(&mut runtime.dmgr, &output);
-                let fitness = runtime::fitness::evaluate_fitness(&mut runtime.dmgr, &output);
+                let fitness = runtime::fitness::evaluate_fitness_batch_add_value(
+                    &mut runtime.dmgr,
+                    &[&output],
+                );
                 results.push((seq, fitness, pnl));
             }
             _ => {
@@ -25,7 +33,14 @@ fn evaluate_samples(
     results
 }
 
-fn write_json(path: &Path, results: &Vec<(Vec<String>, Vec<f64>, Vec<f64>)>) {
+fn write_json(
+    path: &Path,
+    results: &Vec<(
+        Vec<String>,
+        Vec<HashMap<std::string::String, f64>>,
+        Vec<f64>,
+    )>,
+) {
     let mut file = fs::File::create(path).unwrap();
     use std::io::Write;
     write!(file, "[\n").unwrap();
@@ -43,7 +58,7 @@ fn write_json(path: &Path, results: &Vec<(Vec<String>, Vec<f64>, Vec<f64>)>) {
         // Write fitness
         let fit_str = fit
             .iter()
-            .map(|f| format!("{}", f))
+            .map(|f| format!("{:?}", f))
             .collect::<Vec<_>>()
             .join(", ");
         write!(file, "    \"fitness\": [{}],\n", fit_str).unwrap();
@@ -189,8 +204,8 @@ fn main() {
                 .init::<BackendAutoDiff>(&device)
                 .load_record(rl_record);
 
-            println!("Sampling 1000 equations from RL model...");
-            for _ in 0..1000 {
+            println!("Sampling 10 equations from RL model...");
+            for _ in 0..10 {
                 let generated =
                     rl::supervised::generate(&behavior, &available_funcs, &rl_model, 1.0);
                 model_samples_seqs.push(generated);
@@ -202,15 +217,15 @@ fn main() {
         println!("Evaluating Model samples...");
         let model_results = evaluate_samples(model_samples_seqs, call_args.clone(), &mut runtime);
         println!("Model yields {} valid executions", model_results.len());
-        let out_model = trial_dir.join("soln_model_1000.json");
+        let out_model = trial_dir.join("soln_model_10_2.json");
         write_json(&out_model, &model_results);
 
-        println!("Sampling 1000 equations from Random Agent via generate_top_k_samples...");
+        println!("Sampling 100 equations from Random Agent via generate_top_k_samples...");
         // generate_top_k_samples returns distinct valid samples
         let random_evaluated = rl::search::generate_top_k_samples(
             &behavior,
             &available_funcs,
-            1000,
+            100,
             |fitness| fitness.first().copied().unwrap_or(0.0) != -99999.0, // Accept any valid parsed output
             &mut runtime,
         );
@@ -222,7 +237,7 @@ fn main() {
         println!("Evaluating Random samples...");
         let random_results = evaluate_samples(random_samples_seqs, call_args.clone(), &mut runtime);
         println!("Random yields {} valid executions", random_results.len());
-        let out_random = trial_dir.join("soln_random_1000.json");
+        let out_random = trial_dir.join("soln_random_10_2.json");
         write_json(&out_random, &random_results);
     }
 }

@@ -169,23 +169,13 @@ fn main() {
         .init::<BackendAutoDiff>(&device)
         .load_record(rl_record);
 
-    let mut eval_fn = |sequence: &[String]| -> f64 {
-        match runtime.evaluate_sequence(sequence, call_args.clone()) {
-            Ok(stdlib::ParamType::DataFrame(output)) => {
-                let fitness = runtime::fitness::evaluate_fitness(&mut runtime.dmgr, &output);
-                // Multi-objective fitness returns a vector; use the first metric
-                100. * fitness.first().copied().unwrap_or(0.0)
-            }
-            _ => 0.0, // Failed runtime evaluations score 0
-        }
-    };
-
     let target_epochs = 1000;
     let rl_trained = rl::rl::train_rl(
         rl_model,
         &behavior,
         &available_funcs,
-        eval_fn,
+        &mut runtime,
+        call_args.clone(),
         target_epochs, // epochs
         32,            // batch_size
         1e-4,          // lr
@@ -213,7 +203,10 @@ fn main() {
 
         match runtime.evaluate_sequence(&generated_sequence, call_args.clone()) {
             Ok(stdlib::ParamType::DataFrame(output)) => {
-                let fitness = runtime::fitness::evaluate_fitness(&mut runtime.dmgr, &output);
+                let fitness = runtime::fitness::evaluate_fitness_batch_add_value(
+                    &mut runtime.dmgr,
+                    &[&output],
+                );
                 println!("Inference Sample Fitness = {:?}", fitness);
                 break;
             }

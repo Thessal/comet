@@ -28,12 +28,14 @@ pub struct TransformerModelConfig {
 impl TransformerModelConfig {
     pub fn init<B: Backend>(&self, device: &B::Device) -> TransformerModel<B> {
         let type_embedding = EmbeddingConfig::new(self.type_vocab_size, self.d_model).init(device);
-        let action_embedding = EmbeddingConfig::new(self.action_vocab_size, self.d_model).init(device);
+        let action_embedding =
+            EmbeddingConfig::new(self.action_vocab_size, self.d_model).init(device);
 
         // A small local transformer encoder to process the 8 state tokens into a cohesive vector
-        let state_encoder = TransformerEncoderConfig::new(self.d_model, self.d_ff, self.num_heads, 1) // 1 layer is sufficient for the local state
-            .with_dropout(self.dropout)
-            .init(device);
+        let state_encoder =
+            TransformerEncoderConfig::new(self.d_model, self.d_ff, self.num_heads, 1) // 1 layer is sufficient for the local state
+                .with_dropout(self.dropout)
+                .init(device);
 
         let pos_embedding = EmbeddingConfig::new(self.max_seq_length, self.d_model).init(device);
 
@@ -112,16 +114,21 @@ impl<B: Backend> TransformerModel<B> {
     /// Forward pass processing a sequence of state arrays.
     /// `states` shape: [batch_size, seq_length, state_size]
     /// Output shape: [batch_size, seq_length, action_vocab_size]
-    pub fn forward(&self, states: Tensor<B, 3, burn::tensor::Int>) -> Tensor<B, 3> {
+    pub fn forward(
+        &self,
+        states: Tensor<B, 3, burn::tensor::Int>,
+        available_actions: Tensor<B, 3, burn::tensor::Bool>,
+    ) -> Tensor<B, 3> {
         let [batch_size, seq_length, _state_size] = states.dims();
         let device = &states.device();
 
         // 1. Split PREV_ACTION and TYPES and flatten to 2D
         // prev_action shape: [batch_size * seq_length, 1]
-        let prev_action = states.clone()
+        let prev_action = states
+            .clone()
             .slice([0..batch_size, 0..seq_length, 0..1])
             .reshape([batch_size * seq_length, 1]);
-            
+
         // type_tokens shape: [batch_size * seq_length, state_size - 1]
         let type_tokens = states
             .slice([0..batch_size, 0..seq_length, 1..self.state_size])
@@ -129,17 +136,21 @@ impl<B: Backend> TransformerModel<B> {
 
         // Embed individually
         let prev_action_emb = self.action_embedding.forward(prev_action); // [batch*seq, 1, d_model]
-        let types_emb = self.type_embedding.forward(type_tokens);         // [batch*seq, 7, d_model]
-        
+        let types_emb = self.type_embedding.forward(type_tokens); // [batch*seq, 7, d_model]
+
         // Re-combine sequences along the explicit state token dimension (dim=1)
         let states_flat = Tensor::cat(vec![prev_action_emb, types_emb], 1); // [batch*seq, 8, d_model]
 
         // 2. Hierarchical State Encoding (over the 8 local tokens)
-        let state_encoded = self.state_encoder.forward(TransformerEncoderInput::new(states_flat));
+        let state_encoded = self
+            .state_encoder
+            .forward(TransformerEncoderInput::new(states_flat));
 
         // Mean pool across the 8 encoded tokens to yield a single comprehensive state semantic vector
         // Mean pooling over dim 1 yields [batch*seq, 1, d_model]
-        let x = state_encoded.mean_dim(1).reshape([batch_size, seq_length, self.d_model]);
+        let x = state_encoded
+            .mean_dim(1)
+            .reshape([batch_size, seq_length, self.d_model]);
 
         // 3. Add sequence positional encoding
         let pos_indices = Tensor::arange(0..seq_length as i64, device)
@@ -157,7 +168,10 @@ impl<B: Backend> TransformerModel<B> {
         let encoded = self.encoder.forward(input);
 
         // 6. Predict next action
-        self.output_proj.forward(encoded)
+        let logits = self.output_proj.forward(encoded);
+
+        let is_invalid = available_actions.bool_not();
+        logits.mask_fill(is_invalid, -f32::INFINITY)
     }
 }
 
@@ -190,23 +204,22 @@ mod tests {
             &device,
         );
 
+        let available_mask = Tensor::<Backend, 3, burn::tensor::Bool>::from_bool(
+            burn::tensor::TensorData::new(
+                vec![false, true, false, true, false],
+                [1, 1, 5]
+            ),
+            &device,
+        );
+        let available_actions = available_mask;
+
         // 3. Run Forward Pass (predict logits over the action vocabulary space)
-        let logits = model.forward(states);
+        let logits = model.forward(states, available_actions);
 
         // Output logits shape is [batch_size=1, seq_length=1, action_vocab_size=5]
         assert_eq!(logits.dims(), [1, 1, 5]);
 
-        // 4. Action Masking Logic!
-        // Suppose the environment dictates that ONLY actions 1 (Shift) and 3 (Reduce_B) are structurally valid right now.
-        // We build a boolean mask where `true` means INVALID (so we can mask them out).
-        let is_invalid_action_mask = Tensor::<Backend, 3, burn::tensor::Bool>::from_bool(
-            TensorData::from([[[true, false, true, false, true]]]),
-            &device,
-        );
-
-        // 5. Mask invalid elements down to negative infinity so they have zero probability after Softmax
-        // `mask_fill` fills elements where the mask is TRUE.
-        let masked_logits = logits.mask_fill(is_invalid_action_mask, -f32::INFINITY);
+        let masked_logits = logits;
 
         // 6. Compute action probabilities
         // Softmax across the action vocabulary dimension (dim 2)
@@ -237,7 +250,7 @@ mod tests {
         let device = Default::default();
         let config = ModelSize::Small.get_config(20, 20); // typical vocab sizes
         let model = config.init::<Backend>(&device);
-        
+
         println!("Transformer Architecture:\n{}", model);
         // Burn implicitly calculates total trainable parameters and sizes upon module formatting.
     }

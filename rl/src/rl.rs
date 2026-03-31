@@ -22,6 +22,7 @@ pub fn update_parameters<B: AutodiffBackend, M: AutodiffModule<B>>(
 struct Trajectory {
     states: Vec<[usize; 8]>,
     actions: Vec<usize>,
+    valid_actions_mask: Vec<Vec<bool>>,
     sequence: Vec<String>,
 }
 
@@ -51,9 +52,16 @@ fn sample_trajectory<B: Backend>(
         sequence: vec![],
     };
 
+    let action_vocab_size = 3 // Pad, Done, Shift
+        + behavior.floats.as_ref().map_or(0, |v| v.len())
+        + behavior.integers.as_ref().map_or(0, |v| v.len())
+        + behavior.strings.as_ref().map_or(0, |v| v.len())
+        + available_funcs.len();
+
     let mut traj = Trajectory {
         states: vec![],
         actions: vec![],
+        valid_actions_mask: vec![],
         sequence: vec![],
     };
 
@@ -77,6 +85,16 @@ fn sample_trajectory<B: Backend>(
             let action_id =
                 crate::supervised::action_to_id(&Action::Done, behavior, available_funcs);
             traj.actions.push(action_id);
+
+            let mut available_mask = vec![false; action_vocab_size];
+            for a in &valid_actions {
+                let id = crate::supervised::action_to_id(a, behavior, available_funcs);
+                if id < action_vocab_size {
+                    available_mask[id] = true;
+                }
+            }
+            traj.valid_actions_mask.push(available_mask);
+
             break; // Stop immediately upon reaching Done state natively.
         }
 
@@ -95,7 +113,22 @@ fn sample_trajectory<B: Backend>(
         let encoded_i32: Vec<i32> = encoded.iter().map(|&x| x as i32).collect();
         let input_tensor =
             Tensor::<B, 3, Int>::from_data(TensorData::new(encoded_i32, [1, 1, 8]), device);
-        let logits = inference_model.forward(input_tensor);
+
+        let mut available_mask = vec![false; action_vocab_size];
+        for a in &valid_actions {
+            let id = crate::supervised::action_to_id(a, behavior, available_funcs);
+            if id < action_vocab_size {
+                available_mask[id] = true;
+            }
+        }
+        traj.valid_actions_mask.push(available_mask.clone());
+
+        let available_tensor = burn::tensor::Tensor::<B, 3, burn::tensor::Bool>::from_bool(
+            TensorData::new(available_mask, [1, 1, action_vocab_size]),
+            device,
+        );
+
+        let logits = inference_model.forward(input_tensor, available_tensor);
         let probs = burn::tensor::activation::softmax(logits / temperature, 2);
         let probs_data = probs.into_data().to_vec::<f32>().unwrap();
 
@@ -138,20 +171,18 @@ fn sample_trajectory<B: Backend>(
     traj
 }
 
-pub fn train_rl<B: AutodiffBackend, F>(
+pub fn train_rl<B: AutodiffBackend>(
     mut model: TransformerModel<B>,
     behavior: &BehaviorDecl,
     available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
-    mut eval_fn: F,
+    runtime: &mut runtime::runtime::Runtime,
+    call_args: Vec<String>,
     epochs: usize,
     batch_size: usize,
     learning_rate: f64,
     lambda_complexity: f64,
     entropy_weight: f64,
-) -> TransformerModel<B>
-where
-    F: FnMut(&[String]) -> f64,
-{
+) -> TransformerModel<B> {
     use burn::optim::AdamConfig;
     let device = <B as Backend>::Device::default();
     let config_optim = AdamConfig::new();
@@ -174,10 +205,40 @@ where
             ));
         }
 
+        let sequences: Vec<&[String]> = trajs.iter().map(|t| t.sequence.as_slice()).collect();
+
+        let mut parsed_outputs = Vec::new();
+        for seq in &sequences {
+            match runtime.evaluate_sequence(seq, call_args.clone()) {
+                Ok(stdlib::ParamType::DataFrame(output)) => {
+                    parsed_outputs.push(Some(output));
+                }
+                _ => {
+                    parsed_outputs.push(None); // Penality placeholder
+                }
+            }
+        }
+
+        let mut valid_refs = Vec::new();
+        for out in &parsed_outputs {
+            if let Some(o) = out {
+                valid_refs.push(o.as_slice());
+            } else {
+                valid_refs.push(&[]);
+            }
+        }
+
+        let batch_fitness =
+            runtime::fitness::evaluate_fitness_batch_add_value(&mut runtime.dmgr, &valid_refs);
+
+        let fitnesses: Vec<f64> = batch_fitness
+            .into_iter()
+            .map(|metrics| runtime::fitness::fitness_summary(&metrics))
+            .collect();
+
         let mut rewards = Vec::new();
-        for traj in &trajs {
-            let fitness = eval_fn(&traj.sequence);
-            let reward = fitness - lambda_complexity * (traj.sequence.len() as f64);
+        for (i, traj) in trajs.iter().enumerate() {
+            let reward = fitnesses[i] - lambda_complexity * (traj.sequence.len() as f64);
             rewards.push(reward);
         }
 
@@ -199,10 +260,17 @@ where
             .unwrap_or(1)
             .max(1);
 
+        let action_vocab_size = 3 // Pad, Done, Shift
+            + behavior.floats.as_ref().map_or(0, |v| v.len())
+            + behavior.integers.as_ref().map_or(0, |v| v.len())
+            + behavior.strings.as_ref().map_or(0, |v| v.len())
+            + available_funcs.len();
+
         let mut inputs_data = Vec::with_capacity(batch_size * max_seq_len * 8);
         let mut actions_data = Vec::with_capacity(batch_size * max_seq_len);
         let mut advantages_data = Vec::with_capacity(batch_size * max_seq_len);
         let mut mask_data = Vec::with_capacity(batch_size * max_seq_len);
+        let mut valid_mask_data = Vec::with_capacity(batch_size * max_seq_len * action_vocab_size);
 
         for (i, traj) in trajs.iter().enumerate() {
             let seq_len = traj.states.len();
@@ -213,11 +281,15 @@ where
                     actions_data.push(traj.actions[t] as i32);
                     advantages_data.push(adv);
                     mask_data.push(1.0f32);
+                    valid_mask_data.extend_from_slice(&traj.valid_actions_mask[t]);
                 } else {
                     inputs_data.extend_from_slice(&[0; 8]);
                     actions_data.push(0);
                     advantages_data.push(0.0);
                     mask_data.push(0.0);
+                    let mut pad_mask = vec![false; action_vocab_size];
+                    pad_mask[0] = true;
+                    valid_mask_data.extend(pad_mask);
                 }
             }
         }
@@ -248,8 +320,16 @@ where
             &device,
         );
 
+        let available_actions_tensor = Tensor::<B, 3, burn::tensor::Bool>::from_bool(
+            TensorData::new(
+                valid_mask_data,
+                [batch_size, max_seq_len, action_vocab_size],
+            ),
+            &device,
+        );
+
         // Forward Pass (WITH gradients across batch!)
-        let logits = model.forward(inputs_tensor); // [batch, max_seq_len, vocab_size]
+        let logits = model.forward(inputs_tensor, available_actions_tensor.clone()); // [batch, max_seq_len, vocab_size]
         let probs = burn::tensor::activation::softmax(logits.clone(), 2);
         let log_probs = burn::tensor::activation::log_softmax(logits, 2);
 
@@ -265,7 +345,10 @@ where
         let policy_loss_mean = policy_loss.sum_dim(1).mean();
 
         // Entropy Bonus = - sum( p * log(p) )
-        let entropy = (probs * log_probs)
+        // To avoid NaN from 0 * -inf, we mask log_probs to 0 where available_actions is false
+        let is_invalid = available_actions_tensor.bool_not();
+        let safe_log_probs = log_probs.mask_fill(is_invalid, 0.0);
+        let entropy = (probs * safe_log_probs)
             .sum_dim(2)
             .mul_scalar(-1.0_f32)
             .reshape([batch_size, max_seq_len]);

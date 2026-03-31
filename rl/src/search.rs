@@ -25,7 +25,7 @@ pub struct SearchEnv {
     pub available_integers: Vec<i64>,
     pub available_floats: Vec<f64>,
     pub available_strings: Vec<String>,
-    pub limit_introducing_constants: bool,
+    pub limit_introducing_constants_too_much: bool,
 }
 
 impl SearchEnv {
@@ -41,7 +41,7 @@ impl SearchEnv {
             available_integers,
             available_floats,
             available_strings,
-            limit_introducing_constants,
+            limit_introducing_constants_too_much: limit_introducing_constants,
         }
     }
 
@@ -63,8 +63,9 @@ impl SearchEnv {
             actions.push(Action::Shift);
         }
 
-        // We limit random constant generation depth to keep searches feasible.
-        if self.limit_introducing_constants && (state.stack.len() < 3) {
+        // If limit_introducing_constants_too_much is true, prevent increasing stack size by introducing constants over 3.
+        // It prevents expression search space explosion like function_call(1,2,3,4,5,6, ..., 99).
+        if self.limit_introducing_constants_too_much && (state.stack.len() < 5) {
             for &i in &self.available_integers {
                 actions.push(Action::ShiftInteger(i));
             }
@@ -231,12 +232,22 @@ pub fn generate_top_k_samples(
         true,
     );
 
-    let mut sample_count = 0;
     let mut attempts = 0;
-    while sample_count < num_samples && attempts < 50000 * top_k {
-        print!("Attempt: {}\r", attempts);
+
+    // 1. Generate a large pool of structurally valid sequences first
+    let target_pool = num_samples * 20; // Ensure a sizable target objective portfolio context
+    let mut structurally_valid_sequences = Vec::new();
+
+    while structurally_valid_sequences.len() < target_pool && attempts < 50000 * top_k {
+        print!(
+            "Attempt: {} | Pool: {}/{}\r",
+            attempts,
+            structurally_valid_sequences.len(),
+            target_pool
+        );
         let _ = std::io::stdout().flush();
         attempts += 1;
+
         let mut current_state = initial_state.clone();
         let mut hit_done = false;
 
@@ -274,25 +285,46 @@ pub fn generate_top_k_samples(
         }
 
         if hit_done {
-            let fitness =
-                match runtime.evaluate_sequence(&current_state.sequence, param_names.clone()) {
-                    Ok(ParamType::DataFrame(output)) => {
-                        runtime::fitness::evaluate_fitness(&mut runtime.dmgr, &output)
-                    }
-                    _ => vec![-1.0], // Penalize runtime failure
-                };
-            if selection_rule(&fitness) {
-                samples.push(EvaluatedSample {
-                    actions: current_state.sequence.clone(),
-                    fitness,
-                });
-                sample_count += 1;
-            }
+            structurally_valid_sequences.push(current_state.sequence);
         }
     }
     println!();
 
-    // Sort descending by fitness
+    // 2. Evaluate all valid structure sequences sequentially
+    let mut parsed_outputs = Vec::new();
+    let mut valid_indices = Vec::new();
+    for (i, seq) in structurally_valid_sequences.iter().enumerate() {
+        match runtime.evaluate_sequence(seq, param_names.clone()) {
+            Ok(stdlib::ParamType::DataFrame(output)) => {
+                parsed_outputs.push(output);
+                valid_indices.push(i);
+            }
+            _ => {}
+        }
+    }
+
+    // 3. Batch evaluating native portfolio math (marginal Value-Added Sharpe combinations)
+    let valid_refs: Vec<&[Vec<f64>]> = parsed_outputs.iter().map(|o| o.as_slice()).collect();
+    let batch_fitness =
+        runtime::fitness::evaluate_fitness_batch_add_value(&mut runtime.dmgr, &valid_refs);
+
+    let mut fitness_scores = vec![vec![-1.0]; structurally_valid_sequences.len()];
+    for (idx, metrics) in valid_indices.into_iter().zip(batch_fitness.into_iter()) {
+        fitness_scores[idx] = vec![runtime::fitness::fitness_summary(&metrics)];
+    }
+
+    // 4. Construct samples structurally and securely filter mapping mathematically
+    for (i, seq) in structurally_valid_sequences.into_iter().enumerate() {
+        let fitness = fitness_scores[i].clone();
+        if selection_rule(&fitness) {
+            samples.push(EvaluatedSample {
+                actions: seq,
+                fitness,
+            });
+        }
+    }
+
+    // 5. Sort descending by fitness
     samples.sort_by(|a, b| {
         let f_a = a.fitness.first().copied().unwrap_or(-1.0);
         let f_b = b.fitness.first().copied().unwrap_or(-1.0);
