@@ -1,20 +1,11 @@
-# Fn data(symbol: String) -> DataFrame
-# Fn consume_float(b: Float Optional) -> Void
-# Fn cs_rank(a: DataFrame) -> DataFrame Normalized
-# Fn cs_rank_nonzero(a: DataFrame, eps: Float Nonzero) -> DataFrame Normalized Nonzero
-# Fn ts_diff(a: DataFrame 'a, delay: Int) -> DataFrame 'a Indicator
-# Fn subtract(a: DataFrame 'a, b:DataFrame 'a) -> DataFrame 'a Indicator
-# Fn divide(a: DataFrame 'a, b: DataFrame 'a Nonzero) -> DataFrame 'a Indicator
-
 Behavior Comparator(signal: DataFrame, eps: Float, reference: DataFrame) {
-    weights="behavior_2_compare.pth", train=true, supervised_epochs=100
+    weights="behavior_1_compare.pth", train=true, supervised_epochs=100,
+    operators = [add, divide, ts_mean, ts_diff, consume_float, cs_rank, ts_rank, cs_zscore, ts_zscore],
+    integers = [5, 21, 252], floats = [0.1, 0.5, 0.9, 5.0, 21.0, 252.0], strings=["volume", "adv20"]
 } -> DataFrame
 
 Flow volume_spike {
     volume = data("volume")
     adv20 = data("adv20")
-    eps_levels = [0.1, 0.5, 1.0]
-    x = Comparator(volume, adv20, eps_levels)
-    variousdays = [1, 5, 21, 252]
-    ts_diff(x, variousdays)
-}  
+    Comparator(volume, 0.1, adv20)
+}

@@ -11,6 +11,7 @@ impl CsZscoreState {
         CsZscoreState { len }
     }
 }
+
 impl UnaryOp for CsZscoreState {
     fn step(&mut self, a: crate::CometData, out_ptr: *mut f64) {
         let len = self.len;
@@ -56,10 +57,4 @@ impl UnaryOp for CsZscoreState {
     }
 }
 
-
-inventory::submit! {
-    crate::OperatorMeta {
-        name: "cs_zscore",
-        output_shape: crate::OutputShape::DataFrame,
-    }
-}
+crate::register_unary_op!(CsZscoreState, "cs_zscore");

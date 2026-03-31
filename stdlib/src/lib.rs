@@ -4,19 +4,28 @@
 pub mod add;
 pub mod consume_float;
 pub mod cs_rank;
+pub mod cs_zscore;
 pub mod data;
 pub mod divide;
 pub mod multiply;
 pub mod subtract;
 pub mod ts_diff;
 pub mod ts_mean;
+pub mod ts_rank;
+pub mod ts_zscore;
 
 #[cfg(test)]
 mod test_cs_rank;
 #[cfg(test)]
+mod test_cs_zscore;
+#[cfg(test)]
 mod test_subtract;
 #[cfg(test)]
 mod test_ts_diff;
+#[cfg(test)]
+mod test_ts_rank;
+#[cfg(test)]
+mod test_ts_zscore;
 
 use std::collections::VecDeque;
 

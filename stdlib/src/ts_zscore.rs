@@ -12,6 +12,7 @@ impl TsZscoreState {
             history: DequeState::new(period, len), len }
     }
 }
+
 impl UnaryOp for TsZscoreState {
 
     fn step(&mut self, a: crate::CometData, out_ptr: *mut f64) {
@@ -67,10 +68,4 @@ impl UnaryOp for TsZscoreState {
     fn drop_buffers(&mut self) {}
 }
 
-
-inventory::submit! {
-    crate::OperatorMeta {
-        name: "ts_zscore",
-        output_shape: crate::OutputShape::DataFrame,
-    }
-}
+crate::register_period_unary_op!(TsZscoreState, "ts_zscore");

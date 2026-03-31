@@ -15,26 +15,30 @@ impl TsRankState {
             buffers: vec![Vec::with_capacity(period); len],
             history: DequeState::new(period, len),
             time: 0,
-            period, len }
+            period,
+            len,
+        }
     }
 }
+
 impl UnaryOp for TsRankState {
-    
     fn step(&mut self, a: crate::CometData, out_ptr: *mut f64) {
         let len = self.len;
         let a_slice = unsafe { a.as_slice(len) };
         let out_slice = unsafe { std::slice::from_raw_parts_mut(out_ptr, len) };
         let old_history_slice_opt = self.history.get_oldest();
-        
+
         for j in 0..len {
             let v = a_slice[j];
-            
+
             // Remove leaving value
             if self.time >= self.period {
                 if let Some(old_history_slice) = old_history_slice_opt {
                     let old_v = old_history_slice[j];
                     if !old_v.is_nan() {
-                        if let Ok(idx) = self.buffers[j].binary_search_by(|a| a.partial_cmp(&old_v).unwrap_or(std::cmp::Ordering::Equal)) {
+                        if let Ok(idx) = self.buffers[j].binary_search_by(|a| {
+                            a.partial_cmp(&old_v).unwrap_or(std::cmp::Ordering::Equal)
+                        }) {
                             // Find any element and carefully iterate to remove just one instance
                             // we just remove the first one found since all identical values are equivalent
                             self.buffers[j].remove(idx);
@@ -42,16 +46,18 @@ impl UnaryOp for TsRankState {
                     }
                 }
             }
-            
+
             // Insert new value
             if !v.is_nan() {
-                let idx = match self.buffers[j].binary_search_by(|a| a.partial_cmp(&v).unwrap_or(std::cmp::Ordering::Equal)) {
+                let idx = match self.buffers[j]
+                    .binary_search_by(|a| a.partial_cmp(&v).unwrap_or(std::cmp::Ordering::Equal))
+                {
                     Ok(i) => i,
                     Err(i) => i,
                 };
                 self.buffers[j].insert(idx, v);
             }
-            
+
             // Compute rank
             if !v.is_nan() && self.buffers[j].len() > 1 {
                 let mut left = 0;
@@ -70,20 +76,14 @@ impl UnaryOp for TsRankState {
                 out_slice[j] = f64::NAN;
             }
         }
-        
+
         self.history.push(a_slice);
         self.time += 1;
     }
-    
+
     fn drop_buffers(&mut self) {
         self.buffers.clear();
     }
 }
 
-
-inventory::submit! {
-    crate::OperatorMeta {
-        name: "ts_rank",
-        output_shape: crate::OutputShape::DataFrame,
-    }
-}
+crate::register_period_unary_op!(TsRankState, "ts_rank");
