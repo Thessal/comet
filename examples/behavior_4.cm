@@ -1,0 +1,9 @@
+Behavior Comparator() {
+    weights="behavior_1_compare.pth", train=true, supervised_epochs=100,
+    operators = [add, divide, ts_mean, ts_diff, cs_rank, ts_rank, cs_zscore, ts_zscore, data],
+    integers = [5, 21, 252], floats = [0.1, 0.5, 0.9, 5.0, 21.0, 252.0], strings=["volume", "adv20"]
+} -> DataFrame
+
+Flow volume_spike {
+    Comparator()
+}

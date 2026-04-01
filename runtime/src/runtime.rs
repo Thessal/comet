@@ -78,7 +78,8 @@ impl Runtime {
                     let f = token.parse::<f64>().map_err(|e| e.to_string())?;
                     stack.push((token.clone(), ParamType::Float(f)));
                 } else if first_char == '"' || first_char == '\'' {
-                    return Err(format!("String sequence tokens unsupported: {}", token));
+                    let s = token[1..token.len() - 1].to_string();
+                    stack.push((token.clone(), ParamType::String(s)));
                 } else if first_char.is_ascii_alphabetic() {
                     let func_name = token;
 
@@ -269,5 +270,21 @@ mod tests {
 
         let result = runtime.evaluate_sequence(&seq_bad, param_names);
         assert!(result.is_err(), "Malformed sequence must generate an error");
+    }
+
+    #[test]
+    fn test_string_literal_parsing() {
+        let mut runtime = Runtime::new(100, "../data");
+        let seq = vec![
+            "\"volume\"".to_string(),
+            "data".to_string(),
+        ];
+        let result = runtime.evaluate_sequence(&seq, vec![]).expect("Evaluation should succeed");
+        match result {
+            ParamType::DataFrame(df) => {
+                assert!(!df.is_empty(), "Expected non-empty dataframe");
+            }
+            _ => panic!("Expected DataFrame output"),
+        }
     }
 }

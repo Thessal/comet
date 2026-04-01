@@ -19,7 +19,7 @@ Program {
                 ],
                 return_type: DataFrame,
                 weights: Some(
-                    "behavior_2_compare.pth",
+                    "behavior_1_compare.pth",
                 ),
                 train: Some(
                     true,
@@ -27,10 +27,42 @@ Program {
                 supervised_epochs: Some(
                     100,
                 ),
-                operators: None,
-                integers: None,
-                floats: None,
-                strings: None,
+                operators: Some(
+                    [
+                        "add",
+                        "divide",
+                        "ts_mean",
+                        "ts_diff",
+                        "consume_float",
+                        "cs_rank",
+                        "ts_rank",
+                        "cs_zscore",
+                        "ts_zscore",
+                    ],
+                ),
+                integers: Some(
+                    [
+                        5,
+                        21,
+                        252,
+                    ],
+                ),
+                floats: Some(
+                    [
+                        0.1,
+                        0.5,
+                        0.9,
+                        5.0,
+                        21.0,
+                        252.0,
+                    ],
+                ),
+                strings: Some(
+                    [
+                        "volume",
+                        "adv20",
+                    ],
+                ),
             },
         ),
         Flow(
@@ -71,31 +103,8 @@ Program {
                             ],
                         },
                     },
-                    Assignment {
-                        target: "eps_levels",
-                        expr: List(
-                            [
-                                Literal(
-                                    Float(
-                                        0.1,
-                                    ),
-                                ),
-                                Literal(
-                                    Float(
-                                        0.5,
-                                    ),
-                                ),
-                                Literal(
-                                    Float(
-                                        1.0,
-                                    ),
-                                ),
-                            ],
-                        ),
-                    },
-                    Assignment {
-                        target: "x",
-                        expr: Call {
+                    Expr(
+                        Call {
                             path: Path {
                                 segments: [
                                     "Comparator",
@@ -105,55 +114,13 @@ Program {
                                 Identifier(
                                     "volume",
                                 ),
+                                Literal(
+                                    Float(
+                                        0.1,
+                                    ),
+                                ),
                                 Identifier(
                                     "adv20",
-                                ),
-                                Identifier(
-                                    "eps_levels",
-                                ),
-                            ],
-                        },
-                    },
-                    Assignment {
-                        target: "variousdays",
-                        expr: List(
-                            [
-                                Literal(
-                                    Integer(
-                                        1,
-                                    ),
-                                ),
-                                Literal(
-                                    Integer(
-                                        5,
-                                    ),
-                                ),
-                                Literal(
-                                    Integer(
-                                        21,
-                                    ),
-                                ),
-                                Literal(
-                                    Integer(
-                                        252,
-                                    ),
-                                ),
-                            ],
-                        ),
-                    },
-                    Expr(
-                        Call {
-                            path: Path {
-                                segments: [
-                                    "ts_diff",
-                                ],
-                            },
-                            args: [
-                                Identifier(
-                                    "x",
-                                ),
-                                Identifier(
-                                    "variousdays",
                                 ),
                             ],
                         },

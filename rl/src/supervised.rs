@@ -606,10 +606,10 @@ pub fn generate<B: burn::tensor::backend::Backend>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use burn::backend::Cuda;
+    use burn::backend::ndarray::NdArray;
     use parser::program::TypedArg;
 
-    type B = Cuda;
+    type B = NdArray;
 
     #[test]
     fn test_encode_and_batch() {

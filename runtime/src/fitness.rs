@@ -1,6 +1,6 @@
 //! Fitness evaluation, backtesting, and PnL generation.
 
-use crate::backtest::mockbacktester;
+use crate::backtest::minimal_backtest;
 use crate::dmgr::DataManager;
 use crate::runtime::Runtime;
 
@@ -144,7 +144,7 @@ pub fn evaluate_fitness_batch_add_value(
             pnls.push(None);
             continue;
         }
-        let pnl = mockbacktester(dmgr, position);
+        let pnl = minimal_backtest(dmgr, position);
         if pnl.is_empty() {
             pnls.push(None);
         } else {

@@ -1,6 +1,6 @@
 use parser::parser::parse;
 use parser::program::Declaration;
-use runtime::backtest::mockbacktester;
+use runtime::backtest::minimal_backtest;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -18,7 +18,7 @@ fn evaluate_samples(
     for seq in samples_seqs {
         match runtime.evaluate_sequence(&seq, call_args.clone()) {
             Ok(stdlib::ParamType::DataFrame(output)) => {
-                let pnl = runtime::backtest::mockbacktester(&mut runtime.dmgr, &output);
+                let pnl = runtime::backtest::minimal_backtest(&mut runtime.dmgr, &output);
                 let fitness = runtime::fitness::evaluate_fitness_batch_add_value(
                     &mut runtime.dmgr,
                     &[&output],

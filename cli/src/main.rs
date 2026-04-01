@@ -147,7 +147,7 @@ fn main() {
     use burn::record::Recorder;
     let record = trained_model.into_record();
     let type_vocab_size = 1 + parser::program::TYPE_DECL_LENGTH;
-    let action_vocab_size = 2 // Done, Shift
+    let action_vocab_size = 3 // Pad, Done, Shift
         + behavior.floats.as_ref().map_or(0, |v| v.len())
         + behavior.integers.as_ref().map_or(0, |v| v.len())
         + behavior.strings.as_ref().map_or(0, |v| v.len())

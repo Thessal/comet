@@ -4,7 +4,7 @@ use pest::iterators::Pair;
 use pest_derive::Parser;
 use thiserror::Error;
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
@@ -44,11 +44,11 @@ fn parse_program(pair: Pair<Rule>) -> Result<Program, ParserError> {
 }
 
 fn validate_program(program: &Program) -> Result<(), ParserError> {
-    let mut known_functions = HashSet::new();
+    let mut known_functions = HashMap::new();
     for decl in &program.declarations {
         match decl {
             Declaration::Behavior(b) => {
-                known_functions.insert(b.name.clone());
+                known_functions.insert(b.name.clone(), b.args.len());
             }
             _ => {}
         }
@@ -69,12 +69,20 @@ fn validate_program(program: &Program) -> Result<(), ParserError> {
     Ok(())
 }
 
-fn validate_expr(expr: &Expr, known_functions: &HashSet<String>) -> Result<(), ParserError> {
+fn validate_expr(expr: &Expr, known_functions: &HashMap<String, usize>) -> Result<(), ParserError> {
     match expr {
         Expr::Call { path, args } => {
-            let _func_name = path.segments.last().unwrap();
+            let func_name = path.segments.last().unwrap();
+            if let Some(&expected_arity) = known_functions.get(func_name) {
+                if args.len() != expected_arity {
+                    return Err(ParserError::SemanticError(format!(
+                        "Function '{}' expects {} arguments, but got {}",
+                        func_name, expected_arity, args.len()
+                    )));
+                }
+            }
             // In the future, this should check against an injected stdlib registry.
-            // For now, we allow any function call structure.
+            // For now, we allow any function call structure for built-in/unknown.
             for arg in args {
                 validate_expr(arg, known_functions)?;
             }

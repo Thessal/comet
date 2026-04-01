@@ -109,9 +109,6 @@ pub fn get_available_funcs() -> Vec<(
     let mut funcs = Vec::new();
     for meta in inventory::iter::<stdlib::OperatorMeta> {
         let name = meta.name.to_string();
-        if name == "data" {
-            continue;
-        }
         let mut inputs = Vec::new();
         for input in meta.inputs {
             inputs.push(match input {

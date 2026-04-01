@@ -25,15 +25,16 @@ Program {
                     true,
                 ),
                 supervised_epochs: Some(
-                    10,
+                    100,
                 ),
                 operators: Some(
                     [
                         "add",
                         "divide",
                         "ts_mean",
-                        "cs_rank",
                         "ts_diff",
+                        "consume_float",
+                        "cs_rank",
                     ],
                 ),
                 integers: Some(

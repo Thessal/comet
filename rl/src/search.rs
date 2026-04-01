@@ -249,12 +249,13 @@ pub fn generate_top_k_samples(
         attempts += 1;
 
         let mut current_state = initial_state.clone();
+        let minimal_len = initial_state.unprocessed_params.len() + 1;
         let mut hit_done = false;
 
         for step in 0..64 {
             let valid_actions = env.get_valid_actions(&current_state, available_funcs);
 
-            if valid_actions.contains(&Action::Done) && step >= 5 {
+            if valid_actions.contains(&Action::Done) && step >= minimal_len {
                 current_state = env
                     .step(&current_state, Action::Done, available_funcs)
                     .unwrap();
@@ -288,7 +289,10 @@ pub fn generate_top_k_samples(
             structurally_valid_sequences.push(current_state.sequence);
         }
     }
-    println!();
+    println!(
+        "\nGenerated {} structurally valid sequences",
+        structurally_valid_sequences.len()
+    );
 
     // 2. Evaluate all valid structure sequences sequentially
     let mut parsed_outputs = Vec::new();
@@ -299,7 +303,12 @@ pub fn generate_top_k_samples(
                 parsed_outputs.push(output);
                 valid_indices.push(i);
             }
-            _ => {}
+            Ok(x) => {
+                println!("Wrong data type was returned: {:?}", x);
+            }
+            Err(e) => {
+                println!("Failed to evaluate sequence: {:?} ({})", seq, e);
+            }
         }
     }
 
