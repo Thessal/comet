@@ -99,7 +99,11 @@ impl ActionSpace {
             Action::Done => 1,
             Action::Shift => 2,
             Action::ShiftInteger(v) => {
-                let idx = self.behavior_integers.iter().position(|x| x == v).unwrap_or(0);
+                let idx = self
+                    .behavior_integers
+                    .iter()
+                    .position(|x| x == v)
+                    .unwrap_or(0);
                 base_ints + idx
             }
             Action::ShiftFloat(v) => {
@@ -111,7 +115,11 @@ impl ActionSpace {
                 base_floats + idx
             }
             Action::ShiftString(v) => {
-                let idx = self.behavior_strings.iter().position(|x| x == v).unwrap_or(0);
+                let idx = self
+                    .behavior_strings
+                    .iter()
+                    .position(|x| x == v)
+                    .unwrap_or(0);
                 base_strings + idx
             }
             Action::Reduce(func_name) => {
@@ -119,7 +127,9 @@ impl ActionSpace {
                     .available_funcs
                     .iter()
                     .position(|(n, _, _)| n == func_name)
-                    .unwrap_or_else(|| panic!("Function {} not found in available_funcs", func_name));
+                    .unwrap_or_else(|| {
+                        panic!("Function {} not found in available_funcs", func_name)
+                    });
                 base_funcs + idx
             }
         }
@@ -343,7 +353,7 @@ pub fn generate_top_k_samples(
 
     // 1. Generate a large pool of structurally valid sequences first
     let target_pool = num_samples * 20; // Ensure a sizable target objective portfolio context
-    let mut structurally_valid_sequences = Vec::new();
+    let mut structurally_valid_sequences = std::collections::HashSet::new();
 
     while structurally_valid_sequences.len() < target_pool && attempts < 50000 * top_k {
         print!(
@@ -393,13 +403,15 @@ pub fn generate_top_k_samples(
         }
 
         if hit_done {
-            structurally_valid_sequences.push(current_state.sequence);
+            structurally_valid_sequences.insert(current_state.sequence);
         }
     }
     println!(
         "\nGenerated {} structurally valid sequences",
         structurally_valid_sequences.len()
     );
+
+    let structurally_valid_sequences: Vec<_> = structurally_valid_sequences.into_iter().collect();
 
     // 2. Evaluate all valid structure sequences sequentially
     let mut parsed_outputs = Vec::new();
