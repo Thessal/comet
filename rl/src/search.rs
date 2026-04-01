@@ -19,6 +19,113 @@ pub enum Action {
     Done,          // Successfully matched exit condition
 }
 
+impl Action {
+    pub fn from_string(s: &str) -> Self {
+        if s == "!shift" {
+            Action::Shift
+        } else if s == "!done" {
+            Action::Done
+        } else if s.starts_with("\"") {
+            Action::ShiftString(s.trim_matches('"').to_string())
+        } else if let Ok(i) = s.parse::<i64>() {
+            Action::ShiftInteger(i)
+        } else if let Ok(f) = s.parse::<f64>() {
+            Action::ShiftFloat(f)
+        } else {
+            Action::Reduce(s.to_string())
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ActionSpace {
+    pub behavior_integers: Vec<i64>,
+    pub behavior_floats: Vec<f64>,
+    pub behavior_strings: Vec<String>,
+    pub available_funcs: Vec<(Ident, Vec<TypeDecl>, TypeDecl)>,
+}
+
+impl ActionSpace {
+    pub fn new(
+        behavior: &parser::program::BehaviorDecl,
+        available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
+    ) -> Self {
+        Self {
+            behavior_integers: behavior.integers.clone().unwrap_or_default(),
+            behavior_floats: behavior.floats.clone().unwrap_or_default(),
+            behavior_strings: behavior.strings.clone().unwrap_or_default(),
+            available_funcs: available_funcs.to_vec(),
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        3 // Pad, Done, Shift
+            + self.behavior_integers.len()
+            + self.behavior_floats.len()
+            + self.behavior_strings.len()
+            + self.available_funcs.len()
+    }
+
+    pub fn print_action_space(&self) {
+        println!("Action Space (Size: {}):", self.size());
+        println!("  0: Pad");
+        println!("  1: Done");
+        println!("  2: Shift");
+        let mut offset = 3;
+        for (i, val) in self.behavior_integers.iter().enumerate() {
+            println!("  {}: ShiftInteger({})", offset + i, val);
+        }
+        offset += self.behavior_integers.len();
+        for (i, val) in self.behavior_floats.iter().enumerate() {
+            println!("  {}: ShiftFloat({})", offset + i, val);
+        }
+        offset += self.behavior_floats.len();
+        for (i, val) in self.behavior_strings.iter().enumerate() {
+            println!("  {}: ShiftString(\"{}\")", offset + i, val);
+        }
+        offset += self.behavior_strings.len();
+        for (i, (name, _, _)) in self.available_funcs.iter().enumerate() {
+            println!("  {}: Reduce({})", offset + i, name);
+        }
+    }
+
+    pub fn action_to_id(&self, action: &Action) -> usize {
+        let base_ints = 3; // Pad is 0, Done is 1, Shift is 2
+        let base_floats = base_ints + self.behavior_integers.len();
+        let base_strings = base_floats + self.behavior_floats.len();
+        let base_funcs = base_strings + self.behavior_strings.len();
+
+        match action {
+            Action::Done => 1,
+            Action::Shift => 2,
+            Action::ShiftInteger(v) => {
+                let idx = self.behavior_integers.iter().position(|x| x == v).unwrap_or(0);
+                base_ints + idx
+            }
+            Action::ShiftFloat(v) => {
+                let idx = self
+                    .behavior_floats
+                    .iter()
+                    .position(|x| (x - v).abs() < 1e-6)
+                    .unwrap_or(0);
+                base_floats + idx
+            }
+            Action::ShiftString(v) => {
+                let idx = self.behavior_strings.iter().position(|x| x == v).unwrap_or(0);
+                base_strings + idx
+            }
+            Action::Reduce(func_name) => {
+                let idx = self
+                    .available_funcs
+                    .iter()
+                    .position(|(n, _, _)| n == func_name)
+                    .unwrap_or_else(|| panic!("Function {} not found in available_funcs", func_name));
+                base_funcs + idx
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SearchEnv {
     pub target_return: TypeDecl,

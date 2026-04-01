@@ -178,11 +178,7 @@ fn main() {
         type BackendAutoDiff = burn::backend::Autodiff<burn::backend::NdArray>;
         let device = Default::default();
         let type_vocab_size = 1 + parser::program::TYPE_DECL_LENGTH;
-        let action_vocab_size = 2 // Done, Shift
-            + behavior.floats.as_ref().map_or(0, |v| v.len())
-            + behavior.integers.as_ref().map_or(0, |v| v.len())
-            + behavior.strings.as_ref().map_or(0, |v| v.len())
-            + available_funcs.len();
+        let action_vocab_size = rl::search::ActionSpace::new(&behavior, &available_funcs).size();
 
         let config = rl::model::ModelSize::Small.get_config(type_vocab_size, action_vocab_size);
         let model_path = trial_dir.join(format!("{}_weights.bin", behavior.name));

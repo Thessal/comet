@@ -106,79 +106,6 @@ pub fn type_to_id(t: &TypeDecl) -> usize {
     }
 }
 
-pub fn action_to_id(
-    action: &Action,
-    behavior: &parser::program::BehaviorDecl,
-    available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
-) -> usize {
-    let ints = behavior
-        .integers
-        .as_ref()
-        .map(|v| v.as_slice())
-        .unwrap_or(&[]);
-    let floats = behavior
-        .floats
-        .as_ref()
-        .map(|v| v.as_slice())
-        .unwrap_or(&[]);
-    let strings = behavior
-        .strings
-        .as_ref()
-        .map(|v| v.as_slice())
-        .unwrap_or(&[]);
-
-    let base_ints = 3; // Pad is 0, Done is 1, Shift is 2
-    let base_floats = base_ints + ints.len();
-    let base_strings = base_floats + floats.len();
-    let base_funcs = base_strings + strings.len();
-
-    match action {
-        Action::Done => 1,
-        Action::Shift => 2,
-        Action::ShiftInteger(v) => {
-            let idx = ints.iter().position(|x| x == v).unwrap_or(0);
-            base_ints + idx
-        }
-        Action::ShiftFloat(v) => {
-            let idx = floats
-                .iter()
-                .position(|x| (x - v).abs() < 1e-6)
-                .unwrap_or(0);
-            base_floats + idx
-        }
-        Action::ShiftString(v) => {
-            let idx = strings.iter().position(|x| x == v).unwrap_or(0);
-            base_strings + idx
-        }
-        Action::Reduce(func_name) => {
-            let idx = available_funcs
-                .iter()
-                .position(|(n, _, _)| n == func_name)
-                .expect(&format!(
-                    "Function {} not found in available_funcs",
-                    func_name
-                ));
-            base_funcs + idx
-        }
-    }
-}
-
-pub fn string_to_action(s: &str) -> Action {
-    if s == "!shift" {
-        Action::Shift
-    } else if s == "!done" {
-        Action::Done
-    } else if s.starts_with("\"") {
-        Action::ShiftString(s.trim_matches('"').to_string())
-    } else if let Ok(i) = s.parse::<i64>() {
-        Action::ShiftInteger(i)
-    } else if let Ok(f) = s.parse::<f64>() {
-        Action::ShiftFloat(f)
-    } else {
-        Action::Reduce(s.to_string())
-    }
-}
-
 pub fn encode_state(state: &SearchState, prev_action_id: usize) -> [usize; 8] {
     let mut encoded = [0; 8];
     encoded[0] = prev_action_id;
@@ -245,11 +172,8 @@ impl ProgramSequenceDataset {
             true,
         );
 
-        let action_vocab_size = 3 // Pad, Done, Shift
-            + behavior.floats.as_ref().map_or(0, |v| v.len())
-            + behavior.integers.as_ref().map_or(0, |v| v.len())
-            + behavior.strings.as_ref().map_or(0, |v| v.len())
-            + available_funcs.len();
+        let action_space = crate::search::ActionSpace::new(behavior, available_funcs);
+        let action_vocab_size = action_space.size();
 
         for sample in samples {
             // Replay the sample sequence to extract state action pairs
@@ -264,15 +188,15 @@ impl ProgramSequenceDataset {
                 let valid_actions = env.get_valid_actions(&current_state, available_funcs);
                 let mut available_mask = vec![false; action_vocab_size];
                 for valid_a in &valid_actions {
-                    let id = action_to_id(valid_a, behavior, available_funcs);
+                    let id = action_space.action_to_id(valid_a);
                     if id < action_vocab_size {
                         available_mask[id] = true;
                     }
                 }
                 available_actions_seq.push(available_mask);
 
-                let action = string_to_action(a);
-                let target_id = action_to_id(&action, behavior, available_funcs);
+                let action = Action::from_string(a);
+                let target_id = action_space.action_to_id(&action);
 
                 let state_tensor = encode_state(&current_state, prev_action_id);
                 states.push(state_tensor);
@@ -290,14 +214,14 @@ impl ProgramSequenceDataset {
             let valid_actions = env.get_valid_actions(&current_state, available_funcs);
             let mut available_mask = vec![false; action_vocab_size];
             for valid_a in &valid_actions {
-                let id = action_to_id(valid_a, behavior, available_funcs);
+                let id = action_space.action_to_id(valid_a);
                 if id < action_vocab_size {
                     available_mask[id] = true;
                 }
             }
             available_actions_seq.push(available_mask);
 
-            let target_id = action_to_id(&Action::Done, behavior, available_funcs);
+            let target_id = action_space.action_to_id(&Action::Done);
             let state_tensor = encode_state(&current_state, prev_action_id);
             states.push(state_tensor);
             targets.push(target_id);
@@ -414,11 +338,8 @@ pub fn train<B: burn::tensor::backend::AutodiffBackend>(
 
     let device = <B as Backend>::Device::default();
 
-    let action_vocab_size = 3 // Pad, Done, Shift
-        + behavior.floats.as_ref().map_or(0, |v| v.len())
-        + behavior.integers.as_ref().map_or(0, |v| v.len())
-        + behavior.strings.as_ref().map_or(0, |v| v.len())
-        + available_funcs.len();
+    let action_space = crate::search::ActionSpace::new(behavior, available_funcs);
+    let action_vocab_size = action_space.size();
 
     let batcher_train = TransformerBatcher::new(32, action_vocab_size);
     let batcher_valid = TransformerBatcher::new(32, action_vocab_size);
@@ -435,12 +356,7 @@ pub fn train<B: burn::tensor::backend::AutodiffBackend>(
 
     println!("--- Initializing Transformer Model ---");
     let type_vocab_size = 1 + TYPE_DECL_LENGTH; // 0 = PAD
-    let action_vocab_size2 = 3 // Pad, Done, Shift
-        + behavior.floats.as_ref().map_or(0, |v| v.len())
-        + behavior.integers.as_ref().map_or(0, |v| v.len())
-        + behavior.strings.as_ref().map_or(0, |v| v.len())
-        + available_funcs.len();
-    let config = ModelSize::Small.get_config(type_vocab_size, action_vocab_size2);
+    let config = ModelSize::Small.get_config(type_vocab_size, action_vocab_size);
     let model = config.init::<B>(&device);
     let config_optim = AdamConfig::new();
 
@@ -501,6 +417,9 @@ pub fn generate<B: burn::tensor::backend::Backend>(
         sequence: vec![],
     };
 
+    let action_space = crate::search::ActionSpace::new(behavior, available_funcs);
+    let action_vocab_size = action_space.size();
+
     for step_count in 0..100 {
         let valid_actions = env.get_valid_actions(&state, available_funcs);
         if valid_actions.is_empty() {
@@ -515,22 +434,16 @@ pub fn generate<B: burn::tensor::backend::Backend>(
             .sequence
             .last()
             .map(|action_str| {
-                action_to_id(&string_to_action(action_str), behavior, available_funcs)
+                action_space.action_to_id(&Action::from_string(action_str))
             })
             .unwrap_or(0);
 
         let encoded = encode_state(&state, prev_action_id);
         let encoded_i32: Vec<i32> = encoded.iter().map(|&x| x as i32).collect();
 
-        let action_vocab_size = 3 // Pad, Done, Shift
-            + behavior.floats.as_ref().map_or(0, |v| v.len())
-            + behavior.integers.as_ref().map_or(0, |v| v.len())
-            + behavior.strings.as_ref().map_or(0, |v| v.len())
-            + available_funcs.len();
-
         let mut available_mask = vec![false; action_vocab_size];
         for a in &valid_actions {
-            let id = action_to_id(a, behavior, available_funcs);
+            let id = action_space.action_to_id(a);
             if id < action_vocab_size {
                 available_mask[id] = true;
             }
@@ -563,7 +476,7 @@ pub fn generate<B: burn::tensor::backend::Backend>(
         let mut valid_probs: Vec<f32> = valid_candidates
             .iter()
             .map(|a| {
-                let id = action_to_id(a, behavior, available_funcs);
+                let id = action_space.action_to_id(a);
                 probs_data.get(id).copied().unwrap_or(0.0)
             })
             .collect();

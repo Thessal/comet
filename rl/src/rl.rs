@@ -52,11 +52,8 @@ fn sample_trajectory<B: Backend>(
         sequence: vec![],
     };
 
-    let action_vocab_size = 3 // Pad, Done, Shift
-        + behavior.floats.as_ref().map_or(0, |v| v.len())
-        + behavior.integers.as_ref().map_or(0, |v| v.len())
-        + behavior.strings.as_ref().map_or(0, |v| v.len())
-        + available_funcs.len();
+    let action_space = crate::search::ActionSpace::new(behavior, available_funcs);
+    let action_vocab_size = action_space.size();
 
     let mut traj = Trajectory {
         states: vec![],
@@ -74,21 +71,16 @@ fn sample_trajectory<B: Backend>(
             let encoded = crate::supervised::encode_state(
                 &state,
                 state.sequence.last().map_or(0, |a| {
-                    crate::supervised::action_to_id(
-                        &crate::supervised::string_to_action(a),
-                        behavior,
-                        available_funcs,
-                    )
+                    action_space.action_to_id(&Action::from_string(a))
                 }),
             );
             traj.states.push(encoded);
-            let action_id =
-                crate::supervised::action_to_id(&Action::Done, behavior, available_funcs);
+            let action_id = action_space.action_to_id(&Action::Done);
             traj.actions.push(action_id);
 
             let mut available_mask = vec![false; action_vocab_size];
             for a in &valid_actions {
-                let id = crate::supervised::action_to_id(a, behavior, available_funcs);
+                let id = action_space.action_to_id(a);
                 if id < action_vocab_size {
                     available_mask[id] = true;
                 }
@@ -99,11 +91,7 @@ fn sample_trajectory<B: Backend>(
         }
 
         let prev_action_id = state.sequence.last().map_or(0, |a| {
-            crate::supervised::action_to_id(
-                &crate::supervised::string_to_action(a),
-                behavior,
-                available_funcs,
-            )
+            action_space.action_to_id(&Action::from_string(a))
         });
 
         let encoded = crate::supervised::encode_state(&state, prev_action_id);
@@ -116,7 +104,7 @@ fn sample_trajectory<B: Backend>(
 
         let mut available_mask = vec![false; action_vocab_size];
         for a in &valid_actions {
-            let id = crate::supervised::action_to_id(a, behavior, available_funcs);
+            let id = action_space.action_to_id(a);
             if id < action_vocab_size {
                 available_mask[id] = true;
             }
@@ -135,7 +123,7 @@ fn sample_trajectory<B: Backend>(
         let mut valid_probs: Vec<f32> = valid_actions
             .iter()
             .map(|a| {
-                let id = crate::supervised::action_to_id(a, behavior, available_funcs);
+                let id = action_space.action_to_id(a);
                 probs_data.get(id).copied().unwrap_or(0.0)
             })
             .collect();
@@ -158,7 +146,7 @@ fn sample_trajectory<B: Backend>(
         let mut rng = thread_rng();
         let chosen_action = valid_actions[dist.sample(&mut rng)].clone();
 
-        let action_id = crate::supervised::action_to_id(&chosen_action, behavior, available_funcs);
+        let action_id = action_space.action_to_id(&chosen_action);
         traj.actions.push(action_id);
 
         if chosen_action == Action::Done {
@@ -260,11 +248,8 @@ pub fn train_rl<B: AutodiffBackend>(
             .unwrap_or(1)
             .max(1);
 
-        let action_vocab_size = 3 // Pad, Done, Shift
-            + behavior.floats.as_ref().map_or(0, |v| v.len())
-            + behavior.integers.as_ref().map_or(0, |v| v.len())
-            + behavior.strings.as_ref().map_or(0, |v| v.len())
-            + available_funcs.len();
+        let action_space = crate::search::ActionSpace::new(behavior, available_funcs);
+        let action_vocab_size = action_space.size();
 
         let mut inputs_data = Vec::with_capacity(batch_size * max_seq_len * 8);
         let mut actions_data = Vec::with_capacity(batch_size * max_seq_len);

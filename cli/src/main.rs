@@ -147,11 +147,9 @@ fn main() {
     use burn::record::Recorder;
     let record = trained_model.into_record();
     let type_vocab_size = 1 + parser::program::TYPE_DECL_LENGTH;
-    let action_vocab_size = 3 // Pad, Done, Shift
-        + behavior.floats.as_ref().map_or(0, |v| v.len())
-        + behavior.integers.as_ref().map_or(0, |v| v.len())
-        + behavior.strings.as_ref().map_or(0, |v| v.len())
-        + available_funcs.len();
+    let action_space = rl::search::ActionSpace::new(&behavior, &available_funcs);
+    action_space.print_action_space();
+    let action_vocab_size = action_space.size();
 
     let device = Default::default();
     let config = rl::model::ModelSize::Small.get_config(type_vocab_size, action_vocab_size);
