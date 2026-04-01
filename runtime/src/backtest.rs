@@ -84,3 +84,94 @@ pub fn minimal_backtest(dmgr: &mut DataManager, position: &[Vec<f64>]) -> Vec<f6
 
     pnl_sequence
 }
+
+#[cfg(feature = "burn")]
+use burn::backend::Cuda;
+#[cfg(feature = "burn")]
+use burn::tensor::backend::Backend;
+#[cfg(feature = "burn")]
+use burn::tensor::{Tensor, TensorData};
+
+/// Computes portfolio backtest PnL sequence using CUDA tensor operations.
+/// Calculates batched matrix multiplication w * r^T for daily returns.
+pub fn cuda_backtest(dmgr: &mut DataManager, position: &[Vec<f64>]) -> Vec<f64> {
+    let returns = dmgr.get_data("returns");
+    let n_days = position.len().min(returns.len());
+
+    if n_days == 0 {
+        return vec![];
+    }
+
+    let mut n_assets = 0;
+    for i in 0..n_days {
+        n_assets = n_assets.max(position[i].len().min(returns[i].len()));
+    }
+    if n_assets == 0 {
+        return vec![0.0; n_days];
+    }
+
+    let mut w_data = Vec::with_capacity(n_days * n_assets);
+    let mut r_data = Vec::with_capacity(n_days * n_assets);
+
+    for i in 0..n_days {
+        let alpha_row = &position[i];
+        let ret_row = &returns[i];
+        let row_assets = alpha_row.len().min(ret_row.len());
+
+        let mut sum_abs = 0.0;
+        for j in 0..row_assets {
+            let a = alpha_row[j];
+            if !a.is_nan() {
+                sum_abs += a.abs();
+            }
+        }
+
+        for j in 0..n_assets {
+            let tw = if j < row_assets && sum_abs > 1e-8 && !alpha_row[j].is_nan() {
+                alpha_row[j] / sum_abs
+            } else {
+                0.0
+            };
+            w_data.push(tw as f32);
+
+            let r = if j < row_assets && !ret_row[j].is_nan() {
+                ret_row[j] as f32
+            } else {
+                0.0
+            };
+            r_data.push(r);
+        }
+    }
+
+    // Use the Cuda backend directly for tensor operations
+    type B = burn::backend::Cuda;
+    let device = Default::default();
+
+    // Shape: [batch=n_days, 1, n_assets]
+    let w = burn::tensor::Tensor::<B, 3>::from_data(
+        burn::tensor::TensorData::new(w_data, [n_days, 1, n_assets]),
+        &device,
+    );
+    // Shape: [batch=n_days, 1, n_assets]
+    let r = burn::tensor::Tensor::<B, 3>::from_data(
+        burn::tensor::TensorData::new(r_data, [n_days, 1, n_assets]),
+        &device,
+    );
+
+    // Calculates batched matmul w * r^T
+    // r.transpose() shape: [n_days, n_assets, 1]
+    // w.matmul(r.transpose()) shape: [n_days, 1, 1]
+    let r_t = r.transpose();
+    let pnl_batch = w.matmul(r_t);
+
+    let pnl_tensor = pnl_batch.into_data();
+    let pnl_slice = pnl_tensor.as_slice::<f32>().unwrap();
+
+    // Convert back to f64 sequence
+    let mut pnl_sequence = Vec::with_capacity(n_days);
+    for i in 0..n_days {
+        pnl_sequence.push(pnl_slice[i] as f64);
+    }
+
+    pnl_sequence
+}

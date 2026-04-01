@@ -9,6 +9,10 @@ use std::io::Write;
 struct Args {
     /// The input .cm file to compile
     file: String,
+
+    /// Optional flag to use CUDA backend
+    #[arg(long)]
+    cuda: bool,
 }
 
 fn generate_valid_expressions(
@@ -50,6 +54,7 @@ fn generate_valid_expressions(
 
 fn main() {
     let args = Args::parse();
+    let use_cuda = args.cuda || std::env::var("CUDA_PATH").is_ok();
     let filename = &args.file;
     let src = fs::read_to_string(filename).expect("Failed to read file");
 
@@ -82,28 +87,6 @@ fn main() {
     // Initialize central runtime
     let mut runtime = runtime::runtime::Runtime::new(10000, "data");
 
-    // type BackendAutoDiff = burn::backend::Autodiff<burn::backend::Cuda>;
-    // type BackendAutoDiff = burn::backend::Autodiff<burn::backend::Rocm>;
-    type BackendAutoDiff = burn::backend::Autodiff<burn::backend::ndarray::NdArray>;
-
-    // 1) Build dataset, 2) Train transformer,
-    let sample = generate_valid_expressions(&behavior, &available_funcs, 100, &mut runtime);
-    let trained_model = rl::supervised::train::<BackendAutoDiff>(
-        &behavior,
-        &available_funcs,
-        &sample,
-        behavior.supervised_epochs.unwrap(),
-        32, //bs
-        16, //num_worker
-    );
-    let _ = std::io::stdout().flush();
-    println!(
-        "Cache hit rate: {} / {}",
-        runtime.expr_hits, runtime.expr_lookups
-    );
-
-    // 3) Sample a behavior using trained transformer
-    // 4) Evaluate the polish sequence using runtime ## TODO: wrap this, and write a test for this.
     // Extract bound parameter values from the Flow call syntax
     let mut call_args = behavior
         .args
@@ -141,13 +124,52 @@ fn main() {
     // `evaluate_sequence` pops from the end, so we MUST reverse `call_args` to match the Shift order!
     call_args.reverse();
 
+    if use_cuda {
+        println!("--- Using CUDA backend ---");
+        run_with_backend::<burn::backend::Autodiff<burn::backend::Cuda>>(
+            &behavior, &available_funcs, runtime, call_args,
+        );
+    } else {
+        println!("--- Using NdArray backend ---");
+        run_with_backend::<burn::backend::Autodiff<burn::backend::ndarray::NdArray>>(
+            &behavior, &available_funcs, runtime, call_args,
+        );
+    }
+}
+
+fn run_with_backend<B: burn::tensor::backend::AutodiffBackend>(
+    behavior: &BehaviorDecl,
+    available_funcs: &Vec<(
+        String,
+        Vec<parser::program::TypeDecl>,
+        parser::program::TypeDecl,
+    )>,
+    mut runtime: runtime::runtime::Runtime,
+    call_args: Vec<String>,
+) {
+    // 1) Build dataset, 2) Train transformer,
+    let sample = generate_valid_expressions(behavior, available_funcs, 100, &mut runtime);
+    let trained_model = rl::supervised::train::<B>(
+        behavior,
+        available_funcs,
+        &sample,
+        behavior.supervised_epochs.unwrap(),
+        32, //bs
+        16, //num_worker
+    );
+    let _ = std::io::stdout().flush();
+    println!(
+        "Cache hit rate: {} / {}",
+        runtime.expr_hits, runtime.expr_lookups
+    );
+
     // -- RL Fine-Tuning Step --
     println!("--- Starting RL Fine-Tuning ---");
     use burn::module::{AutodiffModule, Module};
     use burn::record::Recorder;
     let record = trained_model.into_record();
     let type_vocab_size = 1 + parser::program::TYPE_DECL_LENGTH;
-    let action_space = rl::search::ActionSpace::new(&behavior, &available_funcs);
+    let action_space = rl::search::ActionSpace::new(behavior, available_funcs);
     action_space.print_action_space();
     let action_vocab_size = action_space.size();
 
@@ -158,20 +180,20 @@ fn main() {
     let bytes = BinBytesRecorder::<FullPrecisionSettings>::default()
         .record(record, ())
         .unwrap();
-    let rl_record: rl::model::TransformerModelRecord<BackendAutoDiff> =
+    let rl_record: rl::model::TransformerModelRecord<B> =
         BinBytesRecorder::<FullPrecisionSettings>::default()
             .load(bytes, &device)
             .unwrap();
 
     let rl_model = config
-        .init::<BackendAutoDiff>(&device)
+        .init::<B>(&device)
         .load_record(rl_record);
 
     let target_epochs = 1000;
     let rl_trained = rl::rl::train_rl(
         rl_model,
-        &behavior,
-        &available_funcs,
+        behavior,
+        available_funcs,
         &mut runtime,
         call_args.clone(),
         target_epochs, // epochs
@@ -193,7 +215,7 @@ fn main() {
     for _ in 0..10 {
         let temperature: f64 = 1.0;
         let generated_sequence =
-            rl::supervised::generate(&behavior, &available_funcs, &final_model, temperature);
+            rl::supervised::generate(behavior, available_funcs, &final_model, temperature);
 
         // 6) Calculate fitness
         println!("Call Args: {:?}", call_args);
