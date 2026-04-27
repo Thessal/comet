@@ -299,7 +299,7 @@ crate-type = ["cdylib"]
                     if needs_malloc {
                         let func_name = op.to_lowercase();
 
-                        let mut out_shape = stdlib::OutputShape::DataFrame;
+                        let mut out_shape = stdlib::Signal::DataFrame(None);
                         for meta in inventory::iter::<stdlib::OperatorMeta> {
                             if meta.name == func_name.as_str() {
                                 out_shape = meta.output_shape;
@@ -308,8 +308,8 @@ crate-type = ["cdylib"]
                         }
 
                         let out_width = match out_shape {
-                            stdlib::OutputShape::Matrix => quote! { (len * len) as usize },
-                            stdlib::OutputShape::TimeSeries => quote! { 1usize },
+                            // stdlib::Signal::Matrix(_) => quote! { (len * len) as usize },
+                            // stdlib::Signal::TimeSeries(_) => quote! { 1usize },
                             _ => quote! { len as usize },
                         };
                         init_allocs.extend(quote! {
@@ -375,7 +375,7 @@ crate-type = ["cdylib"]
                     });
                 }
 
-                let mut out_shape = stdlib::OutputShape::DataFrame;
+                let mut out_shape = stdlib::Signal::DataFrame(None);
                 for meta in inventory::iter::<stdlib::OperatorMeta> {
                     if meta.name == func_name.as_str() {
                         out_shape = meta.output_shape;
@@ -384,8 +384,8 @@ crate-type = ["cdylib"]
                 }
 
                 let out_width = match out_shape {
-                    stdlib::OutputShape::Matrix => quote! { (len * len) as usize },
-                    stdlib::OutputShape::TimeSeries => quote! { 1usize },
+                    stdlib::Signal::Matrix(_) => quote! { (len * len) as usize },
+                    stdlib::Signal::TimeSeries(_) => quote! { 1usize },
                     _ => quote! { len as usize },
                 };
 

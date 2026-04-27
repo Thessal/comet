@@ -1,26 +1,21 @@
+use parser::program::{BehaviorDecl, Ident, TypeDecl};
+use runtime::ast::OperatorSpec;
+use runtime::runtime::Runtime;
 use std::io::Write;
-
-use parser::program::{Ident, TypeDecl};
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct SearchState {
-    pub unprocessed_params: Vec<TypeDecl>,
-    pub stack: Vec<TypeDecl>,
-    pub sequence: Vec<String>,
-}
+use stdlib::Signal;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Action {
-    Shift, // Increase order (move parameter from unprocessed to stack)
-    ShiftInteger(i64),
+    // Increase order (move parameter from unprocessed to stack)
+    ShiftInt(i64),
     ShiftFloat(f64),
     ShiftString(String),
-    Reduce(Ident), // Apply function/behavior and reduce stack
-    Done,          // Successfully matched exit condition
+    Reduce(OperatorSpec), // Apply function/behavior and reduce stack
+    Done,                 // Successfully matched exit condition
 }
 
-impl Action {
-    pub fn from_string(s: &str) -> Self {
+impl From<String> for Action {
+    fn from(s: String) -> Self {
         if s == "!shift" {
             Action::Shift
         } else if s == "!done" {
@@ -28,273 +23,147 @@ impl Action {
         } else if s.starts_with("\"") {
             Action::ShiftString(s.trim_matches('"').to_string())
         } else if let Ok(i) = s.parse::<i64>() {
-            Action::ShiftInteger(i)
+            Action::ShiftInt(i)
         } else if let Ok(f) = s.parse::<f64>() {
             Action::ShiftFloat(f)
         } else {
-            Action::Reduce(s.to_string())
+            Action::Reduce(s.into())
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct ActionSpace {
-    pub behavior_integers: Vec<i64>,
-    pub behavior_floats: Vec<f64>,
-    pub behavior_strings: Vec<String>,
-    pub available_funcs: Vec<(Ident, Vec<TypeDecl>, TypeDecl)>,
+    map: Hashmap<usize, Action>,
+    r_map: HashMap<Action, usize>,
+}
+
+impl From<BehaviorDecl> for ActionSpace {
+    fn from(b: BehaviorDecl) -> ActionSpace {
+        let _integers = b.integers.unwrap_or_default();
+        let _floats = b.floats.unwrap_or_default();
+        let _string = b.strings.unwrap_or_default();
+        let _operators = b.operators.unwrap_or_default();
+
+        let integer_offset = 1; // Done 
+        let float_offset = integer_offset + self._integers.len();
+        let string_offset = float_offset + self._floats.len();
+        let operator_offset = string_offset + self._strings.len();
+
+        let mut map = HashMap::new();
+        map.insert(0, Action::Done);
+        let mut idx = 1;
+        for idx in 1..float_offset {
+            map.insert(idx, Action::ShiftInt(_integers[idx - 1]));
+        }
+        for idx in float_offset..string_offset {
+            map.insert(idx, Action::ShiftFloat(_floats[idx - float_offset]));
+        }
+        for idx in string_offset..operator_offset {
+            map.insert(idx, Action::ShiftString(_strings[idx - string_offset]));
+        }
+        for idx in operator_offset..operator_offset + _operators.len() {
+            let op: OperatorSpec = _operators[idx - operator_offset].into();
+            map.insert(idx, Action::Reduce(op));
+        }
+
+        ActionSpace {
+            map,
+            r_map: HashMap::from_iter(map.iter().map(|(idx, act)| (act.clone(), *idx))),
+        }
+    }
 }
 
 impl ActionSpace {
-    pub fn new(
-        behavior: &parser::program::BehaviorDecl,
-        available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
-    ) -> Self {
-        Self {
-            behavior_integers: behavior.integers.clone().unwrap_or_default(),
-            behavior_floats: behavior.floats.clone().unwrap_or_default(),
-            behavior_strings: behavior.strings.clone().unwrap_or_default(),
-            available_funcs: available_funcs.to_vec(),
-        }
+    fn get_idx(self, action: Action) -> usize {
+        self.r_map.get(action)
     }
-
-    pub fn size(&self) -> usize {
-        3 // Pad, Done, Shift
-            + self.behavior_integers.len()
-            + self.behavior_floats.len()
-            + self.behavior_strings.len()
-            + self.available_funcs.len()
+    fn get_action(self, idx: usize) -> Action {
+        self.map.get(idx)
     }
+}
 
-    pub fn print_action_space(&self) {
-        println!("Action Space (Size: {}):", self.size());
-        println!("  0: Pad");
-        println!("  1: Done");
-        println!("  2: Shift");
-        let mut offset = 3;
-        for (i, val) in self.behavior_integers.iter().enumerate() {
-            println!("  {}: ShiftInteger({})", offset + i, val);
-        }
-        offset += self.behavior_integers.len();
-        for (i, val) in self.behavior_floats.iter().enumerate() {
-            println!("  {}: ShiftFloat({})", offset + i, val);
-        }
-        offset += self.behavior_floats.len();
-        for (i, val) in self.behavior_strings.iter().enumerate() {
-            println!("  {}: ShiftString(\"{}\")", offset + i, val);
-        }
-        offset += self.behavior_strings.len();
-        for (i, (name, _, _)) in self.available_funcs.iter().enumerate() {
-            println!("  {}: Reduce({})", offset + i, name);
-        }
-    }
-
-    pub fn action_to_id(&self, action: &Action) -> usize {
-        let base_ints = 3; // Pad is 0, Done is 1, Shift is 2
-        let base_floats = base_ints + self.behavior_integers.len();
-        let base_strings = base_floats + self.behavior_floats.len();
-        let base_funcs = base_strings + self.behavior_strings.len();
-
-        match action {
-            Action::Done => 1,
-            Action::Shift => 2,
-            Action::ShiftInteger(v) => {
-                let idx = self
-                    .behavior_integers
-                    .iter()
-                    .position(|x| x == v)
-                    .unwrap_or(0);
-                base_ints + idx
-            }
-            Action::ShiftFloat(v) => {
-                let idx = self
-                    .behavior_floats
-                    .iter()
-                    .position(|x| (x - v).abs() < 1e-6)
-                    .unwrap_or(0);
-                base_floats + idx
-            }
-            Action::ShiftString(v) => {
-                let idx = self
-                    .behavior_strings
-                    .iter()
-                    .position(|x| x == v)
-                    .unwrap_or(0);
-                base_strings + idx
-            }
-            Action::Reduce(func_name) => {
-                let idx = self
-                    .available_funcs
-                    .iter()
-                    .position(|(n, _, _)| n == func_name)
-                    .unwrap_or_else(|| {
-                        panic!("Function {} not found in available_funcs", func_name)
-                    });
-                base_funcs + idx
-            }
-        }
-    }
+pub struct SearchHistory {
+    //TODO
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SearchEnv {
-    pub target_return: TypeDecl,
-    pub available_integers: Vec<i64>,
-    pub available_floats: Vec<f64>,
-    pub available_strings: Vec<String>,
-    pub limit_introducing_constants_too_much: bool,
+pub struct SearchState {
+    pub params_used: HashMap<Signal, bool>, // true if used. all of them need to be used.
+    pub stack: Vec<(Signal, Vec<OperatorSpec>, Option<Vec<Vec<f64>>>)>, // (type, expression, data)
 }
 
-impl SearchEnv {
-    pub fn new(
-        target_return: TypeDecl,
-        available_integers: Vec<i64>,
-        available_floats: Vec<f64>,
-        available_strings: Vec<String>,
-        limit_introducing_constants: bool,
-    ) -> Self {
-        SearchEnv {
-            target_return,
-            available_integers,
-            available_floats,
-            available_strings,
-            limit_introducing_constants_too_much: limit_introducing_constants,
-        }
-    }
-
-    pub fn get_valid_actions(
-        &self,
-        state: &SearchState,
-        available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
-    ) -> Vec<Action> {
-        let mut actions = Vec::new();
-
-        if state.unprocessed_params.is_empty()
-            && state.stack.len() == 1
-            && state.stack[0] == self.target_return
-        {
-            actions.push(Action::Done);
-        }
-
-        if !state.unprocessed_params.is_empty() {
-            actions.push(Action::Shift);
-        }
-
-        // If limit_introducing_constants_too_much is true, prevent increasing stack size by introducing constants over 3.
-        // It prevents expression search space explosion like function_call(1,2,3,4,5,6, ..., 99).
-        if self.limit_introducing_constants_too_much && (state.stack.len() < 5) {
-            for &i in &self.available_integers {
-                actions.push(Action::ShiftInteger(i));
-            }
-            for &f in &self.available_floats {
-                actions.push(Action::ShiftFloat(f));
-            }
-            for s in &self.available_strings {
-                actions.push(Action::ShiftString(s.clone()));
-            }
-        }
-
-        for (name, param_types, _ret_type) in available_funcs {
-            // Check if stack suffix matches param_types
-            if param_types.is_empty() {
-                // Zero-ary operator - can always apply
-                actions.push(Action::Reduce(name.clone()));
-            } else if state.stack.len() >= param_types.len() {
-                let stack_suffix = &state.stack[state.stack.len() - param_types.len()..];
-                if stack_suffix == param_types.as_slice() {
-                    actions.push(Action::Reduce(name.clone()));
-                }
-            }
-        }
-
-        actions
-    }
-
-    pub fn step(
-        &self,
-        state: &SearchState,
-        action: Action,
-        available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
-    ) -> Result<SearchState, String> {
-        let mut new_state = state.clone();
-
+#[derive(Debug, Clone, PartialEq)]
+impl SearchState {
+    pub fn apply_action(&mut self, action: Action) -> (bool) {
+        // (done)
         match action {
-            Action::Shift => {
-                if let Some(param) = new_state.unprocessed_params.pop() {
-                    new_state.stack.push(param);
-                    new_state.sequence.push("!shift".to_string());
-                    Ok(new_state)
-                } else {
-                    Err("Cannot shift: no unprocessed parameters remaining.".to_string())
+            Action::Done => true,
+            Action::ShiftInt(i) => {
+                self.stack.push((Signal::Int, None));
+                false
+            }
+            Action::ShiftFloat(f) => {
+                self.stack.push((Signal::Float, None));
+                false
+            }
+            Action::ShiftString(s) => {
+                self.stack.push((Signal::String, None));
+                false
+            }
+            Action::Reduce(op) => {
+                let mut args = Vec::new();
+                for _ in 0..op.inputs.len() {
+                    args.push(self.stack.pop().unwrap());
                 }
+                self.stack.push((op.output, None));
+                false
             }
-            Action::ShiftInteger(val) => {
-                // Technically it maps to Int or Float. We push Float per runtime/stdlib types.
-                new_state.stack.push(TypeDecl::Float);
-                new_state.sequence.push(val.to_string());
-                Ok(new_state)
-            }
-            Action::ShiftFloat(val) => {
-                new_state.stack.push(TypeDecl::Float);
-                new_state.sequence.push(val.to_string());
-                Ok(new_state)
-            }
-            Action::ShiftString(val) => {
-                new_state.stack.push(TypeDecl::String);
-                new_state.sequence.push(format!("\"{}\"", val));
-                Ok(new_state)
-            }
-            Action::Reduce(func_name) => {
-                let func_def = available_funcs
-                    .iter()
-                    .find(|(n, _, _)| *n == func_name)
-                    .ok_or_else(|| format!("Unknown function: {}", func_name))?;
+        }
 
-                let param_types = &func_def.1;
-                let ret_type = &func_def.2;
+        // if self.sequence.len() >= self.max_length {
+        //     return (self.state.clone(), -1.0, true); // Penalize hitting max depth
+        // }
 
-                if new_state.stack.len() < param_types.len() {
-                    return Err(format!("Cannot reduce {}: stack too small.", func_name));
-                }
+        match self
+            .search_env
+            .step(&self.state, action, &self.search_range)
+        {
+            Ok(new_state) => {
+                self.state = new_state;
 
-                // Check types and pop
-                for expected_type in param_types.iter().rev() {
-                    let actual = new_state.stack.pop().unwrap();
-                    if &actual != expected_type {
-                        return Err(format!(
-                            "Type mismatch reducing {}: expected {:?}, got {:?}",
-                            func_name, expected_type, actual
-                        ));
-                    }
-                }
-
-                // Only push if not Void
-                if *ret_type != TypeDecl::Void {
-                    new_state.stack.push(ret_type.clone());
-                }
-
-                // Add to sequence prefix explicitly for tracking (simulated postfix order for now,
-                // but real serialization will build AST and convert using `dag_to_sequence`).
-                new_state.sequence.push(func_name.clone());
-
-                Ok(new_state)
-            }
-            Action::Done => {
-                if new_state.unprocessed_params.is_empty()
-                    && new_state.stack.len() == 1
-                    && new_state.stack[0] == self.target_return
+                // Done?
+                if self.state.unprocessed_params.is_empty()
+                    && self.state.stack.len() == 1
+                    && self.state.stack[0] == self.search_env.target_return
                 {
-                    Ok(new_state)
+                    // Natively evaluate Stack sequence without intermediate AST/DAG compilation
+                    match self
+                        .runtime
+                        .evaluate_sequence(&self.state.sequence, self.param_names.clone())
+                    {
+                        Ok(_output) => {
+                            // Sequence execution successful!
+                            // Normally calculate fitness or cross entropy here
+                            (self.state.clone(), 1.0, true)
+                        }
+                        Err(_) => {
+                            // Map translation failed
+                            (self.state.clone(), -1.0, true)
+                        }
+                    }
                 } else {
-                    Err("Exit condition not met.".to_string())
+                    // Intermediate step
+                    (self.state.clone(), 0.0, false)
                 }
+            }
+            Err(_) => {
+                // Invalid action taken
+                (self.state.clone(), -1.0, true)
             }
         }
     }
 }
-
-use runtime::runtime::Runtime;
-use stdlib::ParamType;
 
 #[derive(Clone, Debug)]
 pub struct EvaluatedSample {
@@ -304,7 +173,7 @@ pub struct EvaluatedSample {
 
 pub fn generate_top_k_samples(
     behavior: &parser::program::BehaviorDecl,
-    available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
+    available_funcs: &[runtime::ast::OperatorSpec],
     top_k: usize,
     selection_rule: fn(&Vec<f64>) -> bool,
     runtime: &mut Runtime,
@@ -418,7 +287,7 @@ pub fn generate_top_k_samples(
     let mut valid_indices = Vec::new();
     for (i, seq) in structurally_valid_sequences.iter().enumerate() {
         match runtime.evaluate_sequence(seq, param_names.clone()) {
-            Ok(stdlib::ParamType::DataFrame(output)) => {
+            Ok(stdlib::Signal::DataFrame(output)) => {
                 parsed_outputs.push(output);
                 valid_indices.push(i);
             }
@@ -467,6 +336,155 @@ pub fn generate_top_k_samples(
     samples
 }
 
+// impl SearchEnv {
+//     pub fn new(
+//         target_return: TypeDecl,
+//         available_integers: Vec<i64>,
+//         available_floats: Vec<f64>,
+//         available_strings: Vec<String>,
+//         limit_introducing_constants: bool,
+//     ) -> Self {
+//         SearchEnv {
+//             target_return,
+//             available_integers,
+//             available_floats,
+//             available_strings,
+//             limit_introducing_constants_too_much: limit_introducing_constants,
+//         }
+//     }
+
+//     pub fn get_valid_actions(
+//         &self,
+//         state: &SearchState,
+//         available_funcs: &[runtime::ast::OperatorSignature],
+//     ) -> Vec<Action> {
+//         let mut actions = Vec::new();
+
+//         if state.unprocessed_params.is_empty()
+//             && state.stack.len() == 1
+//             && state.stack[0] == self.target_return
+//         {
+//             actions.push(Action::Done);
+//         }
+
+//         if !state.unprocessed_params.is_empty() {
+//             actions.push(Action::Shift);
+//         }
+
+//         // If limit_introducing_constants_too_much is true, prevent increasing stack size by introducing constants over 3.
+//         // It prevents expression search space explosion like function_call(1,2,3,4,5,6, ..., 99).
+//         if self.limit_introducing_constants_too_much && (state.stack.len() < 5) {
+//             for &i in &self.available_integers {
+//                 actions.push(Action::ShiftInteger(i));
+//             }
+//             for &f in &self.available_floats {
+//                 actions.push(Action::ShiftFloat(f));
+//             }
+//             for s in &self.available_strings {
+//                 actions.push(Action::ShiftString(s.clone()));
+//             }
+//         }
+
+//         for sig in available_funcs {
+//             let name = &sig.name;
+//             let param_types = &sig.inputs;
+//             if param_types.is_empty() {
+//                 // Zero-ary operator - can always apply
+//                 actions.push(Action::Reduce(name.clone()));
+//             } else if state.stack.len() >= param_types.len() {
+//                 let stack_suffix = &state.stack[state.stack.len() - param_types.len()..];
+//                 if stack_suffix == param_types.as_slice() {
+//                     actions.push(Action::Reduce(name.clone()));
+//                 }
+//             }
+//         }
+
+//         actions
+//     }
+
+//     pub fn step(
+//         &self,
+//         state: &SearchState,
+//         action: Action,
+//         available_funcs: &[runtime::ast::OperatorSignature],
+//     ) -> Result<SearchState, String> {
+//         let mut new_state = state.clone();
+
+//         match action {
+//             Action::Shift => {
+//                 if let Some(param) = new_state.unprocessed_params.pop() {
+//                     new_state.stack.push(param);
+//                     new_state.sequence.push("!shift".to_string());
+//                     Ok(new_state)
+//                 } else {
+//                     Err("Cannot shift: no unprocessed parameters remaining.".to_string())
+//                 }
+//             }
+//             Action::ShiftInteger(val) => {
+//                 // Technically it maps to Int or Float. We push Float per runtime/stdlib types.
+//                 new_state.stack.push(TypeDecl::Float);
+//                 new_state.sequence.push(val.to_string());
+//                 Ok(new_state)
+//             }
+//             Action::ShiftFloat(val) => {
+//                 new_state.stack.push(TypeDecl::Float);
+//                 new_state.sequence.push(val.to_string());
+//                 Ok(new_state)
+//             }
+//             Action::ShiftString(val) => {
+//                 new_state.stack.push(TypeDecl::String);
+//                 new_state.sequence.push(format!("\"{}\"", val));
+//                 Ok(new_state)
+//             }
+//             Action::Reduce(func_name) => {
+//                 let func_def = available_funcs
+//                     .iter()
+//                     .find(|sig| sig.name == *func_name)
+//                     .ok_or_else(|| format!("Unknown function: {}", func_name))?;
+
+//                 let param_types = &func_def.inputs;
+//                 let ret_type = &func_def.output;
+
+//                 if new_state.stack.len() < param_types.len() {
+//                     return Err(format!("Cannot reduce {}: stack too small.", func_name));
+//                 }
+
+//                 // Check types and pop
+//                 for expected_type in param_types.iter().rev() {
+//                     let actual = new_state.stack.pop().unwrap();
+//                     if &actual != expected_type {
+//                         return Err(format!(
+//                             "Type mismatch reducing {}: expected {:?}, got {:?}",
+//                             func_name, expected_type, actual
+//                         ));
+//                     }
+//                 }
+
+//                 // Only push if not Void
+//                 if *ret_type != TypeDecl::Void {
+//                     new_state.stack.push(ret_type.clone());
+//                 }
+
+//                 // Add to sequence prefix explicitly for tracking (simulated postfix order for now,
+//                 // but real serialization will build AST and convert using `dag_to_sequence`).
+//                 new_state.sequence.push(func_name.clone());
+
+//                 Ok(new_state)
+//             }
+//             Action::Done => {
+//                 if new_state.unprocessed_params.is_empty()
+//                     && new_state.stack.len() == 1
+//                     && new_state.stack[0] == self.target_return
+//                 {
+//                     Ok(new_state)
+//                 } else {
+//                     Err("Exit condition not met.".to_string())
+//                 }
+//             }
+//         }
+//     }
+// }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -492,26 +510,26 @@ mod tests {
         let env = SearchEnv::new(TypeDecl::DataFrame, vec![], vec![], vec![], true); // Target return: DataFrame
 
         let available_funcs = vec![
-            (
-                "consume_float".to_string(),
-                vec![TypeDecl::Float],
-                TypeDecl::Void,
-            ),
-            (
-                "cs_rank".to_string(),
-                vec![TypeDecl::DataFrame],
-                TypeDecl::DataFrame,
-            ),
-            (
-                "ts_diff".to_string(),
-                vec![TypeDecl::DataFrame, TypeDecl::Float],
-                TypeDecl::DataFrame,
-            ),
-            (
-                "divide".to_string(),
-                vec![TypeDecl::DataFrame, TypeDecl::DataFrame],
-                TypeDecl::DataFrame,
-            ),
+            runtime::ast::OperatorSpec {
+                name: "consume_float".to_string(),
+                inputs: vec![TypeDecl::Float],
+                output: TypeDecl::Void,
+            },
+            runtime::ast::OperatorSpec {
+                name: "cs_rank".to_string(),
+                inputs: vec![TypeDecl::DataFrame],
+                output: TypeDecl::DataFrame,
+            },
+            runtime::ast::OperatorSpec {
+                name: "ts_diff".to_string(),
+                inputs: vec![TypeDecl::DataFrame, TypeDecl::Float],
+                output: TypeDecl::DataFrame,
+            },
+            runtime::ast::OperatorSpec {
+                name: "divide".to_string(),
+                inputs: vec![TypeDecl::DataFrame, TypeDecl::DataFrame],
+                output: TypeDecl::DataFrame,
+            },
         ];
 
         // 1st step: Shift
@@ -571,7 +589,7 @@ mod tests {
         let src = std::fs::read_to_string("../examples/behavior_1.cm").expect("Read failed");
         let program = parse(&src).expect("Failed to parse behavior_1.cm");
 
-        let available_funcs = crate::env::get_available_funcs();
+        let available_funcs = runtime::ast::OperatorSpec::get_available_funcs();
 
         let mut target_behavior = None;
         for decl in &program.declarations {
@@ -586,7 +604,7 @@ mod tests {
 
         println!("Inferring action candidates from the code:");
         for f in &available_funcs {
-            println!("- {}({:?}) -> {:?}", f.0, f.1, f.2);
+            println!("- {}({:?}) -> {:?}", f.name, f.inputs, f.output);
         }
 
         println!("\nGenerating sample expression trees and evaluating using runtime...");

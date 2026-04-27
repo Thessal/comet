@@ -9,10 +9,10 @@ pub struct DataManager {
 }
 
 impl DataManager {
-    pub fn new<P: AsRef<Path>>(data_dir: P) -> Self {
+    pub fn new(data_dir: PathBuf) -> Self {
         DataManager {
             cache: HashMap::new(),
-            data_dir: data_dir.as_ref().to_path_buf(),
+            data_dir,
         }
     }
 

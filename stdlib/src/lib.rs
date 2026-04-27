@@ -14,6 +14,9 @@ pub mod ts_mean;
 pub mod ts_rank;
 pub mod ts_zscore;
 
+use std::collections::HashMap;
+use std::sync::OnceLock;
+
 #[cfg(test)]
 mod test_cs_rank;
 #[cfg(test)]
@@ -112,10 +115,10 @@ macro_rules! register_data_op {
         inventory::submit! {
             crate::OperatorMeta {
                 name: $name,
-                inputs: &[crate::OutputShape::ScalarString],
-                output_shape: crate::OutputShape::DataFrame,
-                execute: |_args: &[crate::ParamType]| -> crate::ParamType {
-                    crate::ParamType::Vector(vec![])
+                inputs: &[crate::Signal::String(None)],
+                output_shape: crate::Signal::DataFrame(None),
+                execute: |_args: &[crate::Signal]| -> crate::Signal {
+                    crate::Signal::DataFrame(Some(vec![]))
                 }
             }
         }
@@ -176,37 +179,70 @@ pub trait MatrixOp {
     fn drop_buffers(&mut self) {}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OutputShape {
-    Void,
-    TimeSeries, // 1 element per timestep
-    Vector,     // Variable elements (Iliffe vector)
-    DataFrame,  // len elements per timestep
-    Matrix,     // len * len elements per timestep
-    ScalarFloat,
-    ScalarInt,
-    ScalarString,
-}
-
 #[derive(Debug, Clone, PartialEq)]
-pub enum ParamType {
+pub enum Signal {
     // Used to evaluate parameters in runtime
-    Float(f64),
-    String(String),
-    Variable(String),
-    Vector(Vec<f64>),
-    DataFrame(Vec<Vec<f64>>),
+    Void,
+    Float(Option<f64>),
+    Int(Option<i64>),
+    String(Option<String>),
+    Vector(Option<Vec<f64>>),
+    DataFrame(Option<Vec<Vec<f64>>>),
 }
 
 #[derive(Clone)]
 pub struct OperatorMeta {
     pub name: &'static str,
-    pub inputs: &'static [OutputShape],
-    pub output_shape: OutputShape,
-    pub execute: fn(&[crate::ParamType]) -> crate::ParamType,
+    pub inputs: &'static [Signal],
+    pub output_shape: Signal,
+    pub execute: fn(&[Signal]) -> Signal,
+}
+
+fn get_operator_meta_map() -> &'static HashMap<&'static str, OperatorMeta> {
+    static MAP: OnceLock<HashMap<&'static str, OperatorMeta>> = OnceLock::new();
+    MAP.get_or_init(|| {
+        let mut m = HashMap::new();
+        for meta in inventory::iter::<OperatorMeta> {
+            m.insert(meta.name, meta.clone());
+        }
+        m
+    })
+}
+
+impl From<&str> for OperatorMeta {
+    fn from(sig_name: &str) -> Self {
+        if let Some(meta) = get_operator_meta_map().get(sig_name) {
+            return meta.clone();
+        }
+        panic!("Could not find {} in the stdlib", sig_name);
+    }
+}
+
+impl OperatorMeta {
+    pub fn execute(&self, args: &[Signal]) -> Result<Signal, String> {
+        let arity = self.inputs.len();
+        if args.len() < arity {
+            return Err(format!("Stack underflow for {}", self.name));
+        }
+
+        for (arg, expected) in args.iter().zip(self.inputs.iter()) {
+            if std::mem::discriminant(arg) != std::mem::discriminant(expected) {
+                return Err(format!(
+                    "Type mistmatch for {}, arg: {:?}, expected: {:?}",
+                    self.name, arg, expected
+                ));
+            }
+        }
+
+        Ok((self.execute)(args))
+    }
 }
 
 inventory::collect!(OperatorMeta);
+
+///////
+// Calculating operator for dataframe
+///////
 
 #[macro_export]
 macro_rules! register_unary_op {
@@ -214,11 +250,11 @@ macro_rules! register_unary_op {
         inventory::submit! {
             crate::OperatorMeta {
                 name: $name,
-                inputs: &[crate::OutputShape::DataFrame],
-                output_shape: crate::OutputShape::DataFrame,
-                execute: |args: &[crate::ParamType]| -> crate::ParamType {
+                inputs: &[crate::Signal::DataFrame(None)],
+                output_shape: crate::Signal::DataFrame(None),
+                execute: |args: &[crate::Signal]| -> crate::Signal {
                     match &args[0] {
-                        crate::ParamType::DataFrame(df) => {
+                        crate::Signal::DataFrame(Some(df)) => {
                             let t_len = df.len();
                             let n_len = if t_len > 0 { df[0].len() } else { 0 };
                             let mut state = $state::new(0, n_len);
@@ -232,9 +268,9 @@ macro_rules! register_unary_op {
                                 state.step(a_data, output.as_mut_ptr());
                                 outputs.push(output);
                             }
-                            crate::ParamType::DataFrame(outputs)
+                            crate::Signal::DataFrame(Some(outputs))
                         }
-                        crate::ParamType::Vector(v) => {
+                        crate::Signal::Vector(Some(v)) => {
                             let t_len = v.len();
                             let mut state = $state::new(0, 1);
                             let mut outputs = Vec::with_capacity(t_len);
@@ -247,9 +283,9 @@ macro_rules! register_unary_op {
                                 state.step(a_data, output.as_mut_ptr());
                                 outputs.push(output[0]);
                             }
-                            crate::ParamType::Vector(outputs)
+                            crate::Signal::Vector(Some(outputs))
                         }
-                        crate::ParamType::Float(f) => {
+                        crate::Signal::Float(Some(f)) => {
                             let mut state = $state::new(0, 1);
                             let mut output = vec![0.0; 1];
                             let a_data = crate::CometData {
@@ -257,7 +293,7 @@ macro_rules! register_unary_op {
                                 ptr: f as *const f64,
                             };
                             state.step(a_data, output.as_mut_ptr());
-                            crate::ParamType::Float(output[0])
+                            crate::Signal::Float(Some(output[0]))
                         }
                         _ => panic!("Expected Vector, DataFrame or Float"),
                     }
@@ -273,27 +309,27 @@ macro_rules! register_binary_op {
         inventory::submit! {
             crate::OperatorMeta {
                 name: $name,
-                inputs: &[crate::OutputShape::DataFrame, crate::OutputShape::DataFrame],
-                output_shape: crate::OutputShape::DataFrame,
-                execute: |args: &[crate::ParamType]| -> crate::ParamType {
+                inputs: &[crate::Signal::DataFrame(None), crate::Signal::DataFrame(None)],
+                output_shape: crate::Signal::DataFrame(None),
+                execute: |args: &[crate::Signal]| -> crate::Signal {
                     let t_len = match &args[0] {
-                        crate::ParamType::DataFrame(df) => df.len(),
-                        crate::ParamType::Vector(v) => v.len(),
+                        crate::Signal::DataFrame(Some(df)) => df.len(),
+                        crate::Signal::Vector(Some(v)) => v.len(),
                         _ => match &args[1] {
-                            crate::ParamType::DataFrame(df) => df.len(),
-                            crate::ParamType::Vector(v) => v.len(),
+                            crate::Signal::DataFrame(Some(df)) => df.len(),
+                            crate::Signal::Vector(Some(v)) => v.len(),
                             _ => 1,
                         }
                     };
                     let n_len = match &args[0] {
-                        crate::ParamType::DataFrame(df) => if t_len > 0 { df[0].len() } else { 0 },
+                        crate::Signal::DataFrame(Some(df)) => if t_len > 0 { df[0].len() } else { 0 },
                         _ => match &args[1] {
-                            crate::ParamType::DataFrame(df) => if t_len > 0 { df[0].len() } else { 0 },
+                            crate::Signal::DataFrame(Some(df)) => if t_len > 0 { df[0].len() } else { 0 },
                             _ => 1,
                         }
                     };
 
-                    let is_output_df = matches!(&args[0], crate::ParamType::DataFrame(_)) || matches!(&args[1], crate::ParamType::DataFrame(_));
+                    let is_output_df = matches!(&args[0], crate::Signal::DataFrame(_)) || matches!(&args[1], crate::Signal::DataFrame(_));
 
                     let mut state = $state::new(0, n_len);
                     let mut df_out = Vec::with_capacity(t_len);
@@ -301,15 +337,15 @@ macro_rules! register_binary_op {
 
                     for t in 0..t_len {
                         let (a_ptr, a_const) = match &args[0] {
-                            crate::ParamType::DataFrame(df) => (df[t].as_ptr(), false),
-                            crate::ParamType::Vector(v) => (&v[t] as *const f64, true),
-                            crate::ParamType::Float(f) => (f as *const f64, true),
+                            crate::Signal::DataFrame(Some(df)) => (df[t].as_ptr(), false),
+                            crate::Signal::Vector(Some(v)) => (&v[t] as *const f64, true),
+                            crate::Signal::Float(Some(f)) => (f as *const f64, true),
                             _ => panic!("Expected Vector/DataFrame/Float"),
                         };
                         let (b_ptr, b_const) = match &args[1] {
-                            crate::ParamType::DataFrame(df) => (df[t].as_ptr(), false),
-                            crate::ParamType::Vector(v) => (&v[t] as *const f64, true),
-                            crate::ParamType::Float(f) => (f as *const f64, true),
+                            crate::Signal::DataFrame(Some(df)) => (df[t].as_ptr(), false),
+                            crate::Signal::Vector(Some(v)) => (&v[t] as *const f64, true),
+                            crate::Signal::Float(Some(f)) => (f as *const f64, true),
                             _ => panic!("Expected Vector/DataFrame/Float"),
                         };
 
@@ -332,11 +368,11 @@ macro_rules! register_binary_op {
                     }
 
                     if is_output_df {
-                        crate::ParamType::DataFrame(df_out)
-                    } else if t_len == 1 && matches!(&args[0], crate::ParamType::Float(_)) && matches!(&args[1], crate::ParamType::Float(_)) {
-                        crate::ParamType::Float(vec_out[0])
+                        crate::Signal::DataFrame(Some(df_out))
+                    } else if t_len == 1 && matches!(&args[0], crate::Signal::Float(Some(_))) && matches!(&args[1], crate::Signal::Float(Some(_))) {
+                        crate::Signal::Float(Some(vec_out[0]))
                     } else {
-                        crate::ParamType::Vector(vec_out)
+                        crate::Signal::Vector(Some(vec_out))
                     }
                 }
             }
@@ -350,28 +386,30 @@ macro_rules! register_period_unary_op {
         inventory::submit! {
             crate::OperatorMeta {
                 name: $name,
-                inputs: &[crate::OutputShape::ScalarInt, crate::OutputShape::DataFrame],
-                output_shape: crate::OutputShape::DataFrame,
-                execute: |args: &[crate::ParamType]| -> crate::ParamType {
+                inputs: &[crate::Signal::Int(None), crate::Signal::DataFrame(None)],
+                output_shape: crate::Signal::DataFrame(None),
+                // TODO: FIXME
+                execute: |args: &[crate::Signal]| -> crate::Signal {
                     let t_len = match &args[1] {
-                        crate::ParamType::DataFrame(df) => df.len(),
-                        crate::ParamType::Vector(v) => v.len(),
-                        crate::ParamType::Float(_) => 1,
+                        crate::Signal::DataFrame(Some(df)) => df.len(),
+                        crate::Signal::Vector(Some(v)) => v.len(),
+                        crate::Signal::Float(_) => 1,
                         _ => panic!("Expected Vector/DataFrame/Float"),
                     };
                     let n_len = match &args[1] {
-                        crate::ParamType::DataFrame(df) => if t_len > 0 { df[0].len() } else { 0 },
+                        crate::Signal::DataFrame(Some(df)) => if t_len > 0 { df[0].len() } else { 0 },
                         _ => 1,
                     };
 
-                    let is_output_df = matches!(&args[1], crate::ParamType::DataFrame(_));
+                    let is_output_df = matches!(&args[1], crate::Signal::DataFrame(_));
 
                     let period = match &args[0] {
-                        crate::ParamType::DataFrame(df) => {
+                        crate::Signal::DataFrame(Some(df)) => {
                             if !df.is_empty() && !df[0].is_empty() { df[0][0] as usize } else { 0 }
                         }
-                        crate::ParamType::Vector(v) => if !v.is_empty() { v[0] as usize } else { 0 },
-                        crate::ParamType::Float(f) => *f as usize,
+                        crate::Signal::Vector(Some(v)) => if !v.is_empty() { v[0] as usize } else { 0 },
+                        crate::Signal::Float(Some(f)) => *f as usize,
+                        crate::Signal::Int(Some(f)) => *f as usize,
                         _ => panic!("Expected period as Vector/DataFrame/Float"),
                     };
 
@@ -381,9 +419,9 @@ macro_rules! register_period_unary_op {
 
                     for t in 0..t_len {
                         let (b_ptr, b_const) = match &args[1] {
-                            crate::ParamType::DataFrame(df) => (df[t].as_ptr(), false),
-                            crate::ParamType::Vector(v) => (&v[t] as *const f64, true),
-                            crate::ParamType::Float(f) => (f as *const f64, true),
+                            crate::Signal::DataFrame(Some(df)) => (df[t].as_ptr(), false),
+                            crate::Signal::Vector(Some(v)) => (&v[t] as *const f64, true),
+                            crate::Signal::Float(Some(f)) => (f as *const f64, true),
                             _ => panic!("Expected Vector/DataFrame/Float"),
                         };
 
@@ -402,11 +440,11 @@ macro_rules! register_period_unary_op {
                     }
 
                     if is_output_df {
-                        crate::ParamType::DataFrame(df_out)
-                    } else if t_len == 1 && matches!(&args[1], crate::ParamType::Float(_)) {
-                        crate::ParamType::Float(vec_out[0])
+                        crate::Signal::DataFrame(Some(df_out))
+                    } else if t_len == 1 && matches!(&args[1], crate::Signal::Float(Some(_))) {
+                        crate::Signal::Float(Some(vec_out[0]))
                     } else {
-                        crate::ParamType::Vector(vec_out)
+                        crate::Signal::Vector(Some(vec_out))
                     }
                 }
             }

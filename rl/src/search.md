@@ -1,27 +1,16 @@
-# Comet RL Action and Type Index Mapping Convention
+# RL State and Action definition
 
-This document outlines the embedding index assignments used to encode the current environment `SearchState` and sequence actions into uniform numeric vocabulary IDs. These numerical identifiers are mapped into the `TransformerModel`'s trainable embeddings during symbolic regression search.
+## Action Space
 
-## Action to Index Mapping (`action_to_id`)
+Action space is a union of 4 different types of action set.
+### Action to Index Mapping (`action_to_id`)
 
-The model's action vocabulary size dynamically scales alongside the explicitly configured constants (integers, floats, strings) and subset of operator macros extracted directly from the user's `BehaviorDecl`. 
-The formula computes as:
-`action_vocab_size = 2 + len(integers) + len(floats) + len(strings) + len(available_funcs)`
+Action implements methods for converting action from and into the token index.
 
-The IDs align to a continuous index scale mapping independently bounded sets:
+`action_vocab_size = 1 (done) + 1 (reduce) + len(integers) + len(floats) + len(strings) + len(operators)`
 
-- **0**: `Action::Done` 
-  - Represents the concluding action step signaling successful expression termination reducing to the `target_return`.
-- **1**: `Action::Shift`
-  - Moves the next parameter requirement from the `unprocessed_params` pipeline into the operational evaluation context `stack`.
-- **[Base Ints .. + len(integers)]**: `Action::ShiftInteger(v)`
-  - `Base Ints` starts at `2`. Maps individual explicitly permitted integers defined within behavior context to a strictly unique index based on array position.
-- **[Base Floats .. + len(floats)]**: `Action::ShiftFloat(v)`
-  - Evaluates unique floating-point numbers provided in configurations (e.g. `[0.1, 0.5, 0.9]`), independently assigning `ID 2 + len(integers)` to `0.1`, matching each float to a singular categorical classification token.
-- **[Base Strings .. + len(strings)]**: `Action::ShiftString(v)`
-  - Same process applies exclusively for string literals uniquely isolated to specific parameter configurations (e.g. passing `"volume"` to an index class token distinctly separate from `"close"`).
-- **[Base Funcs .. Max Size - 1]**: `Action::Reduce(identifier)`
-  - Maps sequence closures down the array length corresponding explicitly to the alphabetically sorted function subsets available locally to evaluate across dimensions.
+
+## State Representation
 
 ## Type to Index Mapping (`type_to_id`)
 

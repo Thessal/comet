@@ -229,7 +229,7 @@ pub fn evaluate_fitness_batch_add_value(
 
 //     for seq in sequences {
 //         match runtime.evaluate_sequence(seq, call_args.clone()) {
-//             Ok(stdlib::ParamType::DataFrame(output)) => {
+//             Ok(stdlib::Signal::DataFrame(output)) => {
 //                 parsed_outputs.push(Some(output));
 //             }
 //             _ => {

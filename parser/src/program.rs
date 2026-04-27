@@ -32,6 +32,7 @@ pub enum TypeDecl {
     Matrix,
     Vector,
     String,
+    Int,
     Float,
     Bool,
     Void, // for statements that don't return values
@@ -203,6 +204,7 @@ impl fmt::Display for TypeDecl {
             TypeDecl::Vector => write!(f, "Vector"),
             TypeDecl::String => write!(f, "String"),
             TypeDecl::Float => write!(f, "Float"),
+            TypeDecl::Int => write!(f, "Int"),
             TypeDecl::Bool => write!(f, "Bool"),
             TypeDecl::Void => write!(f, "Void"),
         }

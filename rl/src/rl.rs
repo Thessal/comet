@@ -29,7 +29,7 @@ struct Trajectory {
 fn sample_trajectory<B: Backend>(
     inference_model: &TransformerModel<B>,
     behavior: &BehaviorDecl,
-    available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
+    available_funcs: &[runtime::ast::OperatorSpec],
     device: &B::Device,
     temperature: f64,
 ) -> Trajectory {
@@ -70,9 +70,10 @@ fn sample_trajectory<B: Backend>(
         if valid_actions.contains(&Action::Done) {
             let encoded = crate::supervised::encode_state(
                 &state,
-                state.sequence.last().map_or(0, |a| {
-                    action_space.action_to_id(&Action::from_string(a))
-                }),
+                state
+                    .sequence
+                    .last()
+                    .map_or(0, |a| action_space.action_to_id(&Action::from_string(a))),
             );
             traj.states.push(encoded);
             let action_id = action_space.action_to_id(&Action::Done);
@@ -90,9 +91,10 @@ fn sample_trajectory<B: Backend>(
             break; // Stop immediately upon reaching Done state natively.
         }
 
-        let prev_action_id = state.sequence.last().map_or(0, |a| {
-            action_space.action_to_id(&Action::from_string(a))
-        });
+        let prev_action_id = state
+            .sequence
+            .last()
+            .map_or(0, |a| action_space.action_to_id(&Action::from_string(a)));
 
         let encoded = crate::supervised::encode_state(&state, prev_action_id);
         traj.states.push(encoded);
@@ -162,7 +164,7 @@ fn sample_trajectory<B: Backend>(
 pub fn train_rl<B: AutodiffBackend>(
     mut model: TransformerModel<B>,
     behavior: &BehaviorDecl,
-    available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
+    available_funcs: &[runtime::ast::OperatorSpec],
     runtime: &mut runtime::runtime::Runtime,
     call_args: Vec<String>,
     epochs: usize,
@@ -198,7 +200,7 @@ pub fn train_rl<B: AutodiffBackend>(
         let mut parsed_outputs = Vec::new();
         for seq in &sequences {
             match runtime.evaluate_sequence(seq, call_args.clone()) {
-                Ok(stdlib::ParamType::DataFrame(output)) => {
+                Ok(stdlib::Signal::DataFrame(output)) => {
                     parsed_outputs.push(Some(output));
                 }
                 _ => {

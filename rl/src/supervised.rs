@@ -146,7 +146,7 @@ impl ProgramSequenceDataset {
     pub fn new(
         samples: &[EvaluatedSample],
         behavior: &BehaviorDecl,
-        available_funcs: &[(Ident, Vec<TypeDecl>, TypeDecl)],
+        available_funcs: &[runtime::ast::OperatorSpec],
     ) -> Self {
         let mut items = Vec::new();
 
@@ -316,11 +316,7 @@ impl<B: Backend> Batcher<B, TransformerBatchItem, TransformerBatch<B>> for Trans
 
 pub fn train<B: burn::tensor::backend::AutodiffBackend>(
     behavior: &parser::program::BehaviorDecl,
-    available_funcs: &[(
-        parser::program::Ident,
-        Vec<parser::program::TypeDecl>,
-        parser::program::TypeDecl,
-    )],
+    available_funcs: &[runtime::ast::OperatorSpec],
     samples: &[crate::search::EvaluatedSample],
     num_epochs: usize,
     batch_size: usize,
@@ -385,11 +381,7 @@ pub fn train<B: burn::tensor::backend::AutodiffBackend>(
 
 pub fn generate<B: burn::tensor::backend::Backend>(
     behavior: &parser::program::BehaviorDecl,
-    available_funcs: &[(
-        parser::program::Ident,
-        Vec<parser::program::TypeDecl>,
-        parser::program::TypeDecl,
-    )],
+    available_funcs: &[runtime::ast::OperatorSpec],
     inference_model: &crate::model::TransformerModel<B>,
     temperature: f64, // 1.0 is base, <1.0 is more deterministic, >1.0 is more random
 ) -> Vec<String> {
@@ -433,9 +425,7 @@ pub fn generate<B: burn::tensor::backend::Backend>(
         let prev_action_id = state
             .sequence
             .last()
-            .map(|action_str| {
-                action_space.action_to_id(&Action::from_string(action_str))
-            })
+            .map(|action_str| action_space.action_to_id(&Action::from_string(action_str)))
             .unwrap_or(0);
 
         let encoded = encode_state(&state, prev_action_id);
@@ -526,11 +516,11 @@ mod tests {
 
     #[test]
     fn test_encode_and_batch() {
-        let available_funcs = vec![(
-            "add".to_string(),
-            vec![TypeDecl::Float, TypeDecl::Float],
-            TypeDecl::Float,
-        )];
+        let available_funcs = vec![runtime::ast::OperatorSpec {
+            name: "add".to_string(),
+            inputs: vec![TypeDecl::Float, TypeDecl::Float],
+            output: TypeDecl::Float,
+        }];
 
         let behavior = BehaviorDecl {
             name: "TestBehavior".to_string(),
@@ -585,11 +575,11 @@ mod tests {
 
     #[test]
     fn test_burn_training_and_inference_example() {
-        let available_funcs = vec![(
-            "add".to_string(),
-            vec![TypeDecl::Float, TypeDecl::Float],
-            TypeDecl::Float,
-        )];
+        let available_funcs = vec![runtime::ast::OperatorSpec {
+            name: "add".to_string(),
+            inputs: vec![TypeDecl::Float, TypeDecl::Float],
+            output: TypeDecl::Float,
+        }];
         let behavior = BehaviorDecl {
             name: "TestBehavior".to_string(),
             args: vec![
