@@ -1,95 +1,61 @@
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 COMMENT = _{ ("//" ~ (!"\n" ~ ANY)*) | ("/*" ~ (!"*/" ~ ANY)* ~ "*/") | ("#" ~ (!"\n" ~ ANY)*) }
+comma = _{ "," }
 
-program = { SOI ~ declaration* ~ EOI }
-
-declaration = {
-    import_decl |
-    type_decl |
-    behavior_decl |
-    flow_decl
-}
-
+// Literals
 identifier = @{ !keyword ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
-
-keyword = _{ 
-    k_type | k_behavior | k_flow | k_return | k_import 
-}
+literal = { float_literal | int_literal | string_literal | bool_literal }
 int_literal = @{ ASCII_DIGIT+ }
 float_literal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 string_literal = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 bool_literal = { "true" | "false" }
-literal = { float_literal | int_literal | string_literal | bool_literal }
+
+// Types 
 types = { "Series" | "DataFrame" | "Matrix" | "Vector" | "String" | "Int" | "Float" | "Bool" | "Void" }
 
+// Root structure
+program = { SOI ~ declaration* ~ EOI }
+declaration = {
+    import_decl |
+    behavior_decl |
+    flow_decl
+}
+
 // Keywords
-// Keywords
-k_type = { "Type" }
+keyword = _{ 
+    k_behavior | k_flow | k_import 
+}
+k_import = { "Import" }
 k_behavior = { "Behavior" }
 k_flow = { "Flow" }
 
-k_return = { "return" }
-k_import = { "import" }
-
+// Import 
 import_decl = { k_import ~ string_literal }
 
-// type A : B C
-type_decl = { k_type ~ identifier ~ (":" ~ type_name)? ~ ("{" ~ property_list? ~ "}")? ~ ( "[" ~ component_list ~ "]" )? }
-property_list = { identifier ~ ("," ~ identifier)* }
-component_list = { identifier ~ ("," ~ identifier)* }
-
-type_ref = { identifier }
-
-// center : Point
-// Not using struct/enum anymore.
-
-comma = _{ "," }
-
+// Behavior
 // behavior Compare (A: Int) { weights = "w.pth" } -> Series
-behavior_decl = { k_behavior ~ identifier ~ "(" ~ typed_arg_list ~ ")" ~ behavior_props_block? ~ "->" ~ type_name }
+behavior_decl = { k_behavior ~ identifier ~ "(" ~ typed_arg_list ~ ")" ~ behavior_props_block? ~ "->" ~ types }
 behavior_props_block = { "{" ~ behavior_props? ~ "}" }
 behavior_props = { behavior_prop ~ (comma ~ behavior_prop)* }
-behavior_prop = { identifier ~ "=" ~ expr }
+behavior_prop = { identifier ~ "=" ~ arg_value }
 arg_list = { (identifier ~ (comma ~ identifier)*)? }
 typed_arg_list = { (typed_arg ~ (comma ~ typed_arg)*)? }
-typed_arg = { identifier ~ ":" ~ type_name }
+typed_arg = { identifier ~ ":" ~ types }
 
-
-
-block = { "{" ~ statement* ~ "}" }
-
-flow_decl = { k_flow ~ identifier ~ block }
-
-statement = {
-    assignment_stmt |
-    expr_stmt
-}
-
+// Flow
+flow_decl = { k_flow ~ identifier ~ "{" ~ assignment_stmt* ~ expr ~ "}" }
 assignment_stmt = { identifier ~ "=" ~ expr }
-expr_stmt = { expr }
-
-// Types
-type_name = { "DataFrame" | "Matrix" | "Vector" | "String" | "Float" | "Bool" | "Void" }
 
 // Expressions
-expr = { atom }
-
-atom = { primary ~ postfix* }
-postfix = { call_suffix | member_suffix }
-call_suffix = { "(" ~ arg_values ~ ")" }
-member_suffix = { "." ~ identifier }
-
-primary = {
-    literal |
-    path |
-    paren_expr |
-    range_literal |
-    list_literal
+expr = {
+    identifier ~ call_suffix* |    // Function or variable names like `add` or `volume_data`
+    "(" ~ expr ~ ")"|      // Recursive expressions enclosed in parentheses `( x )`
+    arg_value
 }
 
-path = ${ identifier ~ ("::" ~ identifier)* }
-paren_expr = { "(" ~ expr ~ ")" }
-range_literal = { "[" ~ expr ~ ".." ~ (expr ~ "..")? ~ expr ~ "]" }
-list_literal = { "[" ~ (expr ~ (comma ~ expr)*)? ~ "]" }
-arg_values = { (arg_value ~ (comma ~ arg_value)*)? }
-arg_value = { expr }
+call_suffix = { "(" ~ exprs ~ ")" }
+exprs = { (expr ~ (comma ~ expr)*)? }
+range_literal = { "[" ~ literal ~ ".." ~ (literal ~ "..")? ~ literal ~ "]" }
+list_literal = { "[" ~ (literal ~ (comma ~ literal)*)? ~ "]" }
+list_identifier = { "[" ~ (identifier ~ (comma ~ identifier)*)? ~ "]" }
+arg_value = { literal | list_literal | range_literal | list_identifier | identifier }

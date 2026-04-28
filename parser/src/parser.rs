@@ -4,8 +4,6 @@ use pest::iterators::Pair;
 use pest_derive::Parser;
 use thiserror::Error;
 
-use std::collections::HashMap;
-
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
 pub struct CometParser;
@@ -22,13 +20,13 @@ pub enum ParserError {
     SemanticError(String),
 }
 
-pub fn parse(input: &str) -> Result<Program, ParserError> {
+pub fn parse(input: &str) -> Result<InputCode, ParserError> {
     let mut pairs = CometParser::parse(Rule::program, input)?;
     let program_pair = pairs.next().ok_or(ParserError::MissingToken)?;
     Ok(parse_program(program_pair)?)
 }
 
-fn parse_program(pair: Pair<Rule>) -> Result<Program, ParserError> {
+fn parse_program(pair: pest::iterators::Pair<Rule>) -> Result<InputCode, ParserError> {
     let mut declarations = Vec::new();
     for inner in pair.into_inner() {
         match inner.as_rule() {
@@ -37,492 +35,388 @@ fn parse_program(pair: Pair<Rule>) -> Result<Program, ParserError> {
             _ => return Err(ParserError::UnexpectedRule(inner.as_rule())),
         }
     }
-
-    let prog = Program { declarations };
-    validate_program(&prog)?;
-    Ok(prog)
+    Ok(declarations)
 }
 
-fn validate_program(program: &Program) -> Result<(), ParserError> {
-    let mut known_functions = HashMap::new();
-    for decl in &program.declarations {
-        match decl {
-            Declaration::Behavior(b) => {
-                known_functions.insert(b.name.clone(), b.args.len());
+fn parse_declaration(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<crate::program::InputDecl, ParserError> {
+    let inner = pair.into_inner().next().unwrap();
+    match inner.as_rule() {
+        Rule::import_decl => {
+            let s = inner.into_inner().nth(1).unwrap().as_str();
+            Ok(crate::program::InputDecl::Import(
+                s.trim_matches('"').to_string(),
+            ))
+        }
+        Rule::behavior_decl => parse_behavior(inner),
+        Rule::flow_decl => parse_flow(inner),
+        _ => Err(ParserError::UnexpectedRule(inner.as_rule())),
+    }
+}
+
+fn parse_behavior(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<crate::program::InputDecl, ParserError> {
+    let mut inner = pair.into_inner();
+    inner.next(); // skip k_behavior
+    let name = inner.next().unwrap().as_str().to_string();
+
+    let mut inputs = Vec::new();
+    let mut props_pair = None;
+    let mut types_pair = None;
+
+    for p in inner {
+        match p.as_rule() {
+            Rule::typed_arg_list => {
+                for typed_arg in p.into_inner() {
+                    let mut arg_inner = typed_arg.into_inner();
+                    let arg_name = arg_inner.next().unwrap().as_str().to_string();
+                    let arg_type = parse_types(arg_inner.next().unwrap())?;
+                    inputs.push((arg_name, arg_type));
+                }
+            }
+            Rule::behavior_props_block => {
+                props_pair = Some(p);
+            }
+            Rule::types => {
+                types_pair = Some(p);
             }
             _ => {}
         }
     }
 
-    for decl in &program.declarations {
-        if let Declaration::Flow(flow) = decl {
-            for stmt in &flow.body {
-                if let FlowStmt::Expr(expr) = stmt {
-                    validate_expr(expr, &known_functions)?;
-                } else if let FlowStmt::Assignment { expr, .. } = stmt {
-                    validate_expr(expr, &known_functions)?;
-                }
-            }
-        }
-    }
+    let output_type = parse_types(types_pair.unwrap())?;
+    let mut bdecl = crate::program::BehaviorDecl {
+        inputs,
+        output: (name.clone(), output_type),
+        operators: None,
+        integers: None,
+        floats: None,
+        strings: None,
+        weights: None,
+        train: None,
+        supervised_epochs: None,
+    };
 
-    Ok(())
-}
-
-fn validate_expr(expr: &Expr, known_functions: &HashMap<String, usize>) -> Result<(), ParserError> {
-    match expr {
-        Expr::Call { path, args } => {
-            let func_name = path.segments.last().unwrap();
-            if let Some(&expected_arity) = known_functions.get(func_name) {
-                if args.len() != expected_arity {
-                    return Err(ParserError::SemanticError(format!(
-                        "Function '{}' expects {} arguments, but got {}",
-                        func_name, expected_arity, args.len()
-                    )));
-                }
-            }
-            // In the future, this should check against an injected stdlib registry.
-            // For now, we allow any function call structure for built-in/unknown.
-            for arg in args {
-                validate_expr(arg, known_functions)?;
-            }
-            Ok(())
-        }
-
-        Expr::MemberAccess { target, .. } => validate_expr(target, known_functions),
-        Expr::List(exprs) => {
-            for e in exprs {
-                validate_expr(e, known_functions)?;
-            }
-            Ok(())
-        }
-        Expr::Range { start, step, end } => {
-            validate_expr(start, known_functions)?;
-            if let Some(s) = step {
-                validate_expr(s, known_functions)?;
-            }
-            validate_expr(end, known_functions)?;
-            Ok(())
-        }
-        _ => Ok(()),
-    }
-}
-
-fn parse_declaration(pair: Pair<Rule>) -> Result<Declaration, ParserError> {
-    let inner = pair.into_inner().next().ok_or(ParserError::MissingToken)?;
-    match inner.as_rule() {
-        Rule::import_decl => Ok(Declaration::Import(parse_import_decl(inner)?)),
-        Rule::behavior_decl => Ok(Declaration::Behavior(parse_behavior_decl(inner)?)),
-        Rule::flow_decl => Ok(Declaration::Flow(parse_flow_decl(inner)?)),
-
-        _ => Err(ParserError::UnexpectedRule(inner.as_rule())),
-    }
-}
-
-fn parse_import_decl(pair: Pair<Rule>) -> Result<ImportDecl, ParserError> {
-    let mut inner = pair.into_inner();
-    let _k_import = inner.next().unwrap();
-    let lit_pair = inner.next().unwrap();
-    let path = lit_pair.as_str().trim_matches('"').to_string();
-    Ok(ImportDecl { path })
-}
-
-fn parse_identifier(pair: Pair<Rule>) -> Ident {
-    pair.as_str().to_string()
-}
-
-// Constraints Parsing
-
-fn parse_type_name(pair: Pair<Rule>) -> Result<TypeDecl, ParserError> {
-    match pair.as_str() {
-        "DataFrame" => Ok(TypeDecl::DataFrame),
-        "Matrix" => Ok(TypeDecl::Matrix),
-        "Vector" => Ok(TypeDecl::Vector),
-        "String" => Ok(TypeDecl::String),
-        "Float" => Ok(TypeDecl::Float),
-        "Bool" => Ok(TypeDecl::Bool),
-        "Void" => Ok(TypeDecl::Void),
-        _ => Err(ParserError::UnexpectedRule(pair.as_rule())),
-    }
-}
-
-// Declaration Parsing
-fn parse_typed_arg_list(pair: Pair<Rule>) -> Result<Vec<TypedArg>, ParserError> {
-    let mut args = Vec::new();
-    for inner in pair.into_inner() {
-        if inner.as_rule() == Rule::typed_arg {
-            let mut i = inner.into_inner();
-            let name = parse_identifier(i.next().unwrap());
-            let type_decl = parse_type_name(i.next().unwrap())?;
-            args.push(TypedArg { name, type_decl });
-        }
-    }
-    Ok(args)
-}
-
-fn parse_behavior_decl(pair: Pair<Rule>) -> Result<BehaviorDecl, ParserError> {
-    let mut inner = pair.into_inner();
-    let _k_behavior = inner.next().unwrap();
-    let name = parse_identifier(inner.next().unwrap());
-    let args = parse_typed_arg_list(inner.next().unwrap())?;
-
-    let mut weights = None;
-    let mut train = None;
-    let mut supervised_epochs = None;
-    let mut operators = None;
-    let mut integers = None;
-    let mut floats = None;
-    let mut strings = None;
-
-    let mut next_pair = inner.next().unwrap();
-
-    if next_pair.as_rule() == Rule::behavior_props_block {
-        if let Some(props) = next_pair.into_inner().next() {
-            // props is behavior_props
+    if let Some(block) = props_pair {
+        if let Some(props) = block.into_inner().next() {
             for prop in props.into_inner() {
                 let mut prop_inner = prop.into_inner();
-                let key = parse_identifier(prop_inner.next().unwrap());
-                let val_pair = prop_inner.next().unwrap(); // Rule::expr
-                let expr = parse_expr(val_pair)?;
+                let prop_name = prop_inner.next().unwrap().as_str();
+                let prop_val = prop_inner.next().unwrap();
 
-                match key.as_str() {
-                    "weights" => {
-                        if let Expr::Literal(Literal::String(s)) = expr {
-                            weights = Some(s);
-                        } else {
-                            return Err(ParserError::SemanticError(
-                                "weights must be a string".into(),
-                            ));
-                        }
-                    }
-                    "train" => {
-                        if let Expr::Literal(Literal::Boolean(b)) = expr {
-                            train = Some(b);
-                        } else {
-                            return Err(ParserError::SemanticError(
-                                "train must be a boolean".into(),
-                            ));
-                        }
-                    }
+                match prop_name {
+                    "weights" => bdecl.weights = Some(extract_string(&prop_val)?),
+                    "train" => bdecl.train = Some(extract_bool(&prop_val)?),
                     "supervised_epochs" => {
-                        if let Expr::Literal(Literal::Integer(i)) = expr {
-                            supervised_epochs = Some(i as usize);
-                        } else {
-                            return Err(ParserError::SemanticError(
-                                "supervised_epochs must be an integer".into(),
-                            ));
-                        }
+                        bdecl.supervised_epochs = Some(extract_int(&prop_val)? as usize)
                     }
-                    "operators" => {
-                        if let Expr::List(list) = expr {
-                            let mut ops = Vec::new();
-                            for e in list {
-                                if let Expr::Identifier(ident) = e {
-                                    ops.push(ident);
-                                } else {
-                                    return Err(ParserError::SemanticError(
-                                        "operators must be a list of identifiers".into(),
-                                    ));
-                                }
-                            }
-                            operators = Some(ops);
-                        } else {
-                            return Err(ParserError::SemanticError(
-                                "operators must be a list".into(),
-                            ));
-                        }
-                    }
-                    "integers" => {
-                        if let Expr::List(list) = expr {
-                            let mut ints = Vec::new();
-                            for e in list {
-                                if let Expr::Literal(Literal::Integer(i)) = e {
-                                    ints.push(i);
-                                } else {
-                                    return Err(ParserError::SemanticError(
-                                        "integers must be a list of integers".into(),
-                                    ));
-                                }
-                            }
-                            integers = Some(ints);
-                        } else {
-                            return Err(ParserError::SemanticError(
-                                "integers must be a list".into(),
-                            ));
-                        }
-                    }
-                    "floats" => {
-                        if let Expr::List(list) = expr {
-                            let mut flts = Vec::new();
-                            for e in list {
-                                if let Expr::Literal(Literal::Float(f)) = e {
-                                    flts.push(f);
-                                } else {
-                                    return Err(ParserError::SemanticError(
-                                        "floats must be a list of floats".into(),
-                                    ));
-                                }
-                            }
-                            floats = Some(flts);
-                        } else {
-                            return Err(ParserError::SemanticError("floats must be a list".into()));
-                        }
-                    }
-                    "strings" => {
-                        if let Expr::List(list) = expr {
-                            let mut strs = Vec::new();
-                            for e in list {
-                                if let Expr::Literal(Literal::String(s)) = e {
-                                    strs.push(s);
-                                } else {
-                                    return Err(ParserError::SemanticError(
-                                        "strings must be a list of strings".into(),
-                                    ));
-                                }
-                            }
-                            strings = Some(strs);
-                        } else {
-                            return Err(ParserError::SemanticError(
-                                "strings must be a list".into(),
-                            ));
-                        }
-                    }
+                    "operators" => bdecl.operators = Some(extract_ident_list(&prop_val)?),
+                    "integers" => bdecl.integers = Some(extract_int_list(&prop_val)?),
+                    "floats" => bdecl.floats = Some(extract_float_list(&prop_val)?),
+                    "strings" => bdecl.strings = Some(extract_string_list(&prop_val)?),
                     _ => {
                         return Err(ParserError::SemanticError(format!(
-                            "Unknown behavior property: {}",
-                            key
+                            "Unknown property: {}",
+                            prop_name
                         )));
                     }
                 }
             }
         }
-        next_pair = inner.next().unwrap(); // advance to constraint
     }
 
-    let return_type = parse_type_name(next_pair)?;
-
-    Ok(BehaviorDecl {
-        name,
-        args,
-        return_type,
-        weights,
-        train,
-        supervised_epochs,
-        operators,
-        integers,
-        floats,
-        strings,
-    })
+    Ok(crate::program::InputDecl::Behavior(bdecl))
 }
 
-fn parse_flow_decl(pair: Pair<Rule>) -> Result<FlowDecl, ParserError> {
+fn parse_types(pair: pest::iterators::Pair<Rule>) -> Result<crate::types::Signal, ParserError> {
+    match pair.as_str() {
+        "Void" => Ok(crate::types::Signal::Void),
+        "Float" => Ok(crate::types::Signal::Float(None)),
+        "Int" => Ok(crate::types::Signal::Int(None)),
+        "String" => Ok(crate::types::Signal::String(None)),
+        "Vector" => Ok(crate::types::Signal::Vector(None)),
+        "DataFrame" => Ok(crate::types::Signal::DataFrame(None)),
+        s => Err(ParserError::SemanticError(format!("Unknown type: {}", s))),
+    }
+}
+
+fn extract_string(pair: &pest::iterators::Pair<Rule>) -> Result<String, ParserError> {
+    let lit = pair
+        .clone()
+        .into_inner()
+        .next()
+        .ok_or(ParserError::SemanticError("Expected literal".into()))?;
+    let inner = lit
+        .into_inner()
+        .next()
+        .ok_or(ParserError::SemanticError("Expected string inner".into()))?;
+    Ok(inner.as_str().trim_matches('"').to_string())
+}
+fn extract_bool(pair: &pest::iterators::Pair<Rule>) -> Result<bool, ParserError> {
+    let lit = pair
+        .clone()
+        .into_inner()
+        .next()
+        .ok_or(ParserError::SemanticError("Expected literal".into()))?;
+    let inner = lit
+        .into_inner()
+        .next()
+        .ok_or(ParserError::SemanticError("Expected bool inner".into()))?;
+    Ok(inner.as_str() == "true")
+}
+fn extract_int(pair: &pest::iterators::Pair<Rule>) -> Result<i64, ParserError> {
+    let lit = pair
+        .clone()
+        .into_inner()
+        .next()
+        .ok_or(ParserError::SemanticError("Expected literal".into()))?;
+    let inner = lit
+        .into_inner()
+        .next()
+        .ok_or(ParserError::SemanticError("Expected int inner".into()))?;
+    inner
+        .as_str()
+        .parse()
+        .map_err(|_| ParserError::SemanticError("Failed to parse int".into()))
+}
+fn extract_ident_list(
+    pair: &pest::iterators::Pair<Rule>,
+) -> Result<Vec<crate::expr::Ident>, ParserError> {
+    let list_ident = pair
+        .clone()
+        .into_inner()
+        .next()
+        .ok_or(ParserError::SemanticError(
+            "Expected list identifier".into(),
+        ))?;
+    let mut res = Vec::new();
+    for ident in list_ident.into_inner() {
+        res.push(ident.as_str().to_string());
+    }
+    Ok(res)
+}
+fn extract_int_list(pair: &pest::iterators::Pair<Rule>) -> Result<Vec<i64>, ParserError> {
+    let list_lit = pair
+        .clone()
+        .into_inner()
+        .next()
+        .ok_or(ParserError::SemanticError("Expected list literal".into()))?;
+    let mut res = Vec::new();
+    for lit in list_lit.into_inner() {
+        let inner = lit
+            .into_inner()
+            .next()
+            .ok_or(ParserError::SemanticError("Expected int inner".into()))?;
+        res.push(
+            inner
+                .as_str()
+                .parse()
+                .map_err(|_| ParserError::SemanticError("Failed to parse int".into()))?,
+        );
+    }
+    Ok(res)
+}
+fn extract_float_list(pair: &pest::iterators::Pair<Rule>) -> Result<Vec<f64>, ParserError> {
+    let list_lit = pair
+        .clone()
+        .into_inner()
+        .next()
+        .ok_or(ParserError::SemanticError("Expected list literal".into()))?;
+    let mut res = Vec::new();
+    for lit in list_lit.into_inner() {
+        let inner = lit
+            .into_inner()
+            .next()
+            .ok_or(ParserError::SemanticError("Expected float inner".into()))?;
+        res.push(
+            inner
+                .as_str()
+                .parse()
+                .map_err(|_| ParserError::SemanticError("Failed to parse float".into()))?,
+        );
+    }
+    Ok(res)
+}
+fn extract_string_list(pair: &pest::iterators::Pair<Rule>) -> Result<Vec<String>, ParserError> {
+    let list_lit = pair
+        .clone()
+        .into_inner()
+        .next()
+        .ok_or(ParserError::SemanticError("Expected list literal".into()))?;
+    let mut res = Vec::new();
+    for lit in list_lit.into_inner() {
+        let inner = lit
+            .into_inner()
+            .next()
+            .ok_or(ParserError::SemanticError("Expected string inner".into()))?;
+        res.push(inner.as_str().trim_matches('"').to_string());
+    }
+    Ok(res)
+}
+
+fn parse_flow(pair: pest::iterators::Pair<Rule>) -> Result<crate::program::InputDecl, ParserError> {
     let mut inner = pair.into_inner();
-    let _k_flow = inner.next().unwrap();
-    let name = parse_identifier(inner.next().unwrap());
-    let block = parse_block(inner.next().unwrap())?;
+    inner.next(); // k_flow
+    let name = inner.next().unwrap().as_str().to_string();
 
     let mut body = Vec::new();
-    for stmt in block.stmts {
-        match stmt {
-            Stmt::Flow(f) => body.push(f),
-            Stmt::Expr(e) => body.push(FlowStmt::Expr(e)), // Return
+    for p in inner {
+        match p.as_rule() {
+            Rule::assignment_stmt => {
+                let mut assn_inner = p.into_inner();
+                let target = assn_inner.next().unwrap().as_str().to_string();
+                let expr = parse_expr(assn_inner.next().unwrap())?;
+                body.push(crate::expr::Stmt::Flow(crate::expr::FlowStmt::Assignment {
+                    target,
+                    expr,
+                }));
+            }
+            Rule::expr => {
+                body.push(crate::expr::Stmt::Expr(parse_expr(p)?));
+            }
+            _ => {}
         }
     }
 
-    Ok(FlowDecl { name, body })
+    Ok(crate::program::InputDecl::Flow(crate::program::FlowDecl {
+        name,
+        body,
+    }))
 }
 
-fn parse_block(pair: Pair<Rule>) -> Result<Block, ParserError> {
-    let mut stmts = Vec::new();
-    for inner in pair.into_inner() {
-        stmts.push(parse_statement(inner)?);
+fn parse_expr(pair: pest::iterators::Pair<Rule>) -> Result<crate::expr::Expr, ParserError> {
+    let inner = pair.clone().into_inner().next().unwrap();
+    // Case 1: The expression is naturally wrapping another expression (e.g., grouped by parentheses or nested)
+    if inner.as_rule() == Rule::expr {
+        return parse_expr(inner);
     }
-    Ok(Block { stmts })
-}
 
-fn parse_statement(pair: Pair<Rule>) -> Result<Stmt, ParserError> {
-    let inner = pair.into_inner().next().unwrap();
-    match inner.as_rule() {
-        Rule::assignment_stmt => {
-            let mut i = inner.into_inner();
-            let target = parse_identifier(i.next().unwrap());
-            let expr = parse_expr(i.next().unwrap())?;
-            Ok(Stmt::Flow(FlowStmt::Assignment { target, expr }))
-        }
-        Rule::expr_stmt => {
-            let expr = parse_expr(inner.into_inner().next().unwrap())?;
-            Ok(Stmt::Expr(expr))
-        }
-        _ => Err(ParserError::UnexpectedRule(inner.as_rule())),
+    if inner.as_rule() == Rule::arg_value {
+        return parse_arg_value(inner);
     }
-}
 
-// Expressions
+    // Initialize with a simple identifier first
+    let ident = inner.as_str().to_string();
+    let mut current_expr = crate::expr::Expr::Identifier(ident.clone());
 
-fn parse_expr(pair: Pair<Rule>) -> Result<Expr, ParserError> {
-    let inner = pair.into_inner().next().unwrap();
-    parse_atom(inner)
-}
+    let mut all_inner = pair.into_inner();
+    let first = all_inner.next().unwrap();
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use std::path::Path as StdPath;
+    // Case 2: The first inner pair is another expression
+    if first.as_rule() == Rule::expr {
+        return parse_expr(first);
+    }
 
-    #[test]
-    fn test_generate_ast_dumps() {
-        // Find the examples directory relative to the parser crate workspace
-        let examples_dir = StdPath::new("../examples");
-        assert!(
-            examples_dir.exists(),
-            "Examples directory not found at ../examples"
-        );
+    // Prepare a path in case this is a function call
+    let path = crate::expr::Path {
+        segments: vec![first.as_str().to_string()],
+    };
 
-        for entry in fs::read_dir(examples_dir).expect("Failed to read examples directory") {
-            let entry = entry.expect("Failed to read directory entry");
-            let path = entry.path();
-
-            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("cm") {
-                let content = fs::read_to_string(&path).expect("Failed to read .cm file");
-                println!("--- Parsing file: {:?} ---", path);
-
-                match parse(&content) {
-                    Ok(ast) => {
-                        let ast_dump = format!("{:#?}", ast);
-                        let mut rs_path = path.clone();
-                        rs_path.set_extension("rs");
-
-                        fs::write(&rs_path, ast_dump).unwrap_or_else(|e| {
-                            panic!("Failed to write AST to {:?}: {}", rs_path, e)
-                        });
-
-                        println!("AST successfully dumped to {:?}", rs_path);
-                    }
-                    Err(e) => {
-                        println!("Error parsing {:?}:\n{:?}", path, e);
-                        panic!("Failed to parse example {:?}", path);
-                    }
+    // Process suffixes to determine if it's a more complex expression
+    for suffix in all_inner {
+        // Case 3: The expression is a function call (identifier followed by a call suffix)
+        if suffix.as_rule() == Rule::call_suffix {
+            let mut args = Vec::new();
+            if let Some(arg_vals) = suffix.into_inner().next() {
+                for val in arg_vals.into_inner() {
+                    args.push(parse_expr(val)?);
                 }
             }
+            current_expr = crate::expr::Expr::Call {
+                path: path.clone(),
+                args,
+            };
         }
     }
+
+    // Fallback: If no suffixes apply, it remains a simple identifier.
+    Ok(current_expr)
 }
 
-fn parse_atom(pair: Pair<Rule>) -> Result<Expr, ParserError> {
-    let mut inner = pair.into_inner();
-    let primary = parse_primary(inner.next().unwrap())?;
-
-    let mut expr = primary;
-
-    for postfix in inner {
-        let p_inner = postfix.into_inner().next().unwrap();
-        match p_inner.as_rule() {
-            Rule::call_suffix => {
-                let mut args_pair = p_inner.into_inner();
-                let arg_values_pair = args_pair.next().unwrap();
-                let args = parse_arg_values(arg_values_pair)?;
-
-                if let Expr::Identifier(name) = expr {
-                    expr = Expr::Call {
-                        path: Path {
-                            segments: vec![name],
-                        },
-                        args,
-                    };
-                } else {
-                    // Handle other cases if needed
-                }
-            }
-            Rule::member_suffix => {
-                let ident = parse_identifier(p_inner.into_inner().next().unwrap());
-                expr = Expr::MemberAccess {
-                    target: Box::new(expr),
-                    field: ident,
-                };
-            }
-            _ => unreachable!(),
-        }
-    }
-    Ok(expr)
-}
-
-fn parse_primary(pair: Pair<Rule>) -> Result<Expr, ParserError> {
+fn parse_arg_value(pair: pest::iterators::Pair<Rule>) -> Result<crate::expr::Expr, ParserError> {
     let inner = pair.into_inner().next().unwrap();
     match inner.as_rule() {
-        Rule::literal => {
-            let lit_inner = inner.into_inner().next().unwrap();
-            match lit_inner.as_rule() {
-                Rule::int_literal => Ok(Expr::Literal(Literal::Integer(
-                    lit_inner.as_str().parse().unwrap(),
-                ))),
-                Rule::float_literal => Ok(Expr::Literal(Literal::Float(
-                    lit_inner.as_str().parse().unwrap(),
-                ))),
-                Rule::string_literal => Ok(Expr::Literal(Literal::String(
-                    lit_inner.as_str().trim_matches('"').to_string(),
-                ))),
-                Rule::bool_literal => Ok(Expr::Literal(Literal::Boolean(
-                    lit_inner.as_str() == "true",
-                ))),
-                _ => unreachable!(),
-            }
-        }
-        Rule::path => {
-            let mut segments = Vec::new();
-            for seg in inner.into_inner() {
-                segments.push(seg.as_str().to_string());
-            }
-            if segments.len() == 1 {
-                Ok(Expr::Identifier(segments[0].clone()))
-            } else {
-                Ok(Expr::Identifier(segments.join("::")))
-            }
-        }
-        Rule::paren_expr => parse_expr(inner.into_inner().next().unwrap()),
+        Rule::literal => parse_literal(inner).map(crate::expr::Expr::Literal),
         Rule::list_literal => {
             let mut exprs = Vec::new();
-            for e in inner.into_inner() {
-                exprs.push(parse_expr(e)?);
+            for lit in inner.into_inner() {
+                exprs.push(crate::expr::Expr::Literal(parse_literal(lit)?));
             }
-            Ok(Expr::List(exprs))
+            Ok(crate::expr::Expr::List(exprs))
+        }
+        Rule::list_identifier => {
+            let mut exprs = Vec::new();
+            for id in inner.into_inner() {
+                exprs.push(crate::expr::Expr::Identifier(id.as_str().to_string()));
+            }
+            Ok(crate::expr::Expr::List(exprs))
         }
         Rule::range_literal => {
-            let mut exprs = Vec::new();
-            for e in inner.into_inner() {
-                exprs.push(parse_expr(e)?);
-            }
-            if exprs.len() == 2 {
-                let end = exprs.pop().unwrap();
-                let start = exprs.pop().unwrap();
-                Ok(Expr::Range {
-                    start: Box::new(start),
-                    step: None,
-                    end: Box::new(end),
-                })
-            } else if exprs.len() == 3 {
-                let end = exprs.pop().unwrap();
-                let step = exprs.pop().unwrap();
-                let start = exprs.pop().unwrap();
-                Ok(Expr::Range {
-                    start: Box::new(start),
-                    step: Some(Box::new(step)),
-                    end: Box::new(end),
-                })
+            let mut lits = inner.into_inner();
+            let start = crate::expr::Expr::Literal(parse_literal(lits.next().unwrap())?);
+            let next_lit = parse_literal(lits.next().unwrap())?;
+            let end_lit = lits.next().map(parse_literal).transpose()?;
+
+            let (step, end) = if let Some(e) = end_lit {
+                (
+                    Some(Box::new(crate::expr::Expr::Literal(next_lit))),
+                    Box::new(crate::expr::Expr::Literal(e)),
+                )
             } else {
-                unreachable!()
-            }
+                (None, Box::new(crate::expr::Expr::Literal(next_lit)))
+            };
+            Ok(crate::expr::Expr::Range {
+                start: Box::new(start),
+                step,
+                end,
+            })
         }
-        _ => unreachable!(),
+        _ => Err(ParserError::SemanticError(format!(
+            "Unknown arg_value: {:?}",
+            inner.as_rule()
+        ))),
     }
 }
 
-fn parse_arg_values(pair: Pair<Rule>) -> Result<Vec<Expr>, ParserError> {
-    let mut args = Vec::new();
-    for inner in pair.into_inner() {
-        if inner.as_rule() == Rule::arg_value {
-            args.push(parse_expr(inner.into_inner().next().unwrap())?);
-        }
+fn parse_literal(pair: pest::iterators::Pair<Rule>) -> Result<crate::expr::Literal, ParserError> {
+    let inner = pair.into_inner().next().unwrap();
+    match inner.as_rule() {
+        Rule::int_literal => Ok(crate::expr::Literal::Integer(
+            inner.as_str().parse().unwrap(),
+        )),
+        Rule::float_literal => Ok(crate::expr::Literal::Float(inner.as_str().parse().unwrap())),
+        Rule::string_literal => Ok(crate::expr::Literal::String(
+            inner.as_str().trim_matches('"').to_string(),
+        )),
+        Rule::bool_literal => Ok(crate::expr::Literal::Boolean(inner.as_str() == "true")),
+        _ => Err(ParserError::SemanticError("Unknown literal".into())),
     }
-    Ok(args)
+}
+
+#[test]
+fn test_parse_behavior_decl() {
+    let input = r#"
+        Behavior Comparator(signal: DataFrame, eps: Float, reference: DataFrame) {
+            weights="behavior_1_compare.pth", train=true, supervised_epochs=100,
+            operators = [add, divide, ts_mean, ts_diff, consume_float, cs_rank],
+            integers = [5, 21, 252], floats = [0.1, 0.5, 0.9], strings=["volume", "adv20"]
+        } -> DataFrame
+
+        Flow volume_spike {
+            volume = data("volume")
+            adv20 = data("adv20")
+            Comparator(volume, 0.1, adv20)
+        }
+    "#;
+    let result = parse(input);
+    println!("Success: {:?}", result.is_ok());
+    if let Err(e) = &result {
+        println!("Error: {}", e);
+    }
+    assert!(result.is_ok());
+    for stmt in result.unwrap() {
+        println!("{:?}", stmt);
+    }
 }

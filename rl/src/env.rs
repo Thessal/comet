@@ -3,18 +3,19 @@ use parser::program::BehaviorDecl;
 use runtime::runtime::Runtime;
 
 pub struct CometRlEnv {
-    pub runtime: Runtime,
+    behavior: BehaviorDecl,
+    pub runtime: &Runtime,
     pub state: SearchState,
     pub action_space: ActionSpace,
     pub max_length: usize,
 }
 
 impl CometRlEnv {
-    pub fn new(runtime: Runtime, behavior: BehaviorDecl, max_length: usize) -> Self {
-        let state = SearchState { stack: vec![] };
+    pub fn new(runtime: &Runtime, behavior: BehaviorDecl, max_length: usize) -> Self {
         CometRlEnv {
-            runtime: runtime, // comes with internal cache
-            state: state,
+            behavior: behavior.clone(),
+            runtime: runtime,
+            state: behavior.into(),
             action_space: behavior.into(),
             max_length: max_length,
         }
@@ -24,7 +25,7 @@ impl CometRlEnv {
 impl From<BehaviorDecl> for SearchState {
     fn from(x: BehaviorDecl) -> SearchState {
         SearchState {
-            unprocessed_params: x.params,
+            params: todo!(), //x.args.iter().map(|arg| arg.name.clone()).collect(),
             stack: vec![],
         }
     }
@@ -33,7 +34,7 @@ impl From<BehaviorDecl> for SearchState {
 impl CometRlEnv {
     fn reset(&mut self) -> SearchState {
         self.state = SearchState {
-            unprocessed_params: vec![],
+            params: vec![],
             stack: vec![],
         };
         self.state.clone()

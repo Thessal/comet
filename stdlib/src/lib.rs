@@ -1,5 +1,6 @@
-// src/stdlib/lib.rs
 #![allow(clippy::not_unsafe_ptr_arg_deref, clippy::missing_safety_doc)]
+mod types;
+use types::Signal;
 
 pub mod add;
 pub mod consume_float;
@@ -179,16 +180,16 @@ pub trait MatrixOp {
     fn drop_buffers(&mut self) {}
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Signal {
-    // Used to evaluate parameters in runtime
-    Void,
-    Float(Option<f64>),
-    Int(Option<i64>),
-    String(Option<String>),
-    Vector(Option<Vec<f64>>),
-    DataFrame(Option<Vec<Vec<f64>>>),
-}
+// #[derive(Debug, Clone, PartialEq)]
+// pub enum Signal {
+//     // Used to evaluate parameters in runtime
+//     Void,
+//     Float(Option<f64>),
+//     Int(Option<i64>),
+//     String(Option<String>),
+//     Vector(Option<Vec<f64>>),
+//     DataFrame(Option<Vec<Vec<f64>>>),
+// }
 
 #[derive(Clone)]
 pub struct OperatorMeta {

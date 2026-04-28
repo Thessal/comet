@@ -26,6 +26,17 @@ struct Trajectory {
     sequence: Vec<String>,
 }
 
+impl BehaviorDecl {
+    // fn get_params(&self) -> HashMap<Ident, TypeDecl> {
+    fn get_params(&self) -> HashMap<Signal, bool> {
+        let signal:Signal = arg.type_decl.into();
+        let a = self.args
+            .iter()
+            .map(|TypedArg(name, type_decl)| (arg.name.clone(), arg.type_decl.clone()))
+            .collect()
+    }
+}
+
 fn sample_trajectory<B: Backend>(
     inference_model: &TransformerModel<B>,
     behavior: &BehaviorDecl,
@@ -42,14 +53,14 @@ fn sample_trajectory<B: Backend>(
     );
 
     let mut state = SearchState {
-        unprocessed_params: behavior
+        params: behavior
             .args
             .iter()
             .rev()
             .map(|arg| arg.type_decl.clone())
             .collect(),
         stack: vec![],
-        sequence: vec![],
+        // sequence: vec![],
     };
 
     let action_space = crate::search::ActionSpace::new(behavior, available_funcs);

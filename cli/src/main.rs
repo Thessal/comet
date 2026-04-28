@@ -17,18 +17,14 @@ struct Args {
 
 fn generate_valid_expressions(
     behavior: &BehaviorDecl,
-    available_funcs: &Vec<(
-        String,
-        Vec<parser::program::TypeDecl>,
-        parser::program::TypeDecl,
-    )>,
+    available_funcs: &Vec<runtime::ast::OperatorSpec>,
     k: usize,
     runtime: &mut runtime::runtime::Runtime,
 ) -> Vec<rl::search::EvaluatedSample> {
     // TODO: generate top k and drop duplicate samples. the result count may be smaller than k
     println!("Inferring action candidates from the code:");
     for f in available_funcs {
-        println!("- {}({:?}) -> {:?}", f.0, f.1, f.2);
+        println!("- {}({:?}) -> {:?}", f.name, f.inputs, f.output);
     }
 
     println!("\nGenerating sample expression trees and evaluating using runtime...");
@@ -76,11 +72,11 @@ fn main() {
     let available_funcs = if let Some(available_funcs_str) = &behavior.operators {
         let mut available_funcs = Vec::new();
         for func_str in available_funcs_str {
-            available_funcs.push(rl::env::get_available_func(&func_str));
+            available_funcs.push(runtime::ast::OperatorSpec::get_available_func(&func_str));
         }
         available_funcs
     } else {
-        rl::env::get_available_funcs()
+        runtime::ast::OperatorSpec::get_available_funcs()
     };
     println!("--- Available functions : {:?} ---", available_funcs);
 
@@ -127,23 +123,25 @@ fn main() {
     if use_cuda {
         println!("--- Using CUDA backend ---");
         run_with_backend::<burn::backend::Autodiff<burn::backend::Cuda>>(
-            &behavior, &available_funcs, runtime, call_args,
+            &behavior,
+            &available_funcs,
+            runtime,
+            call_args,
         );
     } else {
         println!("--- Using NdArray backend ---");
         run_with_backend::<burn::backend::Autodiff<burn::backend::ndarray::NdArray>>(
-            &behavior, &available_funcs, runtime, call_args,
+            &behavior,
+            &available_funcs,
+            runtime,
+            call_args,
         );
     }
 }
 
 fn run_with_backend<B: burn::tensor::backend::AutodiffBackend>(
     behavior: &BehaviorDecl,
-    available_funcs: &Vec<(
-        String,
-        Vec<parser::program::TypeDecl>,
-        parser::program::TypeDecl,
-    )>,
+    available_funcs: &Vec<runtime::ast::OperatorSpec>,
     mut runtime: runtime::runtime::Runtime,
     call_args: Vec<String>,
 ) {
@@ -185,9 +183,7 @@ fn run_with_backend<B: burn::tensor::backend::AutodiffBackend>(
             .load(bytes, &device)
             .unwrap();
 
-    let rl_model = config
-        .init::<B>(&device)
-        .load_record(rl_record);
+    let rl_model = config.init::<B>(&device).load_record(rl_record);
 
     let target_epochs = 1000;
     let rl_trained = rl::rl::train_rl(
@@ -222,7 +218,7 @@ fn run_with_backend<B: burn::tensor::backend::AutodiffBackend>(
         println!("Generated Sequence: {:?}", generated_sequence);
 
         match runtime.evaluate_sequence(&generated_sequence, call_args.clone()) {
-            Ok(stdlib::ParamType::DataFrame(output)) => {
+            Ok(stdlib::Signal::DataFrame(output)) => {
                 let fitness = runtime::fitness::evaluate_fitness_batch_add_value(
                     &mut runtime.dmgr,
                     &[&output],

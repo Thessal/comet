@@ -89,37 +89,38 @@ pub struct SearchHistory {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SearchState {
-    pub params_used: HashMap<Signal, bool>, // true if used. all of them need to be used.
+    pub params: HashMap<Signal, bool>, // true if used. all of them need to be used.
     pub stack: Vec<(Signal, Vec<OperatorSpec>, Option<Vec<Vec<f64>>>)>, // (type, expression, data)
 }
 
 #[derive(Debug, Clone, PartialEq)]
 impl SearchState {
-    pub fn apply_action(&mut self, action: Action) -> (bool) {
-        // (done)
-        match action {
+    pub fn apply_action(self, action: Action) -> (SearchState, bool) {
+        let mut next_state = self.clone();
+        let done: Bool = match action {
             Action::Done => true,
             Action::ShiftInt(i) => {
-                self.stack.push((Signal::Int, None));
+                next_state.stack.push((Signal::Int, None));
                 false
             }
             Action::ShiftFloat(f) => {
-                self.stack.push((Signal::Float, None));
+                next_state.stack.push((Signal::Float, None));
                 false
             }
             Action::ShiftString(s) => {
-                self.stack.push((Signal::String, None));
+                next_state.stack.push((Signal::String, None));
                 false
             }
             Action::Reduce(op) => {
                 let mut args = Vec::new();
                 for _ in 0..op.inputs.len() {
-                    args.push(self.stack.pop().unwrap());
+                    args.push(next_state.stack.pop().unwrap());
                 }
-                self.stack.push((op.output, None));
+                next_state.stack.push((op.output, None));
                 false
             }
         }
+        (next_state, done)
 
         // if self.sequence.len() >= self.max_length {
         //     return (self.state.clone(), -1.0, true); // Penalize hitting max depth
