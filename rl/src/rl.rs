@@ -1,11 +1,19 @@
 use crate::model::TransformerModel;
-use crate::search::{Action, SearchEnv, SearchState};
+use crate::action::{Action, SearchState};
 use burn::module::{AutodiffModule, Module};
 use burn::optim::{GradientsParams, Optimizer};
 use burn::tensor::backend::{AutodiffBackend, Backend};
 use burn::tensor::{Int, Tensor, TensorData};
-use parser::program::{BehaviorDecl, Ident, TypeDecl};
+use parser::program::{BehaviorDecl};
+use parser::expr::{Ident};
 use std::collections::HashMap;
+use stdlib::types::Signal;
+
+
+
+
+
+
 
 /// Helper function to perform one explicit gradient step
 pub fn update_parameters<B: AutodiffBackend, M: AutodiffModule<B>>(
@@ -63,7 +71,7 @@ fn sample_trajectory<B: Backend>(
         // sequence: vec![],
     };
 
-    let action_space = crate::search::ActionSpace::new(behavior, available_funcs);
+    let action_space = crate::action::ActionSpace::new(behavior, available_funcs);
     let action_vocab_size = action_space.size();
 
     let mut traj = Trajectory {
@@ -230,11 +238,11 @@ pub fn train_rl<B: AutodiffBackend>(
         }
 
         let batch_fitness =
-            runtime::fitness::evaluate_fitness_batch_add_value(&mut runtime.dmgr, &valid_refs);
+            runtime::stats::evaluate_fitness_batch_add_value(&mut runtime.dmgr, &valid_refs);
 
         let fitnesses: Vec<f64> = batch_fitness
             .into_iter()
-            .map(|metrics| runtime::fitness::fitness_summary(&metrics))
+            .map(|metrics| runtime::stats::fitness_summary(&metrics))
             .collect();
 
         let mut rewards = Vec::new();
@@ -261,7 +269,7 @@ pub fn train_rl<B: AutodiffBackend>(
             .unwrap_or(1)
             .max(1);
 
-        let action_space = crate::search::ActionSpace::new(behavior, available_funcs);
+        let action_space = crate::action::ActionSpace::new(behavior, available_funcs);
         let action_vocab_size = action_space.size();
 
         let mut inputs_data = Vec::with_capacity(batch_size * max_seq_len * 8);

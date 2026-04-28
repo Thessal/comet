@@ -20,7 +20,7 @@ fn generate_valid_expressions(
     available_funcs: &Vec<runtime::ast::OperatorSpec>,
     k: usize,
     runtime: &mut runtime::runtime::Runtime,
-) -> Vec<rl::search::EvaluatedSample> {
+) -> Vec<rl::action::EvaluatedSample> {
     // TODO: generate top k and drop duplicate samples. the result count may be smaller than k
     println!("Inferring action candidates from the code:");
     for f in available_funcs {
@@ -28,7 +28,7 @@ fn generate_valid_expressions(
     }
 
     println!("\nGenerating sample expression trees and evaluating using runtime...");
-    let samples = rl::search::generate_top_k_samples(
+    let samples = rl::action::generate_top_k_samples(
         &behavior,
         available_funcs,
         k,
@@ -167,7 +167,7 @@ fn run_with_backend<B: burn::tensor::backend::AutodiffBackend>(
     use burn::record::Recorder;
     let record = trained_model.into_record();
     let type_vocab_size = 1 + parser::program::TYPE_DECL_LENGTH;
-    let action_space = rl::search::ActionSpace::new(behavior, available_funcs);
+    let action_space = rl::action::ActionSpace::new(behavior, available_funcs);
     action_space.print_action_space();
     let action_vocab_size = action_space.size();
 
@@ -219,10 +219,8 @@ fn run_with_backend<B: burn::tensor::backend::AutodiffBackend>(
 
         match runtime.evaluate_sequence(&generated_sequence, call_args.clone()) {
             Ok(stdlib::Signal::DataFrame(output)) => {
-                let fitness = runtime::fitness::evaluate_fitness_batch_add_value(
-                    &mut runtime.dmgr,
-                    &[&output],
-                );
+                let fitness =
+                    runtime::stats::evaluate_fitness_batch_add_value(&mut runtime.dmgr, &[&output]);
                 println!("Inference Sample Fitness = {:?}", fitness);
                 break;
             }

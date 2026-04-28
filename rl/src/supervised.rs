@@ -9,8 +9,8 @@ use burn::{
     train::{ClassificationOutput, InferenceStep, LearningResult, TrainOutput, TrainStep},
 };
 
+use crate::action::{Action, EvaluatedSample, SearchEnv, SearchState};
 use crate::model::TransformerModel;
-use crate::search::{Action, EvaluatedSample, SearchEnv, SearchState};
 use parser::program::{BehaviorDecl, Ident, TYPE_DECL_LENGTH, TypeDecl};
 
 /// The input batch provided to the model during training.
@@ -172,7 +172,7 @@ impl ProgramSequenceDataset {
             true,
         );
 
-        let action_space = crate::search::ActionSpace::new(behavior, available_funcs);
+        let action_space = crate::action::ActionSpace::new(behavior, available_funcs);
         let action_vocab_size = action_space.size();
 
         for sample in samples {
@@ -317,7 +317,7 @@ impl<B: Backend> Batcher<B, TransformerBatchItem, TransformerBatch<B>> for Trans
 pub fn train<B: burn::tensor::backend::AutodiffBackend>(
     behavior: &parser::program::BehaviorDecl,
     available_funcs: &[runtime::ast::OperatorSpec],
-    samples: &[crate::search::EvaluatedSample],
+    samples: &[crate::action::EvaluatedSample],
     num_epochs: usize,
     batch_size: usize,
     num_workers: usize,
@@ -334,7 +334,7 @@ pub fn train<B: burn::tensor::backend::AutodiffBackend>(
 
     let device = <B as Backend>::Device::default();
 
-    let action_space = crate::search::ActionSpace::new(behavior, available_funcs);
+    let action_space = crate::action::ActionSpace::new(behavior, available_funcs);
     let action_vocab_size = action_space.size();
 
     let batcher_train = TransformerBatcher::new(32, action_vocab_size);
@@ -391,14 +391,14 @@ pub fn generate<B: burn::tensor::backend::Backend>(
 
     use burn::tensor::Tensor;
 
-    let env = crate::search::SearchEnv::new(
+    let env = crate::action::SearchEnv::new(
         behavior.return_type.clone(),
         behavior.integers.clone().unwrap_or_default(),
         behavior.floats.clone().unwrap_or_default(),
         behavior.strings.clone().unwrap_or_default(),
         true, // insert constants only when unprocessed param length < 5
     );
-    let mut state = crate::search::SearchState {
+    let mut state = crate::action::SearchState {
         unprocessed_params: behavior
             .args
             .iter()
@@ -409,7 +409,7 @@ pub fn generate<B: burn::tensor::backend::Backend>(
         sequence: vec![],
     };
 
-    let action_space = crate::search::ActionSpace::new(behavior, available_funcs);
+    let action_space = crate::action::ActionSpace::new(behavior, available_funcs);
     let action_vocab_size = action_space.size();
 
     for step_count in 0..100 {
@@ -418,7 +418,7 @@ pub fn generate<B: burn::tensor::backend::Backend>(
             break;
         }
 
-        if valid_actions.contains(&crate::search::Action::Done) {
+        if valid_actions.contains(&crate::action::Action::Done) {
             break;
         }
 
@@ -492,7 +492,7 @@ pub fn generate<B: burn::tensor::backend::Backend>(
         let mut rng = thread_rng();
         let chosen_action = valid_candidates[dist.sample(&mut rng)].clone();
 
-        if chosen_action == crate::search::Action::Done {
+        if chosen_action == crate::action::Action::Done {
             break;
         }
 

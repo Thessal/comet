@@ -2,10 +2,10 @@
 
 stdenv.mkDerivation rec {
   pname = "antigravity";
-  version = "1.20.5-5474622945755136";
+  version = "1.23.2-4781536860569600";
   src = fetchurl {
     url = "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/${version}/linux-x64/Antigravity.tar.gz";
-    sha256 = "sha256-W4dmT0VNpIe43uh6r14zYdm6eblHdwt5i9D6h0qYJ+U=";
+    sha256 = "sha256-UjKkBI/0+hVoXZqYG6T7pXPil/PvybdvY455S693VyU=";
   };
 
   nativeBuildInputs = [

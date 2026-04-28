@@ -1,5 +1,5 @@
 pub mod ast;
-pub mod backtest;
 pub mod dmgr;
-pub mod fitness;
+pub mod pnl;
 pub mod runtime;
+pub mod stats;

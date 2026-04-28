@@ -40,9 +40,7 @@ impl Runtime {
             _ => panic!("First argument of data operator is not a string"),
         };
         let data = || -> Result<Signal, String> {
-            Ok(Signal::DataFrame(Some(
-                self.dmgr.get_data(data_name.as_str()),
-            )))
+            Ok(Signal::DataFrame(self.dmgr.get_data(data_name.as_str())))
         };
         self.expr_cache.try_get_or_insert(key, data)
     }
