@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 parser = { path = "../parser" }
-codegen = { path = "../codegen" }
+# codegen = { path = "../codegen" }
 runtime = { path = "../runtime" }
 rand = "0.8"
 burn = { version = "0.20.1", features = [

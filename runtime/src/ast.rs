@@ -1,9 +1,6 @@
 use crate::runtime::Runtime;
-use parser::program::Literal;
-use parser::program::TypeDecl;
-use std::collections::HashMap;
-use std::sync::OnceLock;
-use stdlib::Signal;
+use parser::expr::Literal;
+use stdlib::types::Signal;
 
 ////////////////////////////////
 /* stdlib wrapper for runtime */
@@ -74,7 +71,7 @@ pub enum Tree {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {
     pub spec: OperatorSpec,
-    pub polish_expression: Option<Vec<Token>>,
+    pub polish_expression: Option<PolishExpr>,
     pub parameters: Option<Vec<Tree>>,
 }
 pub type PolishExpr = Vec<Token>;

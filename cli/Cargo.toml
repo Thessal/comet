@@ -6,7 +6,7 @@ default-run = "comet"
 
 [dependencies]
 parser = { path = "../parser" }
-codegen = { path = "../codegen" }
+# codegen = { path = "../codegen" }
 runtime = { path = "../runtime" }
 rl = { path = "../rl" }
 stdlib = { path = "../stdlib" }

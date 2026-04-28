@@ -1,7 +1,7 @@
 // input code AST
 use crate::expr::Ident;
 use crate::expr::Stmt;
-use crate::types::Signal;
+use stdlib::types::Signal;
 pub type InputCode = Vec<InputDecl>;
 pub type NamedSignal = (String, Signal);
 

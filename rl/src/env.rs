@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::search::{Action, ActionSpace, SearchState};
 use parser::program::BehaviorDecl;
 use runtime::runtime::Runtime;
@@ -34,7 +36,7 @@ impl From<BehaviorDecl> for SearchState {
 impl CometRlEnv {
     fn reset(&mut self) -> SearchState {
         self.state = SearchState {
-            params: vec![],
+            params: HashMap::new(),
             stack: vec![],
         };
         self.state.clone()
@@ -42,7 +44,8 @@ impl CometRlEnv {
 
     fn step(&mut self, action: Action) -> (SearchState, f64, bool) {
         let (next_state, done) = self.state.apply_action(action);
-        let sim_result = self.runtime.evaluate_sequence(&next_state.sequence);
+        // let sim_result = self.runtime.evaluate_sequence(&next_state.sequence);
+        let sim_result = self.runtime.run(&next_state.expression);
         let reward = sim_result.fitness;
         (next_state, reward, done)
     }

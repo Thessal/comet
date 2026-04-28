@@ -1,10 +1,10 @@
-use crate::ast::{Program, Token, Tree}; // Vec<Token>
+use crate::ast::{Program, Token, Tree};
 use crate::dmgr::DataManager;
 use lru::LruCache;
-use parser::program::Literal;
+use parser::expr::Literal;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
-use stdlib::Signal;
+use stdlib::types::Signal;
 
 pub struct Runtime {
     pub dmgr: DataManager,

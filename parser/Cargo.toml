@@ -7,3 +7,4 @@ edition = "2024"
 pest = "2.6"
 pest_derive = "2.6"
 thiserror = "1.0"
+stdlib = { version = "0.1.0", path = "../stdlib" }

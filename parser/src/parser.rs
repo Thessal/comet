@@ -2,6 +2,7 @@ use crate::program::*;
 use pest::Parser;
 use pest::iterators::Pair;
 use pest_derive::Parser;
+use stdlib::types::Signal;
 use thiserror::Error;
 
 #[derive(Parser)]
@@ -130,14 +131,14 @@ fn parse_behavior(
     Ok(crate::program::InputDecl::Behavior(bdecl))
 }
 
-fn parse_types(pair: pest::iterators::Pair<Rule>) -> Result<crate::types::Signal, ParserError> {
+fn parse_types(pair: pest::iterators::Pair<Rule>) -> Result<Signal, ParserError> {
     match pair.as_str() {
-        "Void" => Ok(crate::types::Signal::Void),
-        "Float" => Ok(crate::types::Signal::Float(None)),
-        "Int" => Ok(crate::types::Signal::Int(None)),
-        "String" => Ok(crate::types::Signal::String(None)),
-        "Vector" => Ok(crate::types::Signal::Vector(None)),
-        "DataFrame" => Ok(crate::types::Signal::DataFrame(None)),
+        "Void" => Ok(Signal::Void),
+        "Float" => Ok(Signal::Float(None)),
+        "Int" => Ok(Signal::Int(None)),
+        "String" => Ok(Signal::String(None)),
+        "Vector" => Ok(Signal::Vector(None)),
+        "DataFrame" => Ok(Signal::DataFrame(None)),
         s => Err(ParserError::SemanticError(format!("Unknown type: {}", s))),
     }
 }

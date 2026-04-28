@@ -1,4 +1,4 @@
 [workspace]
-members = ["parser", "codegen", "runtime", "rl", "stdlib", "cli", "results"]
+members = ["parser", "runtime", "rl", "stdlib", "cli", "results", "tmp/example"]
 resolver = "2"
 exclude = ["data"]
