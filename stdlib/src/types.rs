@@ -10,5 +10,19 @@ pub enum Signal {
     DataFrame(Option<Vec<Vec<f64>>>),
 }
 
+impl Into<usize> for Signal {
+    fn into(self) -> usize {
+        match self {
+            Signal::Void => 0,
+            Signal::Float(_) => 1,
+            Signal::Int(_) => 2,
+            Signal::String(_) => 3,
+            Signal::Vector(_) => 4,
+            Signal::DataFrame(_) => 5,
+        }
+    }
+}
+
 // Test
 // assert_eq!(TypeDecl[TypeDecl::DataFrame as usize], TypeDecl::DataFrame);
+// std::mem::discriminant(d) == std::mem::discriminant(i)

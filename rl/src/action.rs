@@ -18,6 +18,7 @@ pub enum Action {
     ShiftInt(i64),
     ShiftFloat(f64),
     ShiftString(String),
+    ShiftParam(usize),    // push param into stack
     Reduce(OperatorSpec), // Apply function/behavior and reduce stack
     Done,                 // Successfully matched exit condition
 }
@@ -38,6 +39,9 @@ impl From<String> for Action {
     fn from(s: String) -> Self {
         if s == "!done" {
             Action::Done
+        } else if s.starts_with("!shift_") {
+            let idx = s.strip_prefix("!shift_").unwrap();
+            Action::ShiftParam(idx.parse::<usize>().unwrap())
         } else if s.starts_with("\"") {
             Action::ShiftString(s.trim_matches('"').to_string())
         } else if let Ok(i) = s.parse::<i64>() {
@@ -79,10 +83,12 @@ impl From<BehaviorDecl> for ActionSpace {
         let _strings = b.strings.unwrap_or_default();
         let _operators = b.operators.unwrap_or_default();
 
-        let integer_offset = 1; // Done 
+        let integer_offset = 1; // Done
         let float_offset = integer_offset + _integers.len();
         let string_offset = float_offset + _floats.len();
         let operator_offset = string_offset + _strings.len();
+        let params_offset = operator_offset + _operators.len();
+        let num_params = b.inputs.len();
 
         let mut map = HashMap::new();
         map.insert(0, Action::Done);
@@ -98,9 +104,12 @@ impl From<BehaviorDecl> for ActionSpace {
                 Action::ShiftString(_strings[idx - string_offset].clone()),
             );
         }
-        for idx in operator_offset..operator_offset + _operators.len() {
+        for idx in operator_offset..params_offset {
             let op: OperatorSpec = OperatorSpec::from(_operators[idx - operator_offset].as_str());
             map.insert(idx, Action::Reduce(op));
+        }
+        for idx in params_offset..params_offset + num_params {
+            map.insert(idx, Action::ShiftParam(idx - params_offset));
         }
 
         let r_map = HashMap::from_iter(map.iter().map(|(idx, act)| (act.clone(), *idx)));

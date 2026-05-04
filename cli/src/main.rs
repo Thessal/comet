@@ -24,7 +24,7 @@ fn generate_valid_expressions(
     // TODO: generate top k and drop duplicate samples. the result count may be smaller than k
     println!("Inferring action candidates from the code:");
     for f in available_funcs {
-        println!("- {}({:?}) -> {:?}", f.name, f.inputs, f.output);
+        println!("- {}({:?}) -> {:?}", f.name, f.inputs_type, f.output_type);
     }
 
     println!("\nGenerating sample expression trees and evaluating using runtime...");

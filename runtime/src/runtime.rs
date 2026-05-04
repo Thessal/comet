@@ -55,13 +55,10 @@ impl Runtime {
                 match self.expr_cache.get(&polish_expr) {
                     Some(signal) => signal.clone(),
                     None => {
-                        let args: Vec<Signal> = program
-                            .parameters
-                            .clone()
-                            .unwrap()
-                            .into_iter()
-                            .map(|param| self.run(&param))
-                            .collect();
+                        let args: Vec<Signal> = match &program.parameters {
+                            Some(x) => x.iter().map(|param| self.run(param)).collect(),
+                            None => vec![],
+                        };
                         let result = self.evaluate(program.spec.clone(), args).unwrap();
                         self.expr_cache.put(polish_expr, result.clone());
                         result
@@ -88,18 +85,33 @@ mod tests {
 
     #[test]
     fn test_runtime_minimal() {
-        // volume / ts_mean(volume, 10)
-        // [ "volume", "data", "10", "volume", "data", "ts_mean", "divide" ]
+        let mut runtime = Runtime::new(100, "../data".into());
+        // param0 = data("volume")
+        let param0: Program = Program {
+            spec: OperatorSpec {
+                name: "data".to_string(),
+                inputs_type: vec![Signal::String(None)],
+                output_type: Signal::DataFrame(None),
+            },
+            polish_expression: Some(vec![
+                Token::Literal(Literal::String("volume".to_string())),
+                Token::Operator("data".into()),
+            ]),
+            parameters: Some(vec![Tree::Literal(Literal::String("volume".to_string()))]),
+        };
+        // let param0_signal = runtime.run(&Tree::Program(param0.clone()));
+        let params: Vec<Program> = vec![param0];
+
+        // volume / ts_mean(param0, 10)
+        // [ param0, "10", param0, "ts_mean", "divide" ]
         let expr: PolishExpr = vec![
-            Token::Literal(Literal::String("volume".to_string())),
-            Token::Operator("data".into()),
+            Token::Parameter(0),
             Token::Literal(Literal::Integer(10)),
-            Token::Literal(Literal::String("volume".to_string())),
-            Token::Operator("data".into()),
+            Token::Parameter(0),
             Token::Operator("ts_mean".into()),
             Token::Operator("divide".into()),
         ];
-        let program: Tree = (&expr).into();
+        let program: Tree = (&expr, params).into();
 
         match program.clone() {
             Tree::Program(program) => {
@@ -109,7 +121,8 @@ mod tests {
                     .iter()
                     .map(|x| x.into())
                     .collect();
-                // println!("{:?}", tokens);
+                println!("{:?}", tokens);
+
                 assert!(
                     tokens
                         == [
@@ -125,8 +138,6 @@ mod tests {
             }
             _ => panic!("Program is not a program"),
         }
-
-        let mut runtime = Runtime::new(100, "../data".into());
 
         let result = runtime.run(&program);
         match result {
@@ -152,7 +163,7 @@ mod tests {
             Token::Literal(Literal::String("nonexistingdata".to_string())),
             Token::Operator("data".into()),
         ];
-        let program: Tree = (&expr).into();
+        let program: Tree = (&expr, vec![]).into();
 
         let mut runtime = Runtime::new(100, "../data".into());
 

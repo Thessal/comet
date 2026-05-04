@@ -9,13 +9,13 @@ use stdlib::types::Signal;
 #[derive(Debug, Clone, PartialEq)]
 pub struct OperatorSpec {
     pub name: String,
-    pub inputs: Vec<Signal>,
-    pub output: Signal,
+    pub inputs_type: Vec<Signal>,
+    pub output_type: Signal,
 }
 
 impl OperatorSpec {
     fn fill(self, arglist: Vec<Tree>) -> Program {
-        let arity = self.inputs.len();
+        let arity = self.inputs_type.len();
         if arglist.len() < arity {
             panic!("Stack underflow for operator {}", self.name);
         }
@@ -45,8 +45,8 @@ impl From<&str> for OperatorSpec {
         let op = OperatorMeta::from(name);
         OperatorSpec {
             name: op.name.to_string(),
-            inputs: op.inputs.to_vec(),
-            output: op.output_shape,
+            inputs_type: op.inputs.to_vec(),
+            output_type: op.output_shape,
         }
     }
 }
@@ -60,6 +60,7 @@ use stdlib::OperatorMeta;
 pub enum Token {
     Operator(OperatorSpec),
     Literal(Literal),
+    Parameter(usize),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -94,6 +95,7 @@ impl Into<String> for &Token {
     fn into(self) -> String {
         match self {
             Token::Operator(operator) => format!("op!{}", operator.name),
+            Token::Parameter(index) => format!("param!{}", index),
             Token::Literal(Literal::Boolean(b)) => format!("bool!{}", b),
             Token::Literal(Literal::Integer(x)) => format!("int!{}", x),
             Token::Literal(Literal::Float(x)) => format!("float!{}", x),
@@ -102,13 +104,14 @@ impl Into<String> for &Token {
     }
 }
 
-impl From<&PolishExpr> for Tree {
-    fn from(tokens: &Vec<Token>) -> Self {
+impl From<(&PolishExpr, Vec<Program>)> for Tree {
+    // (tokens, params)
+    fn from((tokens, params): (&PolishExpr, Vec<Program>)) -> Self {
         let mut arglist: Vec<Tree> = Vec::new();
         for token in tokens.iter() {
             match token {
                 Token::Operator(operator) => {
-                    let arity = operator.inputs.len();
+                    let arity = operator.inputs_type.len();
                     if arglist.len() < arity {
                         panic!("Stack underflow for operator {}", operator.name);
                     }
@@ -119,6 +122,9 @@ impl From<&PolishExpr> for Tree {
                 }
                 Token::Literal(literal) => {
                     arglist.push(Tree::Literal(literal.clone()));
+                }
+                Token::Parameter(index) => {
+                    arglist.push(Tree::Program(params[*index].clone()));
                 }
             }
         }

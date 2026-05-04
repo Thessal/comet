@@ -5,6 +5,7 @@ use crate::state::SearchState;
 use crate::trajectory::Trajectory;
 use crate::trajectory::TrajectoryItem;
 use burn::module::{AutodiffModule, Module};
+use burn::nn::loss;
 use burn::optim::AdamConfig;
 use burn::optim::{GradientsParams, Optimizer};
 use burn::tensor::backend::{AutodiffBackend, Backend};
@@ -25,31 +26,74 @@ pub struct BatchConfig<B: Backend> {
     pub trajectories: Vec<Trajectory>,
 }
 
-impl<'a> Environment<'a> {
-    fn sample_trajectory<B: AutodiffBackend>(
+impl<'a, B: AutodiffBackend> Environment<'a, B> {
+    fn sample_trajectory(
         &mut self,
         model: &TransformerModel<B>,
         config: &BatchConfig<B>,
     ) -> Trajectory {
         let mut trajectory: Trajectory = Vec::new();
-        for _ in 0..config.trajectory_len {
-            let action_space = self.action_space;
-            let valid_actions = self.state.get_valid_actions(&action_space);
-            let action_mask: Tensor<B, 1, Int> = action_space.build_mask(valid_actions);
+        for _ in 0..self.max_length {
+            let action_space = &self.action_space;
+            let valid_actions: Vec<Action> = self.state.get_valid_actions(action_space);
+
+            let mut available_mask = vec![false; action_space.size()];
+            for a in &valid_actions {
+                available_mask[action_space.get_idx(a)] = true;
+            }
+            // Use model's internal device (dummy fetch since we don't have direct device accessor here, we assume default or use a dummy)
+            let device = B::Device::default();
+            let available_tensor = burn::tensor::Tensor::<B, 3, burn::tensor::Bool>::from_bool(
+                burn::tensor::TensorData::new(available_mask, [1, 1, action_space.size()]),
+                &device,
+            );
+
+            let state_data = self.state.to_tensor_data();
+            let state_tensor = Tensor::<B, 3, Int>::from_data(state_data, &device);
 
             //Inference
-            let logits: Tensor<B, 3> = config.model.forward(self.state.into());
-            // let distribution = TODO: sample from logit, using burn, with action mask
-            let action = distribution.sample();
+            let logits: Tensor<B, 3> = config.model.forward(state_tensor, available_tensor);
 
-            let (new_state, done) = self.state.apply_action(action);
+            let probs = burn::tensor::activation::softmax(logits, 2);
+            let probs_data = probs.into_data().to_vec::<f32>().unwrap();
+
+            let mut valid_probs: Vec<f32> = valid_actions
+                .iter()
+                .map(|a| {
+                    let id = action_space.get_idx(a);
+                    probs_data.get(id).copied().unwrap_or(0.0)
+                })
+                .collect();
+
+            let sum: f32 = valid_probs.iter().sum();
+            if sum > 1e-6 {
+                for p in &mut valid_probs {
+                    *p /= sum;
+                }
+            } else {
+                let uniform = 1.0 / valid_actions.len() as f32;
+                for p in &mut valid_probs {
+                    *p = uniform;
+                }
+            }
+
+            // Dummy action selection
+            let action = valid_actions[0].clone();
+
+            let (new_state, done) = self
+                .state
+                .clone()
+                .apply_action(action.clone(), &mut self.runtime);
+            self.state = new_state.clone();
+
             trajectory.push(TrajectoryItem {
-                state: self.state,
-                action: action,
+                state: self.state.clone(),
+                action,
                 reward: 0.0,
-                next_state: None,
+                next_state: Some(new_state.clone()),
                 sequence: self.state.expr.clone(),
             });
+
             if done {
                 break;
             }
@@ -57,7 +101,7 @@ impl<'a> Environment<'a> {
         trajectory
     }
 
-    pub fn sample_trajectories<B: AutodiffBackend>(
+    pub fn sample_trajectories(
         &mut self,
         model: &TransformerModel<B>,
         config: &mut BatchConfig<B>,
@@ -67,26 +111,32 @@ impl<'a> Environment<'a> {
         }
     }
 
-    pub fn calculate_fitness(&self, config: &BatchConfig<B>) -> Vec<f64> {
+    pub fn calculate_fitness(&mut self, config: &BatchConfig<B>) -> Vec<f64> {
         let trajectories = &config.trajectories;
-        let sequences: Vec<&PolishExpr> = trajectories.iter().map(|t| &t.sequence).collect();
-        let asts: Vec<&Tree> = sequences.into_iter().map(|s| &s.into()).collect();
-        let runtime = self.runtime;
-        let positions: Vec<Signal> = asts.iter().map(|ast| runtime.run(ast)).collect();
+        let sequences: Vec<&PolishExpr> = trajectories
+            .iter()
+            .map(|trajectory| &trajectory.iter().last().unwrap().sequence)
+            .collect();
+        let asts: Vec<Tree> = sequences.into_iter().map(|s| s.into()).collect();
+        let positions: Vec<Signal> = asts.iter().map(|ast| self.runtime.run(ast)).collect();
         let pnls: Vec<PnlResult> = positions
             .iter()
-            .map(|pos| self.pnl_calculator.pnl(&pos))
+            .map(|pos| self.pnl_calc.pnl(&pos))
             .collect();
         let fitnesses: Vec<Stats> = pnls.iter().map(|pnl| pnl.into()).collect(); // reward at the end of trajectory.
-        todo!("Think about how to add rewards step by step")
+        todo!("Think about how to add intermediate step rewards, not only reward of episode")
     }
 
-    pub fn calculate_gradient(&self, config: &BatchConfig<B>) -> GradientsParams<B> {
-        let model = &self.config.model;
-        todo!();
+    pub fn calculate_gradient(&self, config: &BatchConfig<B>) -> GradientsParams {
+        let model = &config.model;
+        // dummy return
+        // let empty_loss = Tensor::<B, 1>::zeros([1], &B::Device::default());
+        let loss: Tensor<B, 1> = todo!();
+        let gradients = loss.backward();
+        GradientsParams::from_grads(gradients, model)
     }
 
-    pub fn update_weight(&mut self, gradients: GradientsParams<B>) {
+    pub fn update_weight(&mut self, gradients: GradientsParams) {
         let model = &self.config.model;
         todo!()
     }
