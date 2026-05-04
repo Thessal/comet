@@ -50,8 +50,7 @@ fn diff(x: &Vec<Vec<f64>>) -> Vec<Vec<f64>> {
 /* PnL Calculator */
 ////////////////////////////////
 
-pub struct PnlCalculator<'a> {
-    dmgr: &'a DataManager,
+pub struct PnlCalculator {
     fee_rate: f64,
     usd_long: f64,
     usd_short: f64,
@@ -64,11 +63,10 @@ pub struct PnlResult {
     pub position: Vec<f64>,
 }
 
-impl<'a> PnlCalculator<'a> {
-    pub fn new(dmgr: &'a mut DataManager) -> Self {
+impl PnlCalculator {
+    pub fn new(dmgr: &mut DataManager) -> Self {
         let close_prc = dmgr.get_data("close").expect("Failed to load close data");
         Self {
-            dmgr,
             fee_rate: 0.0005,        // 5 bps
             usd_long: 10_000_000.0,  // 10M USD
             usd_short: 10_000_000.0, // 10M USD

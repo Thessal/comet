@@ -37,10 +37,14 @@ impl From<BehaviorDecl> for SearchState {
 }
 
 impl SearchState {
-    pub fn get_valid_actions(&self, action_space: &ActionSpace) -> Vec<Action> {
+    pub fn get_valid_actions(&self, action: &ActionSpace) -> Vec<Action> {
         todo!()
     }
-    pub fn apply_action(self, action: Action, runtime: &mut Runtime) -> (SearchState, bool) {
+    fn make_tree(
+        &self,
+        action: Action,
+        runtime: &mut Runtime,
+    ) -> (SearchState, PolishExpr, Tree, Signal) {
         let mut next_state = self.clone();
         let (expr, tree, data): (PolishExpr, Tree, Signal) = match action {
             Action::ShiftInt(i) => (
@@ -87,7 +91,7 @@ impl SearchState {
                     datas
                         .iter()
                         .zip(op.inputs_type.iter())
-                        .all(|(d, i)| std::mem::discriminant(d) == std::mem::discriminant(i))
+                        .all(|(d, i)| { std::mem::discriminant(d) == std::mem::discriminant(i) })
                 );
 
                 let expr: PolishExpr = exprs
@@ -104,23 +108,26 @@ impl SearchState {
                 let data = runtime.run(&tree);
                 (expr, tree, data)
             }
+            Action::Done => panic!("Done action should be handled in prior step."),
+        };
+        (next_state, expr, tree, data)
+    }
+
+    pub fn apply_action(&mut self, action: Action, runtime: &mut Runtime) -> (SearchState, bool) {
+        match action {
             Action::Done => {
+                let next_state = self.clone();
                 let params_consumed: bool = next_state.params.iter().all(|(_, _, used)| *used);
                 let stack_size: bool = next_state.stack.len() == 1;
                 assert!(params_consumed && stack_size);
-                (PolishExpr::new(), Tree::Empty, Signal::Void)
+                (next_state, true)
             }
-        };
-
-        let done: bool = match action {
-            Action::Done => true,
-            _ => {
+            x => {
+                let (mut next_state, expr, tree, data) = self.make_tree(x, runtime);
                 next_state.stack.push((expr, tree, data));
-                false
+                (next_state, false)
             }
-        };
-
-        (next_state, done)
+        }
     }
 }
 
@@ -132,6 +139,7 @@ mod tests {
 
     #[test]
     fn test() {
+        let mut runtime = Runtime::new(100, "../data".into());
         let behavior = BehaviorDecl {
             inputs: vec![
                 ("x".to_string(), Signal::DataFrame(None)),
@@ -147,10 +155,10 @@ mod tests {
             supervised_epochs: None,
         };
 
-        let action_space = ActionSpace::from(behavior.clone());
-        let state = SearchState::from(behavior.clone());
+        let action_space = ActionSpace::from(&behavior);
+        let mut state = SearchState::from(behavior.clone());
 
-        let (next_state, done) = state.apply_action(Action::ShiftInt(42), &mut runtime);
+        let (mut next_state, done) = state.apply_action(Action::ShiftInt(42), &mut runtime);
         assert!(!done);
         assert_eq!(next_state.stack.len(), 1);
 

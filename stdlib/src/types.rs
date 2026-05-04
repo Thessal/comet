@@ -23,6 +23,20 @@ impl Into<usize> for Signal {
     }
 }
 
+impl Signal {
+    pub fn is_none(&self) -> bool {
+        match self {
+            Signal::Void => false,
+            Signal::Float(None) => true,
+            Signal::Int(None) => true,
+            Signal::String(None) => true,
+            Signal::Vector(None) => true,
+            Signal::DataFrame(None) => true,
+            _ => false,
+        }
+    }
+}
+
 // Test
 // assert_eq!(TypeDecl[TypeDecl::DataFrame as usize], TypeDecl::DataFrame);
 // std::mem::discriminant(d) == std::mem::discriminant(i)

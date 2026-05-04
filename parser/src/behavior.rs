@@ -109,3 +109,27 @@ impl fmt::Display for FlowDecl {
         writeln!(f, "}}")
     }
 }
+
+pub fn test_make_behavior() -> BehaviorDecl {
+    let inputs = vec![("vol".to_string(), Signal::DataFrame(None))];
+    let output: NamedSignal = ("result".to_string(), Signal::DataFrame(None));
+    let operators = Some(vec![Ident::from("ts_mean"), Ident::from("ts_std")]);
+    let integers = Some(vec![5, 21]);
+    let floats = Some(vec![1.0, 2.0]);
+    let strings = None;
+    let weights = None;
+    let train = Some(false);
+    let supervised_epochs = Some(10);
+    let behavior = BehaviorDecl {
+        inputs,
+        output,
+        operators,
+        integers,
+        floats,
+        strings,
+        weights,
+        train,
+        supervised_epochs,
+    };
+    behavior
+}

@@ -78,28 +78,30 @@ impl Runtime {
     }
 }
 
+pub fn test_make_param0() -> Program {
+    Program {
+        spec: OperatorSpec {
+            name: "data".to_string(),
+            inputs_type: vec![Signal::String(None)],
+            output_type: Signal::DataFrame(None),
+        },
+        polish_expression: Some(vec![
+            Token::Literal(Literal::String("volume".to_string())),
+            Token::Operator("data".into()),
+        ]),
+        parameters: Some(vec![Tree::Literal(Literal::String("volume".to_string()))]),
+    }
+}
+
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use crate::ast::PolishExpr;
 
     #[test]
     fn test_runtime_minimal() {
         let mut runtime = Runtime::new(100, "../data".into());
-        // param0 = data("volume")
-        let param0: Program = Program {
-            spec: OperatorSpec {
-                name: "data".to_string(),
-                inputs_type: vec![Signal::String(None)],
-                output_type: Signal::DataFrame(None),
-            },
-            polish_expression: Some(vec![
-                Token::Literal(Literal::String("volume".to_string())),
-                Token::Operator("data".into()),
-            ]),
-            parameters: Some(vec![Tree::Literal(Literal::String("volume".to_string()))]),
-        };
-        // let param0_signal = runtime.run(&Tree::Program(param0.clone()));
+        let param0 = test_make_param0();
         let params: Vec<Program> = vec![param0];
 
         // volume / ts_mean(param0, 10)

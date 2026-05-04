@@ -76,12 +76,12 @@ impl ActionSpace {
     }
 }
 
-impl From<BehaviorDecl> for ActionSpace {
-    fn from(b: BehaviorDecl) -> ActionSpace {
-        let _integers = b.integers.unwrap_or_default();
-        let _floats = b.floats.unwrap_or_default();
-        let _strings = b.strings.unwrap_or_default();
-        let _operators = b.operators.unwrap_or_default();
+impl From<&BehaviorDecl> for ActionSpace {
+    fn from(b: &BehaviorDecl) -> ActionSpace {
+        let _integers = b.integers.clone().unwrap_or_default();
+        let _floats = b.floats.clone().unwrap_or_default();
+        let _strings = b.strings.clone().unwrap_or_default();
+        let _operators = b.operators.clone().unwrap_or_default();
 
         let integer_offset = 1; // Done
         let float_offset = integer_offset + _integers.len();

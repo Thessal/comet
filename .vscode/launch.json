@@ -23,7 +23,7 @@
                     "run",
                     //"--bin=comet",
                     "--",
-                    "examples/behavior_1.cm",
+                    "examples/behavior_4.cm",
                 ]
             },
             "args": []

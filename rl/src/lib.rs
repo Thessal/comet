@@ -1,9 +1,8 @@
 pub mod action;
 pub mod env;
+pub mod loss;
 pub mod model;
 pub mod rl;
 pub mod state;
-pub mod supervised;
-pub mod synthesis;
 pub mod train;
 pub mod trajectory;
