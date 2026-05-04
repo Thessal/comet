@@ -5,3 +5,5 @@ pub mod rl;
 pub mod state;
 pub mod supervised;
 pub mod synthesis;
+pub mod train;
+pub mod trajectory;

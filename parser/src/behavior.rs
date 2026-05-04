@@ -33,6 +33,7 @@ pub struct FlowDecl {
     pub body: Vec<Stmt>,
 }
 
+use std::collections::HashMap;
 use std::fmt;
 
 impl fmt::Display for InputDecl {

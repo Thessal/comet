@@ -1,6 +1,6 @@
 use clap::Parser;
+use parser::behavior::{BehaviorDecl, Declaration};
 use parser::parser::parse;
-use parser::program::{BehaviorDecl, Declaration};
 use std::fs;
 use std::io::Write;
 
@@ -93,19 +93,21 @@ fn main() {
     for decl in &program.declarations {
         if let Declaration::Flow(f) = decl {
             for stmt in &f.body {
-                if let parser::program::FlowStmt::Expr(parser::program::Expr::Call { path, args }) =
-                    stmt
+                if let parser::behavior::FlowStmt::Expr(parser::behavior::Expr::Call {
+                    path,
+                    args,
+                }) = stmt
                 {
                     if path.segments.join("::") == behavior.name {
                         let mut p = Vec::new();
                         for arg in args {
                             match arg {
-                                parser::program::Expr::Identifier(name) => p.push(name.clone()),
-                                parser::program::Expr::Literal(
-                                    parser::program::Literal::Float(f),
+                                parser::behavior::Expr::Identifier(name) => p.push(name.clone()),
+                                parser::behavior::Expr::Literal(
+                                    parser::behavior::Literal::Float(f),
                                 ) => p.push(f.to_string()),
-                                parser::program::Expr::Literal(
-                                    parser::program::Literal::Integer(i),
+                                parser::behavior::Expr::Literal(
+                                    parser::behavior::Literal::Integer(i),
                                 ) => p.push(i.to_string()),
                                 _ => p.push("volume".to_string()),
                             }
@@ -166,7 +168,7 @@ fn run_with_backend<B: burn::tensor::backend::AutodiffBackend>(
     use burn::module::{AutodiffModule, Module};
     use burn::record::Recorder;
     let record = trained_model.into_record();
-    let type_vocab_size = 1 + parser::program::TYPE_DECL_LENGTH;
+    let type_vocab_size = 1 + parser::behavior::TYPE_DECL_LENGTH;
     let action_space = rl::action::ActionSpace::new(behavior, available_funcs);
     action_space.print_action_space();
     let action_vocab_size = action_space.size();

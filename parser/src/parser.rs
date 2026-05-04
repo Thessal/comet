@@ -1,4 +1,4 @@
-use crate::program::*;
+use crate::behavior::*;
 use pest::Parser;
 use pest::iterators::Pair;
 use pest_derive::Parser;
@@ -41,12 +41,12 @@ fn parse_program(pair: pest::iterators::Pair<Rule>) -> Result<InputCode, ParserE
 
 fn parse_declaration(
     pair: pest::iterators::Pair<Rule>,
-) -> Result<crate::program::InputDecl, ParserError> {
+) -> Result<crate::behavior::InputDecl, ParserError> {
     let inner = pair.into_inner().next().unwrap();
     match inner.as_rule() {
         Rule::import_decl => {
             let s = inner.into_inner().nth(1).unwrap().as_str();
-            Ok(crate::program::InputDecl::Import(
+            Ok(crate::behavior::InputDecl::Import(
                 s.trim_matches('"').to_string(),
             ))
         }
@@ -58,7 +58,7 @@ fn parse_declaration(
 
 fn parse_behavior(
     pair: pest::iterators::Pair<Rule>,
-) -> Result<crate::program::InputDecl, ParserError> {
+) -> Result<crate::behavior::InputDecl, ParserError> {
     let mut inner = pair.into_inner();
     inner.next(); // skip k_behavior
     let name = inner.next().unwrap().as_str().to_string();
@@ -88,7 +88,7 @@ fn parse_behavior(
     }
 
     let output_type = parse_types(types_pair.unwrap())?;
-    let mut bdecl = crate::program::BehaviorDecl {
+    let mut bdecl = crate::behavior::BehaviorDecl {
         inputs,
         output: (name.clone(), output_type),
         operators: None,
@@ -128,7 +128,7 @@ fn parse_behavior(
         }
     }
 
-    Ok(crate::program::InputDecl::Behavior(bdecl))
+    Ok(crate::behavior::InputDecl::Behavior(bdecl))
 }
 
 fn parse_types(pair: pest::iterators::Pair<Rule>) -> Result<Signal, ParserError> {
@@ -257,7 +257,9 @@ fn extract_string_list(pair: &pest::iterators::Pair<Rule>) -> Result<Vec<String>
     Ok(res)
 }
 
-fn parse_flow(pair: pest::iterators::Pair<Rule>) -> Result<crate::program::InputDecl, ParserError> {
+fn parse_flow(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<crate::behavior::InputDecl, ParserError> {
     let mut inner = pair.into_inner();
     inner.next(); // k_flow
     let name = inner.next().unwrap().as_str().to_string();
@@ -281,10 +283,9 @@ fn parse_flow(pair: pest::iterators::Pair<Rule>) -> Result<crate::program::Input
         }
     }
 
-    Ok(crate::program::InputDecl::Flow(crate::program::FlowDecl {
-        name,
-        body,
-    }))
+    Ok(crate::behavior::InputDecl::Flow(
+        crate::behavior::FlowDecl { name, body },
+    ))
 }
 
 fn parse_expr(pair: pest::iterators::Pair<Rule>) -> Result<crate::expr::Expr, ParserError> {

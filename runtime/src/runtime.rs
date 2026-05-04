@@ -75,7 +75,7 @@ impl Runtime {
         }
     }
 
-    pub fn evaluate(&self, spec: OperatorSpec, args: Vec<Signal>) -> Result<Signal, String> {
+    fn evaluate(&self, spec: OperatorSpec, args: Vec<Signal>) -> Result<Signal, String> {
         let operator: stdlib::OperatorMeta = (spec.name.as_str()).into();
         operator.execute(&args)
     }

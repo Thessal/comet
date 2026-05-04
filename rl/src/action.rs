@@ -1,5 +1,5 @@
+use parser::behavior::{BehaviorDecl, FlowDecl, NamedSignal};
 use parser::expr::{Expr, Literal};
-use parser::program::{BehaviorDecl, FlowDecl, NamedSignal};
 use runtime::ast::Token;
 use runtime::ast::{OperatorSpec, PolishExpr};
 use runtime::runtime::Runtime;
@@ -61,10 +61,13 @@ pub struct ActionSpace {
 }
 
 impl ActionSpace {
-    fn get_idx(self, action: &Action) -> usize {
+    pub fn size(&self) -> usize {
+        self.map.len()
+    }
+    pub fn get_idx(&self, action: &Action) -> usize {
         *self.r_map.get(action).unwrap()
     }
-    fn get_action(self, idx: usize) -> Action {
+    pub fn get_action(&self, idx: usize) -> Action {
         self.map.get(&idx).unwrap().clone()
     }
 }
@@ -83,7 +86,6 @@ impl From<BehaviorDecl> for ActionSpace {
 
         let mut map = HashMap::new();
         map.insert(0, Action::Done);
-        let mut idx = 1;
         for idx in 1..float_offset {
             map.insert(idx, Action::ShiftInt(_integers[idx - 1]));
         }
@@ -101,9 +103,7 @@ impl From<BehaviorDecl> for ActionSpace {
             map.insert(idx, Action::Reduce(op));
         }
 
-        ActionSpace {
-            map,
-            r_map: HashMap::from_iter(map.iter().map(|(idx, act)| (act.clone(), *idx))),
-        }
+        let r_map = HashMap::from_iter(map.iter().map(|(idx, act)| (act.clone(), *idx)));
+        ActionSpace { map, r_map }
     }
 }
