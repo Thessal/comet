@@ -162,4 +162,6 @@ mod tests {
         let action_back: Action = action_str.into();
         assert_eq!(action, action_back);
     }
+
+    // TODO: Add ActionSpace from BehaviorDecl and indexing tests.
 }

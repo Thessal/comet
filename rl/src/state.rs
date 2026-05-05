@@ -1,4 +1,7 @@
 use crate::action::{Action, ActionSpace};
+use burn::Tensor;
+use burn::prelude::Backend;
+use burn::tensor::{Float, Int, TensorData};
 use parser::behavior::BehaviorDecl;
 use parser::expr::Literal;
 use runtime::ast::{OperatorSpec, PolishExpr, Program};
@@ -148,7 +151,6 @@ impl SearchState {
                 assert!(is_done_valid);
                 (next_state, true)
             }
-            // Action::Reduce => {} TODO
             other_action => {
                 let (mut next_state, expr, tree, data) =
                     self.make_tree(other_action, param_values, runtime);

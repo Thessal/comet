@@ -6,14 +6,44 @@ use std::path::PathBuf;
 pub struct DataManager {
     cache: HashMap<String, Vec<Vec<f64>>>,
     data_dir: PathBuf,
+    pub data_size: (usize, usize),
 }
 
 impl DataManager {
     pub fn new(data_dir: PathBuf) -> Self {
+        let data = self.get_data("close");
         DataManager {
             cache: HashMap::new(),
             data_dir,
+            data_size: (data.len(), columns.len()),
         }
+    }
+
+    pub fn check_size(&self, data: &Vec<Vec<f64>>) -> Result<(), String> {
+        if data.is_empty() {
+            return Err("Data is empty".to_string());
+        }
+        if data.len() != self.data_size.0 {
+            return Err(format!(
+                "Data length mismatch: expected {}, got {}",
+                self.data_size.0,
+                data.len()
+            ));
+        }
+        let columns = data[0].len();
+        if columns != self.data_size.1 {
+            return Err(format!(
+                "Data columns mismatch: expected {}, got {}",
+                self.data_size.1, columns
+            ));
+        }
+        //// For checking every row
+        // for row in data {
+        //     if row.len() != columns {
+        //         return Err("Data is not rectangular".to_string());
+        //     }
+        // }
+        Ok(())
     }
 
     pub fn get_data(&mut self, name: &str) -> Option<Vec<Vec<f64>>> {
@@ -50,6 +80,9 @@ impl DataManager {
             // panic!("Failed to load data file: {:?}", path);
             return None;
         };
+
+        // data shape check
+        self.check_size(&loaded_data);
 
         self.cache.insert(name.to_string(), loaded_data.clone());
         Some(loaded_data)

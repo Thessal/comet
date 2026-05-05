@@ -1,5 +1,6 @@
 use crate::action::Action;
 use crate::action::ActionSpace;
+use crate::embed::data_embedding_model;
 use crate::reward::calc_intermediate_reward;
 use crate::reward::calc_terminal_reward;
 use crate::state::SearchState;
@@ -24,6 +25,23 @@ pub struct Environment<'a> {
     pub max_length: usize,
     pub pnl_calc: pnl::PnlCalculator,
     pub score_fn: Aggregator,
+}
+
+impl Environment {
+    pub fn state_embed<B: Backend>(&self, device: &B::Device) -> Tensor<B, 1, Float> {
+        let data_size = self.runtime.dmgr.data_size;
+        let embeddings: Vec<Vec<Vec<f64>>> = self
+            .state
+            .stack
+            .iter()
+            .map(|(_, _, signal)| signal.to_dataframe(data_size))
+            .collect();
+        let embeddings: Vec<Tensor<B, 1, Float>> = embeddings
+            .into_iter()
+            .map(|x| data_embedding_model(&x, device))
+            .collect();
+        Tensor::stack(embeddings, 1).max_dim(1) // max pooling
+    }
 }
 
 impl<'a> Environment<'a> {
@@ -54,9 +72,6 @@ impl<'a> Environment<'a> {
             score_fn: score_fn,
         }
     }
-}
-
-impl<'a> Environment<'a> {
     pub fn reset(&mut self) -> SearchState {
         self.trajectory = vec![];
         self.state = self.behavior.clone().into();
@@ -157,4 +172,6 @@ mod tests {
             println!("Reward : {:?}", reward);
         }
     }
+
+    //TODO: tests for invalid actions, terminal states, and maximum trajectory length boundaries.
 }

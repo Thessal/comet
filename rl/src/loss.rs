@@ -1,7 +1,7 @@
 use burn::tensor::{Tensor, backend::Backend};
 
-/// Calculate PPO loss (clipped surrogate objective)
-pub fn ppo_loss<B: Backend>(
+/// Calculate PPO objective (clipped surrogate objective)
+pub fn ppo_objective<B: Backend>(
     log_probs: Tensor<B, 2>,
     old_log_probs: Tensor<B, 2>,
     advantages: Tensor<B, 2>,
@@ -20,3 +20,27 @@ pub fn ppo_loss<B: Backend>(
 
     loss.reshape([1])
 }
+
+// TODO: value function estimation
+// https://spinningup.openai.com/en/latest/algorithms/ppo.html
+// pub fn value_function_loss<B: Backend>(
+//     state_embeds: Tensor<B, 2>,
+//     rewards: Tensor<B, 2>,
+//     returns: Tensor<B, 2>,
+// ) -> Tensor<B, 1> {
+//     let v_pred = model.value_function(state_embeds);
+//     let returns = returns.unsqueeze(1);
+//     let returns_smooth = returns * (1.0 - beta) + beta * v_pred.clone();
+//     let value_loss = ((v_pred - returns_smooth).powi(2)).mean();
+//     value_loss
+// }
+
+// TODO: actor-critic loss
+
+// TODO
+pub fn reinforce<B: Backend>(log_probs: Tensor<B, 2>, returns: Tensor<B, 2>) -> Tensor<B, 1> {
+    let loss = log_probs.clone() * returns.clone();
+    loss.mean().neg().reshape([1])
+}
+
+// TODO: add tests that check for standard results

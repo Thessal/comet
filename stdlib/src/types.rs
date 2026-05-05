@@ -35,6 +35,22 @@ impl Signal {
             _ => false,
         }
     }
+    // cast data into dataframe, for embedding
+    pub fn to_dataframe(&self, size: (usize, usize)) -> Vec<Vec<f64>> {
+        match self {
+            Signal::Void => vec![vec![0.0; size.1]; size.0],
+            Signal::Float(Some(x)) => vec![vec![x.clone(); size.1]; size.0],
+            Signal::Int(Some(i)) => vec![vec![i.clone() as f64; size.1]; size.0],
+            Signal::String(Some(_s)) => vec![vec![0.0; size.1]; size.0],
+            Signal::Vector(Some(_v)) => panic!(),
+            Signal::DataFrame(Some(df)) => {
+                // assert_eq!(df.len(), size.0);
+                // assert!(df.iter().map(|x| x.len()).all(|x| x == size.1));
+                df.clone() // is it deep copy?
+            }
+            _ => panic!(),
+        }
+    }
 }
 
 // Test

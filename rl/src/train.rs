@@ -13,13 +13,6 @@ pub struct BatchConfig {
     pub trajectories: Vec<Trajectory>,
 }
 
-fn encode_state_dummy<B: Backend>(device: &B::Device) -> Tensor<B, 3, Int> {
-    // RNN expects [batch_size, seq_length, 2]
-    // where the 2 features are parent and sibling action indices.
-    let state_data = TensorData::from([[[0, 0]]]);
-    Tensor::<B, 3, Int>::from_data(state_data.convert::<i32>(), device)
-}
-
 impl<'a> Environment<'a> {
     pub fn sample_trajectory<B: Backend>(
         &mut self,
@@ -47,7 +40,7 @@ impl<'a> Environment<'a> {
                 device,
             );
 
-            let state_tensor = encode_state_dummy::<B>(device);
+            let state_tensor = self.state_embed(device);
 
             // Inference
             let logits: Tensor<B, 3> = model.forward(state_tensor, available_tensor);
@@ -126,6 +119,7 @@ impl<'a> Environment<'a> {
             }
 
             // Dummy loss calculation since exact REINFORCE needs re-evaluation or stored log_probs
+            todo!("Implement REINFORCE");
             let dummy_loss = Tensor::<B, 1>::zeros([1], device);
             traj_loss = traj_loss + dummy_loss * reward_sum;
             total_loss = total_loss + traj_loss;
