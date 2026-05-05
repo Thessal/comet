@@ -2,6 +2,7 @@ pub mod action;
 pub mod env;
 pub mod loss;
 pub mod model;
+pub mod reward;
 pub mod rl;
 pub mod state;
 pub mod train;

@@ -65,7 +65,7 @@ impl Runtime {
                     }
                 }
             }
-            Tree::Literal(Literal::Boolean(literal)) => panic!("Boolean literal not supported"),
+            Tree::Literal(Literal::Boolean(_literal)) => panic!("Boolean literal not supported"),
             Tree::Literal(Literal::Integer(literal)) => Signal::Int(Some(literal.clone())),
             Tree::Literal(Literal::Float(literal)) => Signal::Float(Some(literal.clone())),
             Tree::Literal(Literal::String(literal)) => Signal::String(Some(literal.clone())),
@@ -90,6 +90,20 @@ pub fn test_make_param0() -> Program {
             Token::Operator("data".into()),
         ]),
         parameters: Some(vec![Tree::Literal(Literal::String("volume".to_string()))]),
+    }
+}
+pub fn test_make_param1() -> Program {
+    Program {
+        spec: OperatorSpec {
+            name: "data".to_string(),
+            inputs_type: vec![Signal::String(None)],
+            output_type: Signal::DataFrame(None),
+        },
+        polish_expression: Some(vec![
+            Token::Literal(Literal::String("close".to_string())),
+            Token::Operator("data".into()),
+        ]),
+        parameters: Some(vec![Tree::Literal(Literal::String("close".to_string()))]),
     }
 }
 

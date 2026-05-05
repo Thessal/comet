@@ -1,4 +1,3 @@
-use crate::runtime::Runtime;
 use parser::expr::Literal;
 use stdlib::types::Signal;
 
@@ -23,7 +22,7 @@ impl OperatorSpec {
         for arg in arglist {
             args.push(arg);
         }
-        args.reverse();
+        // args.reverse();
         let mut polish_expr: Vec<Token> = Vec::new();
         for arg in args.clone() {
             match arg {
@@ -104,6 +103,16 @@ impl Into<String> for &Token {
     }
 }
 
+// Convert single program to tree
+impl From<Program> for Tree {
+    fn from(param: Program) -> Self {
+        let tokens = vec![Token::Parameter(0)];
+        let params = vec![param];
+        (&tokens, params).into()
+    }
+}
+
+// From tokens (with parameter shift) and parameter list (Program), generate a AST.
 impl From<(&PolishExpr, Vec<Program>)> for Tree {
     // (tokens, params)
     fn from((tokens, params): (&PolishExpr, Vec<Program>)) -> Self {
@@ -116,7 +125,7 @@ impl From<(&PolishExpr, Vec<Program>)> for Tree {
                         panic!("Stack underflow for operator {}", operator.name);
                     }
                     let mut _arglist = arglist.split_off(arglist.len() - arity);
-                    _arglist.reverse();
+                    //_arglist.reverse();
                     let program = operator.clone().fill(_arglist);
                     arglist.push(Tree::Program(program));
                 }

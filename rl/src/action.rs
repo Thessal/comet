@@ -1,12 +1,7 @@
-use parser::behavior::{BehaviorDecl, FlowDecl, NamedSignal};
-use parser::expr::{Expr, Literal};
-use runtime::ast::Token;
-use runtime::ast::{OperatorSpec, PolishExpr};
-use runtime::runtime::Runtime;
+use parser::behavior::BehaviorDecl;
+use runtime::ast::OperatorSpec;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::io::Write;
-use stdlib::types::Signal;
 
 //////////
 /// Action
@@ -25,15 +20,26 @@ pub enum Action {
 
 impl Hash for Action {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            Action::ShiftFloat(x) => (((*x) * 1024.0 * 1024.0).round() as i64).hash(state),
-            Action::Reduce(x) => format!("!{}", x.name).hash(state),
-            x => x.hash(state),
-        }
+        Into::<String>::into(self).hash(state);
     }
 }
 
 impl Eq for Action {}
+
+// Acition serialization and deserialization
+
+impl Into<String> for &Action {
+    fn into(self) -> String {
+        match self {
+            Action::ShiftFloat(x) => format!("{:.8}", x),
+            Action::Reduce(x) => format!("!{}", x.name),
+            Action::Done => format!("!done"),
+            Action::ShiftInt(x) => format!("{}", x),
+            Action::ShiftString(x) => format!("\"{x}\""),
+            Action::ShiftParam(x) => format!("!shift_{}", x),
+        }
+    }
+}
 
 impl From<String> for Action {
     fn from(s: String) -> Self {
@@ -44,12 +50,14 @@ impl From<String> for Action {
             Action::ShiftParam(idx.parse::<usize>().unwrap())
         } else if s.starts_with("\"") {
             Action::ShiftString(s.trim_matches('"').to_string())
+        } else if s.starts_with("!") {
+            Action::Reduce(OperatorSpec::from(&s[1..]))
         } else if let Ok(i) = s.parse::<i64>() {
             Action::ShiftInt(i)
         } else if let Ok(f) = s.parse::<f64>() {
             Action::ShiftFloat(f)
         } else {
-            Action::Reduce(OperatorSpec::from(s.as_str()))
+            panic!("Unknown action: {}", s);
         }
     }
 }
@@ -114,5 +122,44 @@ impl From<&BehaviorDecl> for ActionSpace {
 
         let r_map = HashMap::from_iter(map.iter().map(|(idx, act)| (act.clone(), *idx)));
         ActionSpace { map, r_map }
+    }
+}
+
+/// Write action space serialization and deserialization consistency check test
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_action_consistency() {
+        let action = Action::ShiftInt(42);
+        let action_str: String = (&action).into();
+        let action_back: Action = action_str.into();
+        assert_eq!(action, action_back);
+
+        let action = Action::ShiftFloat(42.0);
+        let action_str: String = (&action).into();
+        let action_back: Action = action_str.into();
+        assert_eq!(action, action_back);
+
+        let action = Action::ShiftString("hello".to_string());
+        let action_str: String = (&action).into();
+        let action_back: Action = action_str.into();
+        assert_eq!(action, action_back);
+
+        let action = Action::ShiftParam(42);
+        let action_str: String = (&action).into();
+        let action_back: Action = action_str.into();
+        assert_eq!(action, action_back);
+
+        let action = Action::Reduce(OperatorSpec::from("ts_mean"));
+        let action_str: String = (&action).into();
+        let action_back: Action = action_str.into();
+        assert_eq!(action, action_back);
+
+        let action = Action::Done;
+        let action_str: String = (&action).into();
+        let action_back: Action = action_str.into();
+        assert_eq!(action, action_back);
     }
 }

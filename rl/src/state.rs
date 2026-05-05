@@ -1,14 +1,9 @@
 use crate::action::{Action, ActionSpace};
-use burn::prelude::Backend;
-use burn::tensor::TensorData;
-use parser::behavior::{BehaviorDecl, FlowDecl, NamedSignal};
-use parser::expr::{Expr, Literal};
+use parser::behavior::BehaviorDecl;
+use parser::expr::Literal;
 use runtime::ast::{OperatorSpec, PolishExpr, Program};
 use runtime::ast::{Token, Tree};
 use runtime::runtime::Runtime;
-use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
-use std::io::Write;
 use stdlib::types::Signal;
 
 //////////
@@ -17,7 +12,7 @@ use stdlib::types::Signal;
 
 #[derive(Debug, Clone)]
 pub struct SearchState {
-    pub params: Vec<(String, Signal, bool)>, // (param name, param data, is_used). all params need to be used in the end.
+    pub params: Vec<(String, Signal, bool)>, // (param name, param type, is_used). all params need to be used in the end.
     pub stack: Vec<(PolishExpr, Tree, Signal)>, // polish expr, tree, data
     pub expr: PolishExpr,                    // Polish expression (added for convenience)
 }
@@ -37,12 +32,48 @@ impl From<BehaviorDecl> for SearchState {
 }
 
 impl SearchState {
+    pub fn is_done_valid(&self) -> (bool, bool, bool) {
+        let params_consumed: bool = self.params.iter().all(|(_, _, used)| *used);
+        let stack_size: bool = self.stack.len() == 1;
+        let is_done_valid: bool = params_consumed && stack_size;
+        (is_done_valid, params_consumed, stack_size)
+    }
     pub fn get_valid_actions(&self, action: &ActionSpace) -> Vec<Action> {
-        todo!()
+        let stack_type_and_data: Vec<Signal> =
+            self.stack.iter().map(|(_, _, s)| s.clone()).collect();
+        let mut valid_actions: Vec<Action> = vec![];
+        for i in 0..action.size() {
+            let a = action.get_action(i);
+            let is_valid: bool = match a {
+                Action::Reduce(OperatorSpec {
+                    name: _name,
+                    inputs_type,
+                    output_type: _output_type,
+                }) => {
+                    if inputs_type.len() > self.stack.len() {
+                        false
+                    } else {
+                        inputs_type
+                            .iter()
+                            .rev()
+                            .zip(stack_type_and_data.iter().rev())
+                            // compare variant only. (not data)
+                            .all(|(i, s)| std::mem::discriminant(i) == std::mem::discriminant(s))
+                    }
+                }
+                Action::Done => self.is_done_valid().0,
+                _ => true,
+            };
+            if is_valid {
+                valid_actions.push(action.get_action(i));
+            }
+        }
+        valid_actions
     }
     fn make_tree(
         &self,
         action: Action,
+        param_values: &Vec<Tree>,
         runtime: &mut Runtime,
     ) -> (SearchState, PolishExpr, Tree, Signal) {
         let mut next_state = self.clone();
@@ -63,21 +94,10 @@ impl SearchState {
                 Signal::String(Some(s.clone())),
             ),
             Action::ShiftParam(i) => {
-                let (param_name, signal, _) = next_state.params[i].clone();
+                let (_param_name, _output_type, _used) = next_state.params[i].clone();
                 next_state.params[i].2 = true;
-                (
-                    vec![Token::Parameter(i)],
-                    Tree::Program(Program {
-                        spec: OperatorSpec {
-                            name: format!("!shift_{}", param_name),
-                            inputs_type: vec![],
-                            output_type: signal.clone(),
-                        },
-                        polish_expression: Some(PolishExpr::from(vec![Token::Parameter(i)])),
-                        parameters: None,
-                    }),
-                    signal,
-                )
+                let tree = param_values[i].clone();
+                (vec![Token::Parameter(i)], tree.clone(), runtime.run(&tree))
             }
             Action::Reduce(op) => {
                 let arity = op.inputs_type.len();
@@ -87,6 +107,7 @@ impl SearchState {
                 let datas: Vec<Signal> = inputs.iter().map(|x| x.2.clone()).collect();
 
                 assert!(datas.len() == arity);
+                // operator arguments type check - RPN
                 assert!(
                     datas
                         .iter()
@@ -105,6 +126,7 @@ impl SearchState {
                     polish_expression: Some(expr.clone()),
                     parameters: Some(trees),
                 });
+
                 let data = runtime.run(&tree);
                 (expr, tree, data)
             }
@@ -113,17 +135,24 @@ impl SearchState {
         (next_state, expr, tree, data)
     }
 
-    pub fn apply_action(&mut self, action: Action, runtime: &mut Runtime) -> (SearchState, bool) {
+    pub fn apply_action(
+        &self,
+        action: Action,
+        runtime: &mut Runtime,
+        param_values: &Vec<Tree>,
+    ) -> (SearchState, bool) {
         match action {
             Action::Done => {
                 let next_state = self.clone();
-                let params_consumed: bool = next_state.params.iter().all(|(_, _, used)| *used);
-                let stack_size: bool = next_state.stack.len() == 1;
-                assert!(params_consumed && stack_size);
+                let (is_done_valid, _params_consumed, _stack_size) = next_state.is_done_valid();
+                assert!(is_done_valid);
                 (next_state, true)
             }
-            x => {
-                let (mut next_state, expr, tree, data) = self.make_tree(x, runtime);
+            // Action::Reduce => {} TODO
+            other_action => {
+                let (mut next_state, expr, tree, data) =
+                    self.make_tree(other_action, param_values, runtime);
+
                 next_state.stack.push((expr, tree, data));
                 (next_state, false)
             }
@@ -133,17 +162,63 @@ impl SearchState {
 
 #[cfg(test)]
 mod tests {
-    use parser::behavior::FlowDecl;
+    use runtime::runtime::test_make_param0;
 
     use super::*;
-
     #[test]
-    fn test() {
+    fn test_get_valid_actions() {
+        let mut runtime = Runtime::new(100, "../data".into());
+        let behavior = BehaviorDecl {
+            inputs: vec![("x".to_string(), Signal::DataFrame(None))],
+            output: ("result".to_string(), Signal::DataFrame(None)),
+            operators: Some(vec!["ts_mean".to_string()]),
+            integers: Some(vec![0, 1]),
+            floats: Some(vec![0.0, 3.0]),
+            strings: None,
+            weights: None,
+            train: None,
+            supervised_epochs: None,
+        };
+        let action_space: ActionSpace = (&behavior).into();
+        let state = SearchState::from(behavior);
+        let valid_actions = state.get_valid_actions(&action_space);
+        assert_eq!(valid_actions.len(), 5); //[ShiftInt(0), ShiftInt(1), ShiftFloat(0.0), ShiftFloat(3.0), ShiftParam(0)]
+        assert!(valid_actions.contains(&Action::ShiftInt(0)));
+        assert!(!valid_actions.contains(&Action::ShiftInt(-1)));
+        assert!(valid_actions.contains(&Action::ShiftFloat(0.0)));
+        assert!(!valid_actions.contains(&Action::ShiftFloat(-1.0)));
+
+        let param_values: Vec<Tree> = vec![Tree::Program(test_make_param0())];
+        let (state, _1) = state.apply_action(Action::ShiftParam(0), &mut runtime, &param_values);
+        let (state, _1) = state.apply_action(Action::ShiftInt(0), &mut runtime, &param_values);
+        // println!("{:?}", state.stack);
+        // println!("action_space {:?}", action_space);
+        let valid_actions2 = state.get_valid_actions(&action_space);
+        // println!("valid_actions2 {:?}", valid_actions2);
+        assert!(valid_actions2.contains(&Action::Reduce(OperatorSpec::from("ts_mean"))));
+        assert_eq!(valid_actions2.len(), 6); // [ShiftInt(0), ShiftInt(1), ShiftFloat(0.0), ShiftFloat(3.0), Reduce("ts_mean"), ShiftParam(0)]
+
+        let operator_offset = 1 + 2 + 2 + 0; // Action space layout [done, integers, floats, strings, operators, params]
+        let action = action_space.get_action(operator_offset);
+        assert!(matches!(action, Action::Reduce(_)));
+        let (state, _1) = state.apply_action(action, &mut runtime, &param_values);
+        let valid_actions3 = state.get_valid_actions(&action_space);
+        // println!(
+        //     "is_done_valid: is_done_valid, params_consumed, stack_size = {:?}",
+        //     state.is_done_valid()
+        // );
+        // println!("stack_size: {:?}", state.stack.len());
+        // println!("valid_actions3 {:?}", valid_actions3);
+        assert!(valid_actions3.contains(&Action::Done));
+        assert_eq!(valid_actions3.len(), 6);
+    }
+    #[test]
+    fn test_action_application() {
         let mut runtime = Runtime::new(100, "../data".into());
         let behavior = BehaviorDecl {
             inputs: vec![
                 ("x".to_string(), Signal::DataFrame(None)),
-                ("y".to_string(), Signal::DataFrame(None)),
+                // ("y".to_string(), Signal::DataFrame(None)),
             ],
             output: ("result".to_string(), Signal::DataFrame(None)),
             operators: Some(vec!["ts_mean".to_string(), "ts_diff".to_string()]),
@@ -155,14 +230,28 @@ mod tests {
             supervised_epochs: None,
         };
 
-        let action_space = ActionSpace::from(&behavior);
-        let mut state = SearchState::from(behavior.clone());
+        let _action_space = ActionSpace::from(&behavior);
+        let state = SearchState::from(behavior.clone());
+        let param_values: Vec<Tree> = vec![
+            Tree::Program(test_make_param0()),
+            // Tree::Program(test_make_param1()),
+        ];
 
-        let (mut next_state, done) = state.apply_action(Action::ShiftInt(42), &mut runtime);
+        let (next_state, done) = {
+            let (s0, _d0) = (state, false);
+            let (s1, _d1) = s0.apply_action(Action::ShiftParam(0), &mut runtime, &param_values);
+            let (s2, _d2) = s1.apply_action(Action::ShiftInt(2), &mut runtime, &param_values);
+            let (s3, d3) = s2.apply_action(
+                Action::Reduce("ts_mean".into()),
+                &mut runtime,
+                &param_values,
+            );
+            (s3, d3)
+        };
         assert!(!done);
         assert_eq!(next_state.stack.len(), 1);
 
-        let (_, done) = next_state.apply_action(Action::Done, &mut runtime);
+        let (_, done) = next_state.apply_action(Action::Done, &mut runtime, &param_values);
         assert!(done);
     }
 }

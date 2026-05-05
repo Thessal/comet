@@ -1,6 +1,5 @@
 use crate::behavior::*;
 use pest::Parser;
-use pest::iterators::Pair;
 use pest_derive::Parser;
 use stdlib::types::Signal;
 use thiserror::Error;

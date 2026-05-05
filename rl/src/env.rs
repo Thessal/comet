@@ -1,15 +1,13 @@
-use std::collections::HashMap;
-
 use crate::action::Action;
 use crate::action::ActionSpace;
-use crate::model::ModelConfig;
+use crate::reward::calc_intermediate_reward;
+use crate::reward::calc_terminal_reward;
 use crate::state::SearchState;
 use crate::train::BatchConfig;
 use crate::trajectory::Trajectory;
 use crate::trajectory::TrajectoryItem;
-use burn::tensor::backend::Backend;
 use parser::behavior::BehaviorDecl;
-use runtime::ast::PolishExpr;
+use runtime::ast::Program;
 use runtime::ast::Tree;
 use runtime::pnl;
 use runtime::runtime::Runtime;
@@ -20,6 +18,7 @@ pub struct Environment<'a> {
     pub trajectory: Trajectory,
     pub config: BatchConfig,
     pub runtime: &'a mut Runtime,
+    pub params: Vec<Tree>,
     pub state: SearchState,
     pub action_space: ActionSpace,
     pub max_length: usize,
@@ -31,11 +30,14 @@ impl<'a> Environment<'a> {
     pub fn new(
         runtime: &'a mut Runtime,
         behavior: BehaviorDecl,
+        params: Vec<Program>,
         score_fn: Aggregator,
         max_length: usize,
         batch_size: usize,
     ) -> Self {
         let pnl_calc = pnl::PnlCalculator::new(&mut runtime.dmgr);
+        let trees: Vec<Tree> = params.iter().map(|p| p.clone().into()).collect();
+        // let params: Vec<Signal> = trees.iter().map(|t| runtime.run(t)).collect();
         Environment {
             behavior: behavior.clone(),
             trajectory: vec![],
@@ -43,6 +45,7 @@ impl<'a> Environment<'a> {
                 batch_size,
                 trajectories: vec![],
             },
+            params: trees,
             runtime: runtime,
             state: behavior.clone().into(),
             action_space: (&behavior).into(),
@@ -61,16 +64,20 @@ impl<'a> Environment<'a> {
     }
 
     pub fn step(&mut self, action: Action) -> TrajectoryItem {
-        let (next_state, done) = self.state.apply_action(action.clone(), &mut self.runtime);
+        let (next_state, done) =
+            self.state
+                .apply_action(action.clone(), &mut self.runtime, &self.params);
         let reward = match done {
             false => {
+                // println!("Intermediate Expr (not done) : {:?}", next_state.expr);
+                // println!("Intermediate State (not done) : {:?}", next_state.stack);
                 assert!(
                     next_state
                         .stack
                         .iter()
                         .all(|(_expr, _tree, data)| !data.is_none())
                 );
-                todo!("calc_intermediate_reward()"); // batch diversity
+                calc_intermediate_reward()
             }
             true => {
                 // let expr: Tree = expr_polish.into();
@@ -80,7 +87,7 @@ impl<'a> Environment<'a> {
                 let pnl_result = self.pnl_calc.pnl(&position);
                 let stats: Stats = (&pnl_result).into();
                 let fitness = self.score_fn.fitness(&stats);
-                todo!("calc_terminal_reward(fitness)");
+                calc_terminal_reward(fitness)
             }
         };
 
@@ -100,21 +107,20 @@ impl<'a> Environment<'a> {
 #[cfg(test)]
 mod tests {
     use parser::behavior::test_make_behavior;
-    use parser::expr::Ident;
-    use parser::{behavior::NamedSignal, expr::Literal};
-    use runtime::ast::{OperatorSpec, Program, Token};
+    use runtime::ast::{OperatorSpec, Program};
     use runtime::runtime::test_make_param0;
     use runtime::stats::Metric;
-    use stdlib::types::Signal;
+    use std::collections::HashMap;
 
-    use crate::model::RnnModelConfig;
+    // use crate::model::ModelConfig;
+    // use crate::model::RnnModelConfig;
 
     use super::*;
 
     #[test]
     fn test_environment_step() {
         let mut runtime = Runtime::new(100, "../data".into());
-        // let param0 = test_make_param0();
+        let param0: Program = test_make_param0();
         let behavior = test_make_behavior();
         let score_fn = Aggregator {
             weights: HashMap::from_iter([
@@ -122,14 +128,14 @@ mod tests {
                 (Metric::Ret, (0.5, 0., 1.)),
             ]),
         };
-        let action_space: ActionSpace = (&behavior).into();
-        let model = ModelConfig::RnnModel(RnnModelConfig {
-            action_vocab_size: action_space.size(),
-            d_model: 10,
-            d_hidden: 10,
-            dropout: 0.1,
-        });
-        let mut env = Environment::new(&mut runtime, behavior, score_fn, 10, 100);
+        // let action_space: ActionSpace = (&behavior).into();
+        // let model = ModelConfig::RnnModel(RnnModelConfig {
+        //     action_vocab_size: action_space.size(),
+        //     d_model: 10,
+        //     d_hidden: 10,
+        //     dropout: 0.1,
+        // });
+        let mut env = Environment::new(&mut runtime, behavior, vec![param0], score_fn, 10, 100);
 
         let actions = vec![
             Action::ShiftParam(0), //data
@@ -141,11 +147,11 @@ mod tests {
         for a in actions {
             assert_eq!(done, false);
             let TrajectoryItem {
-                state,
+                state: _state,
                 action,
                 reward,
-                next_state,
-                sequence,
+                next_state: _next_state,
+                sequence: _sequence,
             } = env.step(a);
             done = matches!(action, Action::Done);
             println!("Reward : {:?}", reward);

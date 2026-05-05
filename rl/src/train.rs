@@ -1,23 +1,12 @@
 use crate::action::Action;
 use crate::env::Environment;
 use crate::model::Model;
-use crate::model::ModelConfig;
 use crate::trajectory::Trajectory;
-use crate::trajectory::TrajectoryItem;
 use burn::optim::{GradientsParams, Optimizer};
 use burn::tensor::backend::{AutodiffBackend, Backend};
 use burn::tensor::{Int, Tensor, TensorData};
-use parser::behavior::BehaviorDecl;
-use parser::expr::Ident;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
-use runtime::ast::PolishExpr;
-use runtime::ast::Tree;
-use runtime::pnl::PnlCalculator;
-use runtime::pnl::PnlResult;
-use runtime::stats::Stats;
-use std::collections::HashMap;
-use stdlib::types::Signal;
 
 pub struct BatchConfig {
     pub batch_size: usize,

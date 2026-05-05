@@ -383,35 +383,35 @@ macro_rules! register_binary_op {
 
 #[macro_export]
 macro_rules! register_period_unary_op {
-    ($state:ident, $name:expr) => {
+    ($state:ident, $name:expr, period_idx: $period_idx:expr, data_idx: $data_idx:expr, inputs: [$($input:expr),*]) => {
         inventory::submit! {
             crate::OperatorMeta {
                 name: $name,
-                inputs: &[crate::Signal::Int(None), crate::Signal::DataFrame(None)],
+                inputs: &[$($input),*],
                 output_shape: crate::Signal::DataFrame(None),
                 // TODO: FIXME
                 execute: |args: &[crate::Signal]| -> crate::Signal {
-                    let t_len = match &args[1] {
+                    let t_len = match &args[$data_idx] {
                         crate::Signal::DataFrame(Some(df)) => df.len(),
                         crate::Signal::Vector(Some(v)) => v.len(),
                         crate::Signal::Float(_) => 1,
                         _ => panic!("Expected Vector/DataFrame/Float"),
                     };
-                    let n_len = match &args[1] {
+                    let n_len = match &args[$data_idx] {
                         crate::Signal::DataFrame(Some(df)) => if t_len > 0 { df[0].len() } else { 0 },
                         _ => 1,
                     };
 
-                    let is_output_df = matches!(&args[1], crate::Signal::DataFrame(_));
+                    let is_output_df = matches!(&args[$data_idx], crate::Signal::DataFrame(_));
 
-                    let period = match &args[0] {
+                    let period = match &args[$period_idx] {
                         crate::Signal::DataFrame(Some(df)) => {
                             if !df.is_empty() && !df[0].is_empty() { df[0][0] as usize } else { 0 }
                         }
                         crate::Signal::Vector(Some(v)) => if !v.is_empty() { v[0] as usize } else { 0 },
                         crate::Signal::Float(Some(f)) => *f as usize,
                         crate::Signal::Int(Some(f)) => *f as usize,
-                        _ => panic!("Expected period as Vector/DataFrame/Float"),
+                        _ => panic!("Expected period as Vector/DataFrame/Float/Int"),
                     };
 
                     let mut state = $state::new(period, n_len);
@@ -419,7 +419,7 @@ macro_rules! register_period_unary_op {
                     let mut vec_out = Vec::with_capacity(t_len);
 
                     for t in 0..t_len {
-                        let (b_ptr, b_const) = match &args[1] {
+                        let (b_ptr, b_const) = match &args[$data_idx] {
                             crate::Signal::DataFrame(Some(df)) => (df[t].as_ptr(), false),
                             crate::Signal::Vector(Some(v)) => (&v[t] as *const f64, true),
                             crate::Signal::Float(Some(f)) => (f as *const f64, true),
@@ -442,7 +442,105 @@ macro_rules! register_period_unary_op {
 
                     if is_output_df {
                         crate::Signal::DataFrame(Some(df_out))
-                    } else if t_len == 1 && matches!(&args[1], crate::Signal::Float(Some(_))) {
+                    } else if t_len == 1 && matches!(&args[$data_idx], crate::Signal::Float(Some(_))) {
+                        crate::Signal::Float(Some(vec_out[0]))
+                    } else {
+                        crate::Signal::Vector(Some(vec_out))
+                    }
+                }
+            }
+        }
+    };
+    // Backward compatibility for operators that haven't been migrated yet
+    ($state:ident, $name:expr) => {
+        crate::register_period_unary_op!(
+            $state,
+            $name,
+            period_idx: 0,
+            data_idx: 1,
+            inputs: [crate::Signal::Int(None), crate::Signal::DataFrame(None)]
+        );
+    };
+}
+
+#[macro_export]
+macro_rules! register_op {
+    (
+        state: $state:ident,
+        name: $name:expr,
+        inputs: [$($input:expr),*],
+        primary_data_idx: $primary_data_idx:expr,
+        params: [$($param_idx:expr),*],
+        data: [$($data_idx:expr),*]
+    ) => {
+        inventory::submit! {
+            crate::OperatorMeta {
+                name: $name,
+                inputs: &[$($input),*],
+                output_shape: crate::Signal::DataFrame(None),
+                execute: |args: &[crate::Signal]| -> crate::Signal {
+                    let t_len = match &args[$primary_data_idx] {
+                        crate::Signal::DataFrame(Some(df)) => df.len(),
+                        crate::Signal::Vector(Some(v)) => v.len(),
+                        crate::Signal::Float(_) => 1,
+                        _ => panic!("Expected Vector/DataFrame/Float"),
+                    };
+                    let n_len = match &args[$primary_data_idx] {
+                        crate::Signal::DataFrame(Some(df)) => if t_len > 0 { df[0].len() } else { 0 },
+                        _ => 1,
+                    };
+
+                    let is_output_df = matches!(&args[$primary_data_idx], crate::Signal::DataFrame(_));
+
+                    let mut state = $state::new(
+                        $(
+                            match &args[$param_idx] {
+                                crate::Signal::DataFrame(Some(df)) => {
+                                    if !df.is_empty() && !df[0].is_empty() { df[0][0] as usize } else { 0 }
+                                }
+                                crate::Signal::Vector(Some(v)) => if !v.is_empty() { v[0] as usize } else { 0 },
+                                crate::Signal::Float(Some(f)) => *f as usize,
+                                crate::Signal::Int(Some(f)) => *f as usize,
+                                _ => panic!("Expected param as Vector/DataFrame/Float/Int"),
+                            }
+                        ),*,
+                        n_len
+                    );
+
+                    let mut df_out = Vec::with_capacity(t_len);
+                    let mut vec_out = Vec::with_capacity(t_len);
+
+                    for t in 0..t_len {
+                        let mut output = vec![0.0; n_len];
+
+                        state.step(
+                            $(
+                                {
+                                    let (ptr, is_const) = match &args[$data_idx] {
+                                        crate::Signal::DataFrame(Some(df)) => (df[t].as_ptr(), false),
+                                        crate::Signal::Vector(Some(v)) => (&v[t] as *const f64, true),
+                                        crate::Signal::Float(Some(f)) => (f as *const f64, true),
+                                        _ => panic!("Expected Vector/DataFrame/Float"),
+                                    };
+                                    crate::CometData {
+                                        dtype: if is_const { crate::DataType::Constant } else { crate::DataType::DataFrame },
+                                        ptr,
+                                    }
+                                }
+                            ),*,
+                            output.as_mut_ptr()
+                        );
+
+                        if is_output_df {
+                            df_out.push(output);
+                        } else {
+                            vec_out.push(output[0]);
+                        }
+                    }
+
+                    if is_output_df {
+                        crate::Signal::DataFrame(Some(df_out))
+                    } else if t_len == 1 && matches!(&args[$primary_data_idx], crate::Signal::Float(Some(_))) {
                         crate::Signal::Float(Some(vec_out[0]))
                     } else {
                         crate::Signal::Vector(Some(vec_out))

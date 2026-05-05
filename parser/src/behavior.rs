@@ -33,7 +33,6 @@ pub struct FlowDecl {
     pub body: Vec<Stmt>,
 }
 
-use std::collections::HashMap;
 use std::fmt;
 
 impl fmt::Display for InputDecl {
@@ -113,7 +112,7 @@ impl fmt::Display for FlowDecl {
 pub fn test_make_behavior() -> BehaviorDecl {
     let inputs = vec![("vol".to_string(), Signal::DataFrame(None))];
     let output: NamedSignal = ("result".to_string(), Signal::DataFrame(None));
-    let operators = Some(vec![Ident::from("ts_mean"), Ident::from("ts_std")]);
+    let operators = Some(vec![Ident::from("ts_mean"), Ident::from("ts_rank")]);
     let integers = Some(vec![5, 21]);
     let floats = Some(vec![1.0, 2.0]);
     let strings = None;

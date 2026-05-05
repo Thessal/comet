@@ -13,7 +13,7 @@ impl TsMeanState {
         TsMeanState {
             sum: DequeState::new(1, len),
             count: DequeState::new(1, len),
-            history: DequeState::new(period, len), 
+            history: DequeState::new(period, len),
             len,
         }
     }
@@ -70,4 +70,11 @@ impl UnaryOp for TsMeanState {
     fn drop_buffers(&mut self) {}
 }
 
-crate::register_period_unary_op!(TsMeanState, "ts_mean");
+crate::register_op!(
+    state: TsMeanState,
+    name: "ts_mean",
+    inputs: [crate::Signal::DataFrame(None), crate::Signal::Int(None)],
+    primary_data_idx: 0,
+    params: [1],
+    data: [0]
+);

@@ -118,15 +118,19 @@ impl<B: Backend> RnnModel<B> {
 
         // 5. Mask out invalid actions
         let is_invalid = available_actions.bool_not();
+        assert_eq!(is_invalid.shape(), logits.shape());
         logits.mask_fill(is_invalid, -f32::INFINITY)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::action::ActionSpace;
+
     use super::*;
     use burn::backend::NdArray;
     use burn::tensor::{Tensor, TensorData};
+    use parser::behavior::test_make_behavior;
 
     type Backend = NdArray<f32>;
 
@@ -134,7 +138,9 @@ mod tests {
     fn test_rnn_inference_with_masking() {
         // TODO: review this machine-generated code
         let device = Default::default();
-        let action_vocab_size = 5;
+        let behavior = test_make_behavior();
+        let action_space: ActionSpace = (&behavior).into();
+        let action_vocab_size = action_space.size();
 
         // 1. Initialize the RNN model
         let config = ModelSize::Small.get_config(action_vocab_size);
@@ -150,8 +156,12 @@ mod tests {
             &device,
         );
 
+        let mut mask = vec![false].repeat(action_vocab_size);
+        for i in (0..action_vocab_size).step_by(2) {
+            mask[i] = true;
+        }
         let available_mask = Tensor::<Backend, 3, burn::tensor::Bool>::from_bool(
-            burn::tensor::TensorData::new(vec![false, true, false, true, false], [1, 1, 5]),
+            burn::tensor::TensorData::new(mask, [1, 1, action_vocab_size]),
             &device,
         );
         let available_actions = available_mask;
@@ -159,27 +169,21 @@ mod tests {
         // 3. Run Forward Pass
         let logits = model.forward(states, available_actions);
 
-        // Output logits shape should be [1, 1, 5]
-        assert_eq!(logits.dims(), [1, 1, 5]);
-
-        let masked_logits = logits;
+        // Output logits shape should be [1, 1, action_vocab_size]
+        assert_eq!(logits.dims(), [1, 1, action_vocab_size]);
 
         // 6. Compute action probabilities
-        let probabilities = burn::tensor::activation::softmax(masked_logits, 2);
+        let probabilities = burn::tensor::activation::softmax(logits, 2);
 
         // 7. Verify math boundaries
         let tensor_data = probabilities.into_data();
         let probs_array: &[f32] = tensor_data.as_slice().unwrap();
-        assert_eq!(probs_array[0], 0.0); // Invalid action 0
-        assert_ne!(probs_array[1], 0.0);
-        assert_eq!(probs_array[2], 0.0); // Invalid action 2
-        assert_ne!(probs_array[3], 0.0);
-        assert_eq!(probs_array[4], 0.0); // Invalid action 4
+        for i in (0..action_vocab_size).step_by(2) {
+            assert!(probs_array[i] > 0.0);
+            assert_eq!(probs_array[i + 1], 0.0);
+        }
 
-        let valid_sum = probs_array[1] + probs_array[3];
-        assert!(
-            (valid_sum - 1.0).abs() < 1e-5,
-            "Valid probabilities must sum exactly to 1.0"
-        );
+        let valid_sum: f32 = probs_array.iter().sum();
+        assert!((valid_sum - 1.0).abs() < 1e-5);
     }
 }

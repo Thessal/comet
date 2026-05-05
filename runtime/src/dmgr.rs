@@ -1,7 +1,7 @@
 use flate2::read::GzDecoder;
 use std::collections::HashMap;
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub struct DataManager {
     cache: HashMap<String, Vec<Vec<f64>>>,
