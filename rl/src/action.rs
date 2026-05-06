@@ -2,6 +2,7 @@ use parser::behavior::BehaviorDecl;
 use runtime::ast::OperatorSpec;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use tch::Tensor;
 
 //////////
 /// Action
@@ -81,6 +82,14 @@ impl ActionSpace {
     }
     pub fn get_action(&self, idx: usize) -> Action {
         self.map.get(&idx).unwrap().clone()
+    }
+
+    pub fn calculate_mask(&self, valid_actions: &Vec<Action>) -> Tensor {
+        let mut mask = vec![false; self.size()];
+        for action in valid_actions {
+            mask[self.get_idx(action)] = true;
+        }
+        Tensor::from_slice(&mask)
     }
 }
 

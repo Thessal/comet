@@ -1,4 +1,4 @@
-use tch::{Tensor, nn, nn::RNN};
+use tch::{Tensor, nn, nn::Module, nn::RNN};
 
 pub enum ModelConfig {
     RnnModel(RnnModelConfig),
@@ -11,10 +11,10 @@ pub enum Model {
     // TransformerModel(TransformerModel)
 }
 
-impl Model {
-    pub fn forward(&self, states: &Tensor, available_actions: &Tensor) -> Tensor {
+impl Module for Model {
+    fn forward(&self, states: &Tensor) -> Tensor {
         match self {
-            Model::RnnModel(model) => model.forward(states, available_actions),
+            Model::RnnModel(model) => model.forward(states),
         }
     }
 }
@@ -98,11 +98,11 @@ pub struct RnnModel {
     output_proj: nn::Linear,
 }
 
-impl RnnModel {
-    pub fn forward(
+impl Module for RnnModel {
+    fn forward(
+        // Outputs unmasked logits.
         &self,
-        states: &Tensor,            // [batch_size, seq_length, 2]
-        available_actions: &Tensor, // [batch_size, seq_length, action_vocab_size], bool
+        states: &Tensor, // [batch_size, seq_length, 2]
     ) -> Tensor {
         // states are Int. shape: [batch, seq, 2]
 
@@ -120,9 +120,12 @@ impl RnnModel {
         // Output projection
         let logits = rnn_out.apply(&self.output_proj);
 
-        // Mask invalid actions
-        let is_invalid = available_actions.logical_not();
-        logits.masked_fill(&is_invalid, f64::NEG_INFINITY)
+        logits
+
+        // // Mask invalid actions
+        // available_actions: &Tensor, // [batch_size, seq_length, action_vocab_size], bool
+        // let is_invalid = available_actions.logical_not();
+        // logits.masked_fill(&is_invalid, f64::NEG_INFINITY)
     }
 }
 
@@ -154,7 +157,12 @@ mod tests {
         let available_actions = Tensor::from_slice(&mask).view([1, 1, action_vocab_size as i64]);
 
         // 3. Run Forward Pass
-        let logits = model.forward(&states, &available_actions);
+        let logits_not_masked = model.forward(&states); // not masked
+        let logits =
+            logits_not_masked.masked_fill(&available_actions.logical_not(), f64::NEG_INFINITY);
+        // available_actions: &Tensor, // [batch_size, seq_length, action_vocab_size], bool
+        // let is_invalid = available_actions.logical_not();
+        // logits.masked_fill(&is_invalid, f64::NEG_INFINITY)
 
         assert_eq!(logits.size(), vec![1, 1, action_vocab_size as i64]);
 

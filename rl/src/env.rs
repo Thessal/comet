@@ -5,8 +5,7 @@ use crate::reward::calc_intermediate_reward;
 use crate::reward::calc_terminal_reward;
 use crate::state::SearchState;
 use crate::train::BatchConfig;
-use crate::trajectory::Trajectory;
-use crate::trajectory::TrajectoryItem;
+use crate::trajectory::Step;
 use parser::behavior::BehaviorDecl;
 use runtime::ast::Program;
 use runtime::ast::Tree;
@@ -16,7 +15,6 @@ use runtime::stats::{Aggregator, Stats};
 
 pub struct Environment<'a> {
     pub behavior: BehaviorDecl, // used for reset
-    pub trajectory: Trajectory,
     pub config: BatchConfig,
     pub runtime: &'a mut Runtime,
     pub params: Vec<Tree>,
@@ -28,10 +26,9 @@ pub struct Environment<'a> {
 }
 
 impl Environment<'_> {
-    pub fn state_embed(&self, device: tch::Device) -> tch::Tensor {
+    pub fn state_embed(&self, state: &SearchState, device: tch::Device) -> tch::Tensor {
         let data_size = self.runtime.dmgr.data_size;
-        let embeddings: Vec<Vec<Vec<f64>>> = self
-            .state
+        let embeddings: Vec<Vec<Vec<f64>>> = state
             .stack
             .iter()
             .map(|(_, _, signal)| signal.to_dataframe(data_size))
@@ -58,7 +55,7 @@ impl<'a> Environment<'a> {
         // let params: Vec<Signal> = trees.iter().map(|t| runtime.run(t)).collect();
         Environment {
             behavior: behavior.clone(),
-            trajectory: vec![],
+            // trajectory: vec![],
             config: BatchConfig {
                 batch_size,
                 trajectories: vec![],
@@ -73,12 +70,12 @@ impl<'a> Environment<'a> {
         }
     }
     pub fn reset(&mut self) -> SearchState {
-        self.trajectory = vec![];
+        // self.trajectory = vec![];
         self.state = self.behavior.clone().into();
         self.state.clone()
     }
 
-    pub fn step(&mut self, action: Action) -> TrajectoryItem {
+    pub fn step(&mut self, action: Action) -> Step {
         let (next_state, done) =
             self.state
                 .apply_action(action.clone(), &mut self.runtime, &self.params);
@@ -106,7 +103,7 @@ impl<'a> Environment<'a> {
             }
         };
 
-        let traj_item = TrajectoryItem {
+        let traj_item = Step {
             state: self.state.clone(),
             action,
             reward,
@@ -161,7 +158,7 @@ mod tests {
 
         for a in actions {
             assert_eq!(done, false);
-            let TrajectoryItem {
+            let Step {
                 state: _state,
                 action,
                 reward,
