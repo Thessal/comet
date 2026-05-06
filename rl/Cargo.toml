@@ -11,4 +11,5 @@ rand = "0.8"
 inventory = "0.3.22"
 stdlib = { version = "0.1.0", path = "../stdlib" }
 # rl = { version = "0.4.0", features = ["gym"] }
-tch = "0.24.0"
+tch = "0.22.0" # libtorch 2.9 
+# tch = "0.24.0" # libtorch 2.11

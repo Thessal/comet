@@ -11,7 +11,7 @@ runtime = { path = "../runtime" }
 rl = { path = "../rl" }
 stdlib = { path = "../stdlib" }
 
-tch = "0.24.0"
+tch = "0.22.0"
 clap = { version = "4.4", features = ["derive"] }
 rand = "0.8"
 inventory = "0.3.22"

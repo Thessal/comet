@@ -1,7 +1,5 @@
 use crate::action::{Action, ActionSpace};
-use burn::Tensor;
-use burn::prelude::Backend;
-use burn::tensor::{Float, Int, TensorData};
+
 use parser::behavior::BehaviorDecl;
 use parser::expr::Literal;
 use runtime::ast::{OperatorSpec, PolishExpr, Program};

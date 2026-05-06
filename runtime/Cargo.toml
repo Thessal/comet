@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-tch = "0.24.0"
+tch = "0.22.0"
 
 stdlib = { path = "../stdlib" }
 parser = { path = "../parser" }

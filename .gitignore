@@ -1,5 +1,7 @@
 /target
 /examples/data
+/tmp
 .comet_tmp_*
 *.so
 *.bin
+*.tar.gz

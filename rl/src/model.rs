@@ -1,27 +1,18 @@
-use burn::{
-    config::Config,
-    module::Module,
-    nn::{Embedding, EmbeddingConfig, Linear, LinearConfig, Lstm, LstmConfig},
-    tensor::{Tensor, backend::Backend},
-};
+use tch::{Tensor, nn, nn::RNN};
 
 pub enum ModelConfig {
     RnnModel(RnnModelConfig),
     // TransformerModel(TransformerModelConfig),
 }
 
-#[derive(Module, Debug)]
-pub enum Model<B: Backend> {
-    RnnModel(RnnModel<B>),
-    // TransformerModel(TransformerModel<B>)
+#[derive(Debug)]
+pub enum Model {
+    RnnModel(RnnModel),
+    // TransformerModel(TransformerModel)
 }
 
-impl<B: Backend> Model<B> {
-    pub fn forward(
-        &self,
-        states: Tensor<B, 3, burn::tensor::Int>,
-        available_actions: Tensor<B, 3, burn::tensor::Bool>,
-    ) -> Tensor<B, 3> {
+impl Model {
+    pub fn forward(&self, states: &Tensor, available_actions: &Tensor) -> Tensor {
         match self {
             Model::RnnModel(model) => model.forward(states, available_actions),
         }
@@ -29,31 +20,52 @@ impl<B: Backend> Model<B> {
 }
 
 impl ModelConfig {
-    pub fn init<B: Backend>(&self, device: &B::Device) -> Model<B> {
+    pub fn init(&self, vs: &nn::Path) -> Model {
         match self {
-            ModelConfig::RnnModel(config) => Model::RnnModel(config.init(device)),
+            ModelConfig::RnnModel(config) => Model::RnnModel(config.init(vs)),
         }
     }
 }
 
-#[derive(Config, Debug)]
+#[derive(Debug)]
 pub struct RnnModelConfig {
     pub action_vocab_size: usize,
     pub d_model: usize,
     pub d_hidden: usize,
-    #[config(default = 0.1)]
     pub dropout: f64,
 }
 
 impl RnnModelConfig {
-    pub fn init<B: Backend>(&self, device: &B::Device) -> RnnModel<B> {
-        let action_embedding =
-            EmbeddingConfig::new(self.action_vocab_size, self.d_model).init(device);
+    pub fn new(action_vocab_size: usize, d_model: usize, d_hidden: usize) -> Self {
+        Self {
+            action_vocab_size,
+            d_model,
+            d_hidden,
+            dropout: 0.1,
+        }
+    }
+    pub fn init(&self, vs: &nn::Path) -> RnnModel {
+        let action_embedding = nn::embedding(
+            vs,
+            self.action_vocab_size as i64,
+            self.d_model as i64,
+            Default::default(),
+        );
 
         // RNN takes the concatenation of parent and sibling embeddings
-        let rnn = LstmConfig::new(self.d_model * 2, self.d_hidden, true).init(device);
+        let rnn = nn::lstm(
+            vs,
+            (self.d_model * 2) as i64,
+            self.d_hidden as i64,
+            Default::default(),
+        );
 
-        let output_proj = LinearConfig::new(self.d_hidden, self.action_vocab_size).init(device);
+        let output_proj = nn::linear(
+            vs,
+            self.d_hidden as i64,
+            self.action_vocab_size as i64,
+            Default::default(),
+        );
 
         RnnModel {
             action_embedding,
@@ -79,105 +91,78 @@ impl ModelSize {
     }
 }
 
-#[derive(Module, Debug)]
-pub struct RnnModel<B: Backend> {
-    action_embedding: Embedding<B>,
-    rnn: Lstm<B>,
-    output_proj: Linear<B>,
+#[derive(Debug)]
+pub struct RnnModel {
+    action_embedding: nn::Embedding,
+    rnn: nn::LSTM,
+    output_proj: nn::Linear,
 }
 
-impl<B: Backend> RnnModel<B> {
+impl RnnModel {
     pub fn forward(
         &self,
-        states: Tensor<B, 3, burn::tensor::Int>,
-        available_actions: Tensor<B, 3, burn::tensor::Bool>,
-    ) -> Tensor<B, 3> {
-        let [batch_size, seq_length, _] = states.dims();
+        states: &Tensor,            // [batch_size, seq_length, 2]
+        available_actions: &Tensor, // [batch_size, seq_length, action_vocab_size], bool
+    ) -> Tensor {
+        // states are Int. shape: [batch, seq, 2]
 
-        // 1. Slice parent and sibling
-        // Assuming states[.., .., 0] is Parent and states[.., .., 1] is Sibling
-        let parent = states
-            .clone()
-            .slice([0..batch_size, 0..seq_length, 0..1])
-            .reshape([batch_size, seq_length]);
+        let parent = states.narrow(2, 0, 1).squeeze_dim(2);
+        let sibling = states.narrow(2, 1, 1).squeeze_dim(2);
 
-        let sibling = states
-            .slice([0..batch_size, 0..seq_length, 1..2])
-            .reshape([batch_size, seq_length]);
+        // Embed
+        let parent_emb = parent.apply(&self.action_embedding);
+        let sibling_emb = sibling.apply(&self.action_embedding);
 
-        // 2. Embed
-        let parent_emb = self.action_embedding.forward(parent);
-        let sibling_emb = self.action_embedding.forward(sibling);
+        // RNN step
+        let rnn_input = Tensor::cat(&[parent_emb, sibling_emb], 2);
+        let rnn_out = self.rnn.seq(&rnn_input).0;
 
-        // 3. RNN step
-        let rnn_input = Tensor::cat(vec![parent_emb, sibling_emb], 2);
-        let (rnn_out, _) = self.rnn.forward(rnn_input, None);
+        // Output projection
+        let logits = rnn_out.apply(&self.output_proj);
 
-        // 4. Output projection to Library (action space)
-        let logits = self.output_proj.forward(rnn_out);
-
-        // 5. Mask out invalid actions
-        let is_invalid = available_actions.bool_not();
-        assert_eq!(is_invalid.shape(), logits.shape());
-        logits.mask_fill(is_invalid, -f32::INFINITY)
+        // Mask invalid actions
+        let is_invalid = available_actions.logical_not();
+        logits.masked_fill(&is_invalid, f64::NEG_INFINITY)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::action::ActionSpace;
-
     use super::*;
-    use burn::backend::NdArray;
-    use burn::tensor::{Tensor, TensorData};
+    use crate::action::ActionSpace;
     use parser::behavior::test_make_behavior;
-
-    type Backend = NdArray<f32>;
+    use tch::{Device, Kind};
 
     #[test]
     fn test_rnn_inference_with_masking() {
-        // TODO: review this machine-generated code
-        let device = Default::default();
         let behavior = test_make_behavior();
         let action_space: ActionSpace = (&behavior).into();
         let action_vocab_size = action_space.size();
 
         // 1. Initialize the RNN model
+        let vs = nn::VarStore::new(Device::Cpu);
         let config = ModelSize::Small.get_config(action_vocab_size);
-        let model = config.init::<Backend>(&device);
+        let model = config.init(&vs.root());
 
-        // 2. Create a dummy state sequence (batch_size=1, seq_length=1, state_size=2)
-        // Format: [Parent, Sibling]
-        let state_data = TensorData::from([[
-            [1, 2], // parent=1, sibling=2
-        ]]);
-        let states = Tensor::<Backend, 3, burn::tensor::Int>::from_data(
-            state_data.convert::<i32>(),
-            &device,
-        );
+        // 2. Create dummy state sequence [batch_size=1, seq_length=1, state_size=2]
+        let states = Tensor::from_slice(&[1_i64, 2_i64]).view([1, 1, 2]);
 
-        let mut mask = vec![false].repeat(action_vocab_size);
+        let mut mask = vec![false; action_vocab_size];
         for i in (0..action_vocab_size).step_by(2) {
             mask[i] = true;
         }
-        let available_mask = Tensor::<Backend, 3, burn::tensor::Bool>::from_bool(
-            burn::tensor::TensorData::new(mask, [1, 1, action_vocab_size]),
-            &device,
-        );
-        let available_actions = available_mask;
+        let available_actions = Tensor::from_slice(&mask).view([1, 1, action_vocab_size as i64]);
 
         // 3. Run Forward Pass
-        let logits = model.forward(states, available_actions);
+        let logits = model.forward(&states, &available_actions);
 
-        // Output logits shape should be [1, 1, action_vocab_size]
-        assert_eq!(logits.dims(), [1, 1, action_vocab_size]);
+        assert_eq!(logits.size(), vec![1, 1, action_vocab_size as i64]);
 
-        // 6. Compute action probabilities
-        let probabilities = burn::tensor::activation::softmax(logits, 2);
+        // 6. Compute probabilities
+        let probabilities = logits.softmax(-1, Kind::Float);
 
-        // 7. Verify math boundaries
-        let tensor_data = probabilities.into_data();
-        let probs_array: &[f32] = tensor_data.as_slice().unwrap();
+        // 7. Verify boundaries
+        let probs_array: Vec<f32> = probabilities.squeeze_dims(&[0, 1]).try_into().unwrap();
         for i in (0..action_vocab_size).step_by(2) {
             assert!(probs_array[i] > 0.0);
             assert_eq!(probs_array[i + 1], 0.0);

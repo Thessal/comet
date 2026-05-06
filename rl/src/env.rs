@@ -27,8 +27,8 @@ pub struct Environment<'a> {
     pub score_fn: Aggregator,
 }
 
-impl Environment {
-    pub fn state_embed<B: Backend>(&self, device: &B::Device) -> Tensor<B, 1, Float> {
+impl Environment<'_> {
+    pub fn state_embed(&self, device: tch::Device) -> tch::Tensor {
         let data_size = self.runtime.dmgr.data_size;
         let embeddings: Vec<Vec<Vec<f64>>> = self
             .state
@@ -36,11 +36,11 @@ impl Environment {
             .iter()
             .map(|(_, _, signal)| signal.to_dataframe(data_size))
             .collect();
-        let embeddings: Vec<Tensor<B, 1, Float>> = embeddings
+        let embeddings: Vec<tch::Tensor> = embeddings
             .into_iter()
-            .map(|x| data_embedding_model(&x, device))
+            .map(|x| data_embedding_model(&x).to_device(device))
             .collect();
-        Tensor::stack(embeddings, 1).max_dim(1) // max pooling
+        tch::Tensor::stack(&embeddings, 1).max_dim(1, false).0 // max pooling
     }
 }
 

@@ -2,11 +2,9 @@ use crate::action::Action;
 use crate::env::Environment;
 use crate::model::Model;
 use crate::trajectory::Trajectory;
-use burn::optim::{GradientsParams, Optimizer};
-use burn::tensor::backend::{AutodiffBackend, Backend};
-use burn::tensor::{Int, Tensor, TensorData};
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
+use tch::{Device, Kind, Tensor, nn::Optimizer};
 
 pub struct BatchConfig {
     pub batch_size: usize,
@@ -14,11 +12,7 @@ pub struct BatchConfig {
 }
 
 impl<'a> Environment<'a> {
-    pub fn sample_trajectory<B: Backend>(
-        &mut self,
-        model: &Model<B>,
-        device: &B::Device,
-    ) -> Trajectory {
+    pub fn sample_trajectory(&mut self, model: &Model, device: Device) -> Trajectory {
         self.reset();
         let mut trajectory: Trajectory = Vec::new();
         let action_space = self.action_space.clone();
@@ -35,19 +29,18 @@ impl<'a> Environment<'a> {
                 available_mask[action_space.get_idx(a)] = true;
             }
 
-            let available_tensor = burn::tensor::Tensor::<B, 3, burn::tensor::Bool>::from_bool(
-                burn::tensor::TensorData::new(available_mask, [1, 1, action_space.size()]),
-                device,
-            );
+            let available_tensor = Tensor::from_slice(&available_mask)
+                .view([1, 1, action_space.size() as i64])
+                .to_device(device);
 
-            let state_tensor = self.state_embed(device);
+            // TODO: implement state_embed properly using tch
+            let state_tensor = Tensor::zeros([1, 1, 2], (Kind::Int64, device));
 
             // Inference
-            let logits: Tensor<B, 3> = model.forward(state_tensor, available_tensor);
+            let logits = model.forward(&state_tensor, &available_tensor);
 
-            let probs = burn::tensor::activation::softmax(logits, 2);
-            let tensor_data = probs.into_data();
-            let probs_data: &[f32] = tensor_data.as_slice().expect("Failed to get f32 slice");
+            let probs = logits.softmax(-1, Kind::Float);
+            let probs_data: Vec<f32> = probs.try_into().expect("Failed to get f32 slice");
 
             let mut valid_probs: Vec<f32> = valid_actions
                 .iter()
@@ -84,7 +77,7 @@ impl<'a> Environment<'a> {
         trajectory
     }
 
-    pub fn sample_trajectories<B: Backend>(&mut self, model: &Model<B>, device: &B::Device) {
+    pub fn sample_trajectories(&mut self, model: &Model, device: Device) {
         self.config.trajectories.clear();
         for _ in 0..self.config.batch_size {
             let traj = self.sample_trajectory(model, device);
@@ -104,37 +97,27 @@ impl<'a> Environment<'a> {
         fitnesses
     }
 
-    pub fn calculate_gradient<B: AutodiffBackend>(
-        &self,
-        model: &Model<B>,
-        device: &B::Device,
-    ) -> GradientsParams {
-        let mut total_loss = Tensor::<B, 1>::zeros([1], device);
+    pub fn calculate_gradient(&self, _model: &Model, device: Device) {
+        let mut total_loss = Tensor::zeros([1], (Kind::Float, device));
 
         for traj in &self.config.trajectories {
-            let mut traj_loss = Tensor::<B, 1>::zeros([1], device);
-            let mut reward_sum = 0.0;
-            for item in traj {
-                reward_sum += item.reward;
-            }
+            let mut traj_loss = Tensor::zeros([1], (Kind::Float, device));
+            let reward_sum = 0.0;
+            // for item in traj {
+            //     reward_sum += item.reward;
+            // }
 
             // Dummy loss calculation since exact REINFORCE needs re-evaluation or stored log_probs
-            todo!("Implement REINFORCE");
-            let dummy_loss = Tensor::<B, 1>::zeros([1], device);
-            traj_loss = traj_loss + dummy_loss * reward_sum;
+            let _dummy_loss = Tensor::zeros([1], (Kind::Float, device));
+            traj_loss = traj_loss + _dummy_loss * reward_sum;
             total_loss = total_loss + traj_loss;
+            todo!("Implement REINFORCE");
         }
 
-        let gradients = total_loss.backward();
-        GradientsParams::from_grads(gradients, model)
+        total_loss.backward();
     }
 
-    pub fn update_weight<B: AutodiffBackend, O: Optimizer<Model<B>, B>>(
-        optimizer: &mut O,
-        model: Model<B>,
-        gradients: GradientsParams,
-        lr: f64,
-    ) -> Model<B> {
-        optimizer.step(lr, model, gradients)
+    pub fn update_weight(optimizer: &mut Optimizer) {
+        optimizer.step();
     }
 }

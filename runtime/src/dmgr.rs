@@ -11,12 +11,14 @@ pub struct DataManager {
 
 impl DataManager {
     pub fn new(data_dir: PathBuf) -> Self {
-        let data = self.get_data("close");
-        DataManager {
+        let mut dmgr = DataManager {
             cache: HashMap::new(),
             data_dir,
-            data_size: (data.len(), columns.len()),
-        }
+            data_size: (0, 0),
+        };
+        let data = dmgr.get_data("close").unwrap();
+        dmgr.data_size = (data.len(), data[0].len());
+        dmgr
     }
 
     pub fn check_size(&self, data: &Vec<Vec<f64>>) -> Result<(), String> {
@@ -82,7 +84,7 @@ impl DataManager {
         };
 
         // data shape check
-        self.check_size(&loaded_data);
+        let _ = self.check_size(&loaded_data);
 
         self.cache.insert(name.to_string(), loaded_data.clone());
         Some(loaded_data)
