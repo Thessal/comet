@@ -1,3 +1,5 @@
+/// TODO: https://github.com/benbaarber/rl/blob/main/Cargo.toml
+/// https://github.com/LaurentMazare/tch-rs/tree/main/examples/reinforcement-learning
 use burn::tensor::{Tensor, backend::Backend};
 
 /// Calculate PPO objective (clipped surrogate objective)

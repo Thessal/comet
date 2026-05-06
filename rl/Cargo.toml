@@ -8,14 +8,7 @@ parser = { path = "../parser" }
 # codegen = { path = "../codegen" }
 runtime = { path = "../runtime" }
 rand = "0.8"
-burn = { version = "0.20.1", features = [
-    "train",
-    "tui",
-    "metrics",
-    "cuda",
-    # "rocm",
-    "ndarray",
-    "store",
-] }
 inventory = "0.3.22"
 stdlib = { version = "0.1.0", path = "../stdlib" }
+# rl = { version = "0.4.0", features = ["gym"] }
+tch = "0.24.0"

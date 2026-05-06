@@ -30,9 +30,22 @@ in pkgs.mkShell.override { stdenv = pkgs.clangStdenv; } {
     myRust
   ] ++ (with pkgs; [
     cargo rustc gcc rustfmt clippy rust-analyzer gdb
-    python313 python313.pkgs.numpy
+    python313 python313.pkgs.numpy libtorch-bin
   ]) ;
   RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+
+  # libtorch
+  shellHook = ''
+    # Point LIBTORCH to the root of the package, not the .so file
+    export LIBTORCH=${pkgs.libtorch-bin}
+    
+    # Ensure the dynamic linker can find the libraries at runtime
+    export LD_LIBRARY_PATH=${pkgs.libtorch-bin}/lib:$LD_LIBRARY_PATH
+    
+    # Use the dev output for headers if the crate requires manual include paths
+    # Though LIBTORCH usually handles this automatically for torch-sys
+    export CXXFLAGS="-I${pkgs.libtorch-bin.dev}/include -I${pkgs.libtorch-bin.dev}/include/torch/csrc/api/include $CXXFLAGS"
+  '';
 
   # # CUDA
   # shellHook = ''
