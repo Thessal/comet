@@ -3,6 +3,8 @@ use tch::{
     nn::{self, LSTMState, Module, RNN},
 };
 
+use crate::action::ActionSpace;
+
 pub enum ModelConfig {
     RnnModel(RnnModelConfig),
     // TransformerModel(TransformerModelConfig),
@@ -65,7 +67,10 @@ impl RnnModelConfig {
             vs,
             crate::env::EMBEDDING_SIZE as i64,
             self.d_hidden as i64,
-            Default::default(),
+            nn::RNNConfig {
+                batch_first: true,
+                ..Default::default()
+            },
         );
 
         let output_proj = nn::linear(
@@ -114,23 +119,31 @@ impl RnnModel {
         hidden: &Option<LSTMState>, // [batch_size, seq_length, 10]
     ) -> (Tensor, Option<LSTMState>) {
         // FIXME : It implements Petersen's DSR(2021) agent, but we are adding semantic embeedding SNIP(2023).
-        // states are Float. shape: [batch, 10] or [batch, seq, 10]
-        let states_3d = if input.dim() == 2 {
-            input.unsqueeze(1)
-        } else {
-            input.shallow_clone()
-        };
+        // states shape: [batch, 10]
+        // let states_3d = if input.dim() == 2 {
+        //     input.unsqueeze(1)
+        // } else {
+        //     input.shallow_clone()
+        // }
+        assert_eq!(input.dim(), 2); // [batch_size, 10]
+        assert_eq!(input.size()[1], crate::env::EMBEDDING_SIZE as i64);
+        let states = input.unsqueeze(1).to_kind(tch::Kind::Float); // [batch_size, 1, 10]
 
         // RNN step
         let lstmstate = match hidden {
             Some(x) => x,
-            None => &self.rnn.zero_state(states_3d.size()[0]),
+            None => &self.rnn.zero_state(states.size()[0]),
         };
-        let output = self.rnn.step(&states_3d, &lstmstate);
+        let output = self.rnn.step(&states, &lstmstate);
         let (rnn_out, _hidden_out) = (output.c(), output.h());
+        assert_eq!(rnn_out.size()[0], 1); // seq_len = 1
+        assert_eq!(rnn_out.size()[1], input.size()[0]); // batch dim
+        assert_eq!(rnn_out.dim(), 3);
 
         // Output projection
-        let logits = rnn_out.apply(&self.output_proj);
+        let logits = rnn_out.apply(&self.output_proj).squeeze_dim(0);
+        assert_eq!(logits.size()[0], input.size()[0]); // batch dim
+        assert_eq!(logits.dim(), 2);
         (logits, Some(output))
 
         // // Mask invalid actions
@@ -158,18 +171,20 @@ mod tests {
         let config = ModelSize::Small.get_config(action_vocab_size);
         let model = config.init(&vs.root());
 
-        // 2. Create dummy state sequence [batch_size=1, seq_length=1, state_size=2]
-        let states = Tensor::from_slice(&[1_i64, 2_i64]).view([1, 1, 2]);
+        // 2. Create dummy state sequence [batch_size=1, state_size=crate::env::EMBEDDING_SIZE]
+        let states = Tensor::from_slice(&[1_i64; crate::env::EMBEDDING_SIZE])
+            .view([1, crate::env::EMBEDDING_SIZE as i64]);
 
         let mut mask = vec![false; action_vocab_size];
         for i in (0..action_vocab_size).step_by(2) {
             mask[i] = true;
         }
-        let available_actions = Tensor::from_slice(&mask).view([1, 1, action_vocab_size as i64]);
+        let available_actions = Tensor::from_slice(&mask).view([1, action_vocab_size as i64]);
 
         // 3. Run Forward Pass
         let lstm_state: Option<LSTMState> = None;
         let (logits_not_masked, _lstm_state) = model.forward(states, &lstm_state); // not masked
+        assert_eq!(logits_not_masked.size()[2], action_vocab_size as i64);
         let logits =
             logits_not_masked.masked_fill(&available_actions.logical_not(), f64::NEG_INFINITY);
         // available_actions: &Tensor, // [batch_size, seq_length, action_vocab_size], bool

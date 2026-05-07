@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, PartialEq)]
+use std::fmt::{self, Write};
+
+#[derive(Clone, PartialEq)]
 #[repr(usize)]
 pub enum Signal {
     // Used to evaluate parameters in runtime
@@ -8,6 +10,28 @@ pub enum Signal {
     String(Option<String>),
     Vector(Option<Vec<f64>>),
     DataFrame(Option<Vec<Vec<f64>>>),
+}
+
+impl fmt::Debug for Signal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Signal::Void => "void".to_string(),
+                Signal::Float(Some(x)) => format!("f[{:.3}]", x),
+                Signal::Int(Some(i)) => format!("i[{:}]", i),
+                Signal::String(Some(s)) => format!("s[{:}]", s),
+                Signal::Vector(Some(_v)) => "vec[Some]".to_string(),
+                Signal::DataFrame(Some(_df)) => "df[Some]".to_string(),
+                Signal::Vector(None) => "vec[None]".to_string(),
+                Signal::DataFrame(None) => "df[None]".to_string(),
+                Signal::Float(None) => "f[None]".to_string(),
+                Signal::Int(None) => "i[None]".to_string(),
+                Signal::String(None) => "s[None]".to_string(),
+            }
+        )
+    }
 }
 
 impl Into<usize> for Signal {

@@ -40,8 +40,11 @@ impl Environment<'_> {
         for (i, tok) in state.expr.iter().take(EMBEDDING_TOKEN_CNT).enumerate() {
             embedding_tokens[i] = tok.into();
         }
-        assert!(embedding_tokens.len() == EMBEDDING_SIZE);
-        tch::Tensor::cat(&embedding_tokens, 0).to_device(device)
+        assert!(embedding_tokens.len() == EMBEDDING_TOKEN_CNT);
+        let out = tch::Tensor::cat(&embedding_tokens, 0).to_device(device);
+        assert!(out.dim() == 1);
+        assert!(out.size()[0] as usize == EMBEDDING_SIZE);
+        out
 
         // // TODO:
         // // SNIP (2023) paper used tokenization and attention pooling.
@@ -65,13 +68,13 @@ impl<'a> Environment<'a> {
     pub fn new(
         runtime: &'a mut Runtime,
         behavior: BehaviorDecl,
-        params: Vec<Program>,
+        params: Vec<Tree>,
         score_fn: Aggregator,
         max_length: usize,
         batch_size: usize,
     ) -> Self {
         let pnl_calc = pnl::PnlCalculator::new(&mut runtime.dmgr);
-        let trees: Vec<Tree> = params.iter().map(|p| p.clone().into()).collect();
+        let trees: Vec<Tree> = params;
         // let params: Vec<Signal> = trees.iter().map(|t| runtime.run(t)).collect();
         Environment {
             behavior: behavior.clone(),
@@ -103,6 +106,14 @@ impl<'a> Environment<'a> {
             false => {
                 // println!("Intermediate Expr (not done) : {:?}", next_state.expr);
                 // println!("Intermediate State (not done) : {:?}", next_state.stack);
+                // println!(
+                //     "stack: {:?}",
+                //     next_state
+                //         .stack
+                //         .iter()
+                //         .map(|x| x.2.clone())
+                //         .collect::<Vec<_>>()
+                // );
                 assert!(
                     next_state
                         .stack
@@ -167,7 +178,14 @@ mod tests {
         //     d_hidden: 10,
         //     dropout: 0.1,
         // });
-        let mut env = Environment::new(&mut runtime, behavior, vec![param0], score_fn, 10, 100);
+        let mut env = Environment::new(
+            &mut runtime,
+            behavior,
+            vec![param0.into()],
+            score_fn,
+            10,
+            100,
+        );
 
         let actions = vec![
             Action::ShiftParam(0), //data

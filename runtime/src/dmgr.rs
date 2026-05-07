@@ -58,7 +58,6 @@ impl DataManager {
         let path = if filename1.exists() {
             filename1
         } else {
-            // fallback for tests
             PathBuf::from(format!("../data/{}.csv.gz", name))
         };
 
@@ -79,8 +78,8 @@ impl DataManager {
             }
             if rows.is_empty() { vec![vec![]] } else { rows }
         } else {
-            // panic!("Failed to load data file: {:?}", path);
-            return None;
+            panic!("Failed to load data file: {:?}", path);
+            // return None;
         };
 
         // data shape check

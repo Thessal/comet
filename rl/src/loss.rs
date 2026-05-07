@@ -74,7 +74,7 @@ pub(crate) mod policy_gradient {
         .scatter_value(1, &actions_flat.unsqueeze(1), 1.0);
 
         /// FIXME: When we use RL loss for RNN, how do we integrate over hidden states?
-        let (logits, _) = model.forward(Tensor::stack(&observations_flat, 0), &hidden_state);
+        let (logits, _) = model.forward(Tensor::stack(&observations_flat, 0), &None);
         // vanilla REINFORCE, misses baseline (critic, or historical avg)
         let log_probs =
             (sampled_mask * logits.log_softmax(1, Float)).sum_dim_intlist(1, false, Float);
