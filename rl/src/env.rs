@@ -1,8 +1,7 @@
 use crate::action::Action;
 use crate::action::ActionSpace;
 use crate::embed::data_embedding_model;
-use crate::reward::calc_intermediate_reward;
-use crate::reward::calc_terminal_reward;
+use crate::loss;
 use crate::state::SearchState;
 use crate::train::BatchConfig;
 use crate::trajectory::Step;
@@ -27,12 +26,15 @@ pub struct Environment<'a> {
 
 impl Environment<'_> {
     pub fn state_embed(&self, state: &SearchState, device: tch::Device) -> tch::Tensor {
+        // SNIP (2023) paper used tokenization and attention pooling.
+        // This is simplified, max pooling based embedding. Let's try this first.
         let data_size = self.runtime.dmgr.data_size;
         let embeddings: Vec<Vec<Vec<f64>>> = state
             .stack
             .iter()
             .map(|(_, _, signal)| signal.to_dataframe(data_size))
             .collect();
+        todo!("data_embedding_model need to be implemented");
         let embeddings: Vec<tch::Tensor> = embeddings
             .into_iter()
             .map(|x| data_embedding_model(&x).to_device(device))
@@ -89,7 +91,7 @@ impl<'a> Environment<'a> {
                         .iter()
                         .all(|(_expr, _tree, data)| !data.is_none())
                 );
-                calc_intermediate_reward()
+                loss::policy_gradient::calc_intermediate_reward()
             }
             true => {
                 // let expr: Tree = expr_polish.into();
@@ -99,7 +101,7 @@ impl<'a> Environment<'a> {
                 let pnl_result = self.pnl_calc.pnl(&position);
                 let stats: Stats = (&pnl_result).into();
                 let fitness = self.score_fn.fitness(&stats);
-                calc_terminal_reward(fitness)
+                loss::policy_gradient::calc_terminal_reward(fitness)
             }
         };
 

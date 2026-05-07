@@ -100,6 +100,7 @@ pub struct RnnModel {
 
 impl Module for RnnModel {
     fn forward(
+        // FIXME : It implements Petersen's DSR(2021) agent, but we are adding semantic embeedding SNIP(2023).
         // Outputs unmasked logits.
         &self,
         states: &Tensor, // [batch_size, seq_length, 2]
