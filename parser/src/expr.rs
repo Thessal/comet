@@ -45,6 +45,17 @@ pub enum Literal {
     Boolean(bool),
 }
 
+impl Into<(f64, f64, f64)> for &Literal {
+    fn into(self) -> (f64, f64, f64) {
+        match self {
+            Literal::Integer(x) => (*x as f64, 0.0, 0.0),
+            Literal::Float(x) => (0.0, *x, 0.0),
+            Literal::String(_) => (0.0, 0.0, 1.0),
+            Literal::Boolean(_) => (0.0, 0.0, 2.0),
+        }
+    }
+}
+
 impl Eq for Literal {}
 
 use std::hash::{Hash, Hasher};

@@ -1,4 +1,7 @@
-use tch::{Tensor, nn, nn::Module, nn::RNN};
+use tch::{
+    Tensor,
+    nn::{self, LSTMState, Module, RNN},
+};
 
 pub enum ModelConfig {
     RnnModel(RnnModelConfig),
@@ -11,10 +14,15 @@ pub enum Model {
     // TransformerModel(TransformerModel)
 }
 
-impl Module for Model {
-    fn forward(&self, states: &Tensor) -> Tensor {
+// impl Module for Model {
+impl Model {
+    pub fn forward(
+        &self,
+        input: Tensor,
+        hidden: &Option<LSTMState>,
+    ) -> (Tensor, Option<LSTMState>) {
         match self {
-            Model::RnnModel(model) => model.forward(states),
+            Model::RnnModel(model) => model.forward(input, hidden),
         }
     }
 }
@@ -55,7 +63,7 @@ impl RnnModelConfig {
         // RNN takes the concatenation of parent and sibling embeddings
         let rnn = nn::lstm(
             vs,
-            (self.d_model * 2) as i64,
+            crate::env::EMBEDDING_SIZE as i64,
             self.d_hidden as i64,
             Default::default(),
         );
@@ -98,30 +106,32 @@ pub struct RnnModel {
     output_proj: nn::Linear,
 }
 
-impl Module for RnnModel {
-    fn forward(
-        // FIXME : It implements Petersen's DSR(2021) agent, but we are adding semantic embeedding SNIP(2023).
-        // Outputs unmasked logits.
+impl RnnModel {
+    // Outputs unmasked logits.
+    pub fn forward(
         &self,
-        states: &Tensor, // [batch_size, seq_length, 2]
-    ) -> Tensor {
-        // states are Int. shape: [batch, seq, 2]
-
-        let parent = states.narrow(2, 0, 1).squeeze_dim(2);
-        let sibling = states.narrow(2, 1, 1).squeeze_dim(2);
-
-        // Embed
-        let parent_emb = parent.apply(&self.action_embedding);
-        let sibling_emb = sibling.apply(&self.action_embedding);
+        input: Tensor,
+        hidden: &Option<LSTMState>, // [batch_size, seq_length, 10]
+    ) -> (Tensor, Option<LSTMState>) {
+        // FIXME : It implements Petersen's DSR(2021) agent, but we are adding semantic embeedding SNIP(2023).
+        // states are Float. shape: [batch, 10] or [batch, seq, 10]
+        let states_3d = if input.dim() == 2 {
+            input.unsqueeze(1)
+        } else {
+            input.shallow_clone()
+        };
 
         // RNN step
-        let rnn_input = Tensor::cat(&[parent_emb, sibling_emb], 2);
-        let rnn_out = self.rnn.seq(&rnn_input).0;
+        let lstmstate = match hidden {
+            Some(x) => x,
+            None => &self.rnn.zero_state(states_3d.size()[0]),
+        };
+        let output = self.rnn.step(&states_3d, &lstmstate);
+        let (rnn_out, _hidden_out) = (output.c(), output.h());
 
         // Output projection
         let logits = rnn_out.apply(&self.output_proj);
-
-        logits
+        (logits, Some(output))
 
         // // Mask invalid actions
         // available_actions: &Tensor, // [batch_size, seq_length, action_vocab_size], bool
@@ -158,7 +168,8 @@ mod tests {
         let available_actions = Tensor::from_slice(&mask).view([1, 1, action_vocab_size as i64]);
 
         // 3. Run Forward Pass
-        let logits_not_masked = model.forward(&states); // not masked
+        let lstm_state: Option<LSTMState> = None;
+        let (logits_not_masked, _lstm_state) = model.forward(states, &lstm_state); // not masked
         let logits =
             logits_not_masked.masked_fill(&available_actions.logical_not(), f64::NEG_INFINITY);
         // available_actions: &Tensor, // [batch_size, seq_length, action_vocab_size], bool

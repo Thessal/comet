@@ -7,7 +7,7 @@ use tch::{
     Device,
     Kind::Float,
     Tensor,
-    nn::{self, OptimizerConfig},
+    nn::{self, LSTMState, OptimizerConfig},
 };
 
 pub struct BatchConfig {
@@ -17,7 +17,8 @@ pub struct BatchConfig {
 
 impl<'a> Environment<'a> {
     pub fn sample_trajectory(&mut self, model: &Model, device: Device) -> Trajectory {
-        self.reset();
+        self.reset(); // resets state
+        let mut lstmstate: Option<LSTMState> = None; // resets lstm hidden input 
         let mut trajectory: Trajectory = Vec::new();
         let action_space = self.action_space.clone();
 
@@ -25,12 +26,9 @@ impl<'a> Environment<'a> {
             let _state = self.state_embed(&self.state, device);
             let observation = _state;
 
-            let logits_not_masked = match model {
-                Model::RnnModel(rnnmodel) => {
-                    tch::no_grad(|| observation.unsqueeze(0).apply(rnnmodel))
-                }
-            };
-            // Mask invalid actions
+            let (logits_not_masked, lstmstate_next) =
+                tch::no_grad(|| model.forward(observation.unsqueeze(0), &lstmstate));
+            lstmstate = lstmstate_next;
             let valid_actions: Vec<Action> = self.state.get_valid_actions(&action_space);
             let available_actions: Tensor = action_space.calculate_mask(&valid_actions);
             let is_invalid = available_actions.logical_not();
@@ -49,7 +47,6 @@ impl<'a> Environment<'a> {
                 break;
             }
         }
-        self.reset();
         trajectory
     }
 

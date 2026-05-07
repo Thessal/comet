@@ -62,6 +62,18 @@ pub enum Token {
     Parameter(usize),
 }
 
+impl Into<tch::Tensor> for &Token {
+    fn into(self) -> tch::Tensor {
+        let mut output: Vec<f64> = vec![0.0, 0.0, 0.0, 0.0, 0.0];
+        match self {
+            Token::Operator(_) => output[0] = 1.0,
+            Token::Literal(x) => (output[1], output[2], output[3]) = x.into(),
+            Token::Parameter(x) => output[4] = *x as f64,
+        }
+        tch::Tensor::from_slice(&output)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Tree {
     Program(Program),
