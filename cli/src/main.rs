@@ -60,6 +60,7 @@ fn _main(args: Args) {
 
     // Initialize central runtime
     let mut runtime = runtime::runtime::Runtime::new(10000, "data".into());
+    runtime.enable = false; // NOTE: dummy runtime
 
     // Extract bound parameter values from the Flow call syntax
     let mut params = Vec::new();
@@ -76,42 +77,40 @@ fn _main(args: Args) {
                         assignments.insert(target.clone(), expr.clone());
                     }
                     parser::expr::Stmt::Expr(Expr::Call { args, .. }) => {
-                        if args.len() == behavior.inputs.len() {
-                            for arg in args {
-                                match arg {
-                                    Expr::Identifier(name) => {
-                                        if let Some(Expr::Call {
-                                            path,
-                                            args: call_args,
-                                        }) = assignments.get(name)
+                        assert!(args.len() == behavior.inputs.len());
+
+                        for arg in args {
+                            match arg {
+                                Expr::Identifier(name) => {
+                                    if let Some(Expr::Call {
+                                        path,
+                                        args: call_args,
+                                    }) = assignments.get(name)
+                                    {
+                                        if path.segments.first().map(|s| s.as_str()) == Some("data")
                                         {
-                                            if path.segments.first().map(|s| s.as_str())
-                                                == Some("data")
+                                            if let Some(Expr::Literal(Literal::String(data_name))) =
+                                                call_args.first()
                                             {
-                                                if let Some(Expr::Literal(Literal::String(
-                                                    data_name,
-                                                ))) = call_args.first()
-                                                {
-                                                    params.push(runtime::ast::Tree::Program(
-                                                        build_data_param(data_name.clone()),
-                                                    ));
-                                                    continue;
-                                                }
+                                                params.push(runtime::ast::Tree::Program(
+                                                    build_data_param(data_name.clone()),
+                                                ));
+                                                continue;
                                             }
                                         }
-                                        // Fallback if not a recognized data assignment
-                                        params.push(runtime::ast::Tree::Program(build_data_param(
-                                            "volume".to_string(),
-                                        )));
                                     }
-                                    Expr::Literal(lit) => {
-                                        params.push(runtime::ast::Tree::Literal(lit.clone()));
-                                    }
-                                    _ => {
-                                        params.push(runtime::ast::Tree::Program(build_data_param(
-                                            "volume".to_string(),
-                                        )));
-                                    }
+                                    // Fallback if not a recognized data assignment
+                                    params.push(runtime::ast::Tree::Program(build_data_param(
+                                        "volume".to_string(),
+                                    )));
+                                }
+                                Expr::Literal(lit) => {
+                                    params.push(runtime::ast::Tree::Literal(lit.clone()));
+                                }
+                                _ => {
+                                    params.push(runtime::ast::Tree::Program(build_data_param(
+                                        "volume".to_string(),
+                                    )));
                                 }
                             }
                         }
@@ -133,8 +132,8 @@ fn _main(args: Args) {
     println!("--- Starting RL Fine-Tuning ---");
     let score_fn = runtime::stats::Aggregator {
         weights: HashMap::from_iter([
-            (runtime::stats::Metric::Sharpe, (0.5, 0., 1.)),
-            (runtime::stats::Metric::Ret, (0.5, 0., 1.)),
+            // (runtime::stats::Metric::Sharpe, (0.5, 0., 1.)),
+            // (runtime::stats::Metric::Ret, (0.5, 0., 1.)),
         ]),
     };
 
@@ -143,8 +142,8 @@ fn _main(args: Args) {
         behavior.clone(),
         params,
         score_fn,
-        10, // max_length
-        32, // batch_size
+        20,   // max_length
+        1024, // batch_size
     );
 
     let action_vocab_size = env.action_space.size();
@@ -153,7 +152,7 @@ fn _main(args: Args) {
     let vs = tch::nn::VarStore::new(device);
     let model = config.init(&vs.root());
 
-    env.run(&model, device);
+    env.run(&model, 100, device);
 
     println!("--- Evaluation ---");
     for i in 0..10 {

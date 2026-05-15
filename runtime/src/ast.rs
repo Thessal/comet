@@ -1,3 +1,5 @@
+use std::fmt;
+
 use parser::expr::Literal;
 use stdlib::types::Signal;
 
@@ -55,11 +57,21 @@ use stdlib::OperatorMeta;
 /* AST Node */
 //////////////
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Token {
     Operator(OperatorSpec),
     Literal(Literal),
     Parameter(usize),
+}
+
+impl fmt::Debug for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Token::Operator(operator) => write!(f, "op!{}", operator.name),
+            Token::Literal(literal) => write!(f, "{}", literal),
+            Token::Parameter(index) => write!(f, "param!{}", index),
+        }
+    }
 }
 
 impl Into<tch::Tensor> for &Token {

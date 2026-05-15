@@ -32,6 +32,9 @@ impl<'a> Environment<'a> {
             lstmstate = lstmstate_next;
 
             let valid_actions: Vec<Action> = self.state.get_valid_actions(&action_space);
+            if valid_actions.is_empty() {
+                break;
+            }
             let available_actions: Tensor = action_space.calculate_mask(&valid_actions);
             let is_invalid = available_actions.logical_not();
             let logits = logits_not_masked.masked_fill(&is_invalid, f64::NEG_INFINITY); // Petersen (2021)
@@ -65,13 +68,50 @@ impl<'a> Environment<'a> {
     }
 
     /// Trains an agent using the policy gradient algorithm.
-    pub fn run(&mut self, model: &Model, device: Device) {
+    pub fn run(&mut self, model: &Model, epochs: usize, device: Device) {
         let vs = nn::VarStore::new(device);
         let mut opt = nn::Adam::default().build(&vs, 1e-2).unwrap();
         println!("action space: {:?}", self.action_space);
-        for epoch_idx in 0..50 {
+        for epoch_idx in 0..epochs {
             self.sample_trajectories(model, device);
             println!("epoch: {:<3} ", epoch_idx);
+            println!(
+                "trajectory count in epoch : {}",
+                self.config.trajectories.len()
+            );
+            println!(
+                "finished equations : {}",
+                self.config
+                    .trajectories
+                    .iter()
+                    .filter(|t| t.last().unwrap().is_done())
+                    .count()
+            );
+            println!(
+                "example : {:?}",
+                self.config.trajectories[0]
+                    .iter()
+                    .last()
+                    .unwrap()
+                    .state
+                    .expr
+            );
+            println!(
+                "eqn length - max: {}, min:{}",
+                self.config
+                    .trajectories
+                    .iter()
+                    .map(|x| x.len())
+                    .max()
+                    .unwrap(),
+                self.config
+                    .trajectories
+                    .iter()
+                    .map(|x| x.len())
+                    .min()
+                    .unwrap()
+            );
+            println!("cache size : {}", self.runtime.expr_cache.len());
             let loss = loss::policy_gradient::calculate_loss(self, model, device);
             opt.backward_step(&loss);
         }

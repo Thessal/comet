@@ -11,6 +11,7 @@ pub struct Runtime {
     pub expr_cache: LruCache<String, Signal>,
     pub expr_lookups: usize,
     pub expr_hits: usize,
+    pub enable: bool,
 }
 
 use crate::ast::OperatorSpec;
@@ -22,6 +23,7 @@ impl Runtime {
             expr_cache: LruCache::new(NonZeroUsize::new(capacity).unwrap()), // TODO : evict only when memory is full
             expr_lookups: 0,
             expr_hits: 0,
+            enable: true,
         }
     }
 
@@ -73,8 +75,12 @@ impl Runtime {
     }
 
     fn evaluate(&self, spec: OperatorSpec, args: Vec<Signal>) -> Result<Signal, String> {
-        let operator: stdlib::OperatorMeta = (spec.name.as_str()).into();
-        operator.execute(&args)
+        if !self.enable {
+            Ok(Signal::DataFrame(Some(vec![vec![0.0]])))
+        } else {
+            let operator: stdlib::OperatorMeta = (spec.name.as_str()).into();
+            operator.execute(&args)
+        }
     }
 }
 

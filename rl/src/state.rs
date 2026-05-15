@@ -63,7 +63,8 @@ impl SearchState {
                     }
                 }
                 Action::Done => self.is_done_valid().0,
-                _ => true,
+                _ => self.stack.len() < 5, // allow introducing variables until stack depth 5
+                                           // TODO: adjust
             };
             if is_valid {
                 valid_actions.push(action.get_action(i));
@@ -150,9 +151,18 @@ impl SearchState {
                 (next_state, true)
             }
             other_action => {
+                let token = match &other_action {
+                    Action::ShiftInt(i) => Token::Literal(Literal::Integer(*i)),
+                    Action::ShiftFloat(f) => Token::Literal(Literal::Float(*f)),
+                    Action::ShiftString(s) => Token::Literal(Literal::String(s.clone())),
+                    Action::ShiftParam(i) => Token::Parameter(*i),
+                    Action::Reduce(op) => Token::Operator(op.clone()),
+                    Action::Done => unreachable!(),
+                };
                 let (mut next_state, expr, tree, data) =
                     self.make_tree(other_action, param_values, runtime);
 
+                next_state.expr.push(token);
                 next_state.stack.push((expr, tree, data));
                 (next_state, false)
             }

@@ -126,7 +126,7 @@ impl<'a> Environment<'a> {
                 // let expr: Tree = expr_polish.into();
                 assert!(next_state.stack.len() == 1);
                 let (_expr, tree, _data) = next_state.stack.get(0).unwrap();
-                let position = self.runtime.run(tree);
+                let position = self.runtime.run(tree); // FIXME: this can be slow. maybe we have to cahnge Signal::DataFrame(Vec<Vec<f64>>) into Signal::DataFrame(tch::Tensor)
                 let pnl_result = self.pnl_calc.pnl(&position);
                 let stats: Stats = (&pnl_result).into();
                 let fitness = self.score_fn.fitness(&stats);
@@ -206,6 +206,63 @@ mod tests {
             done = matches!(action, Action::Done);
             println!("Reward : {:?}", reward);
         }
+    }
+
+    #[test]
+    fn test_action_finish() {
+        let mut runtime = Runtime::new(100, "../data".into());
+        let param0: Program = test_make_param0();
+        let behavior = test_make_behavior();
+        let score_fn = Aggregator {
+            weights: HashMap::from_iter([
+                (Metric::Sharpe, (0.5, 0., 1.)),
+                (Metric::Ret, (0.5, 0., 1.)),
+            ]),
+        };
+
+        let mut env = Environment::new(
+            &mut runtime,
+            behavior.clone(),
+            vec![param0.into()],
+            score_fn,
+            10,
+            1, // batch size
+        );
+
+        // Setup almost finished environment
+        let actions = vec![
+            Action::ShiftParam(0),
+            Action::ShiftInt(5),
+            Action::Reduce(OperatorSpec::from("ts_mean")),
+        ];
+
+        for a in actions {
+            env.step(a);
+        }
+
+        // 1. Inspect valid actions
+        let valid_actions = env.state.get_valid_actions(&env.action_space);
+        println!(
+            "Valid actions at almost finished state: {:?}",
+            valid_actions
+        );
+        assert!(
+            valid_actions.contains(&Action::Done),
+            "Done should be valid"
+        );
+
+        // 2. Check Action Space masking
+        let mask = env.action_space.calculate_mask(&valid_actions);
+        let done_idx = env.action_space.get_idx(&Action::Done) as i64;
+
+        let is_done_valid = bool::try_from(mask.get(done_idx)).unwrap_or(false);
+        assert!(is_done_valid, "Mask for Done should be true");
+
+        // 3. (Optional) Inspect Model logits / probabilities
+        // let vs = tch::nn::VarStore::new(tch::Device::Cpu);
+        // let model_config = crate::model::ModelSize::Small.get_config(env.action_space.size());
+        // let model = crate::model::Model::RnnModel(model_config.init(&vs.root()));
+        // ... (forward pass and inspect mask)
     }
 
     //TODO: tests for invalid actions, terminal states, and maximum trajectory length boundaries.
