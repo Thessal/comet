@@ -24,19 +24,19 @@ fn maximal_brownian_bridge_sample(rng: &mut StdRng, x0: f64, x1: f64, sigma: f64
     h
 }
 
-pub fn sample_ohlc(rng: &mut StdRng, mu_: f64, sigma: f64, x0: f64) -> (f64, f64, f64, f64) {
+pub fn sample_ohlc(rng: &mut StdRng, mu: f64, sigma: f64, x0: f64) -> (f64, f64, f64, f64) {
     // Can symbolic regression recover the drift and volatility from the stochastic time series?
     // Generates dW,
-    // mu_ : mu - 0.5 sigma^2
+    let mu_ = mu - 0.5 * sigma * sigma;
     let (z1, z2) = sample_correlated_normal(&mut rng, 0.0);
     let dt = 1.;
     let dw = dt.sqrt();
     let x1 = x0 + mu_ * dt + sigma * z1 * dw;
 
-    let o = x0;
-    let h = maximal_brownian_bridge_sample(&mut rng, x0, x1, sigma, dt);
-    let l = -maximal_brownian_bridge_sample(&mut rng, -x0, -x1, sigma, dt);
-    let c = x1;
+    let o = x0.exp();
+    let h = maximal_brownian_bridge_sample(&mut rng, x0, x1, sigma, dt).exp();
+    let l = (-maximal_brownian_bridge_sample(&mut rng, -x0, -x1, sigma, dt)).exp();
+    let c = x1.exp();
 
     (o, h, l, c)
 }
