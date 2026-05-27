@@ -20,6 +20,15 @@ chrono = "0.4.39"
 bevy_reflect = "0.18.0"
 inventory = "0.3.22"
 lru = "0.16.3"
+tch = "0.22.0"
 
 [dev-dependencies]
-polars = { version = "0.53.0", features = ["abs", "diff", "dtype-datetime", "lazy", "rank", "rolling_window", "temporal"] }
+polars = { version = "0.53.0", features = [
+    "abs",
+    "diff",
+    "dtype-datetime",
+    "lazy",
+    "rank",
+    "rolling_window",
+    "temporal",
+] }

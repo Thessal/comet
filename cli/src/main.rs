@@ -17,20 +17,12 @@ struct Args {
 }
 
 fn build_data_param(name: String) -> runtime::ast::Program {
-    runtime::ast::Program {
-        spec: runtime::ast::OperatorSpec {
-            name: "data".to_string(),
-            inputs_type: vec![stdlib::types::Signal::String(None)],
-            output_type: stdlib::types::Signal::DataFrame(None),
-        },
-        polish_expression: Some(vec![
-            runtime::ast::Token::Literal(parser::expr::Literal::String(name.clone())),
-            runtime::ast::Token::Operator("data".into()),
-        ]),
-        parameters: Some(vec![runtime::ast::Tree::Literal(
+    runtime::ast::Program::new(
+        "data",
+        vec![runtime::ast::Tree::Literal(
             parser::expr::Literal::String(name),
-        )]),
-    }
+        )],
+    )
 }
 
 //TODO: machine generated code. need verification.
@@ -59,7 +51,7 @@ fn _main(args: Args) {
     println!("--- Selected behavior ---");
 
     // Initialize central runtime
-    let mut runtime = runtime::runtime::Runtime::new(10000, "data".into());
+    let mut runtime = runtime::runtime::Runtime::new(10000, "data".into(), None);
     runtime.enable = false; // NOTE: dummy runtime
 
     // Extract bound parameter values from the Flow call syntax

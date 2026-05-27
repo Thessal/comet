@@ -14,12 +14,12 @@ pub struct Runtime {
     pub enable: bool,
 }
 
-use crate::ast::OperatorSpec;
+use stdlib::OperatorSpec;
 
 impl Runtime {
-    pub fn new(capacity: usize, data_dir: PathBuf) -> Self {
+    pub fn new(capacity: usize, data_dir: PathBuf, device: Option<tch::Device>) -> Self {
         Runtime {
-            dmgr: DataManager::new(data_dir),
+            dmgr: DataManager::new(data_dir, device),
             expr_cache: LruCache::new(NonZeroUsize::new(capacity).unwrap()), // TODO : evict only when memory is full
             expr_lookups: 0,
             expr_hits: 0,
@@ -76,41 +76,27 @@ impl Runtime {
 
     fn evaluate(&self, spec: OperatorSpec, args: Vec<Signal>) -> Result<Signal, String> {
         if !self.enable {
-            Ok(Signal::DataFrame(Some(vec![vec![0.0]])))
+            Ok(Signal::DataFrame(Some(tch::Tensor::zeros(
+                &[1, 1],
+                tch::kind::FLOAT_CPU,
+            ))))
         } else {
-            let operator: stdlib::OperatorMeta = (spec.name.as_str()).into();
-            operator.execute(&args)
+            spec.execute(&args)
         }
     }
 }
 
 pub fn test_make_param0() -> Program {
-    Program {
-        spec: OperatorSpec {
-            name: "data".to_string(),
-            inputs_type: vec![Signal::String(None)],
-            output_type: Signal::DataFrame(None),
-        },
-        polish_expression: Some(vec![
-            Token::Literal(Literal::String("volume".to_string())),
-            Token::Operator("data".into()),
-        ]),
-        parameters: Some(vec![Tree::Literal(Literal::String("volume".to_string()))]),
-    }
+    Program::new(
+        "data",
+        vec![Tree::Literal(Literal::String("volume".to_string()))],
+    )
 }
 pub fn test_make_param1() -> Program {
-    Program {
-        spec: OperatorSpec {
-            name: "data".to_string(),
-            inputs_type: vec![Signal::String(None)],
-            output_type: Signal::DataFrame(None),
-        },
-        polish_expression: Some(vec![
-            Token::Literal(Literal::String("close".to_string())),
-            Token::Operator("data".into()),
-        ]),
-        parameters: Some(vec![Tree::Literal(Literal::String("close".to_string()))]),
-    }
+    Program::new(
+        "data",
+        vec![Tree::Literal(Literal::String("close".to_string()))],
+    )
 }
 
 #[cfg(test)]
@@ -120,7 +106,7 @@ pub mod tests {
 
     #[test]
     fn test_runtime_minimal() {
-        let mut runtime = Runtime::new(100, "../data".into());
+        let mut runtime = Runtime::new(100, "../data".into(), None);
         let param0 = test_make_param0();
         let params: Vec<Program> = vec![param0];
 
@@ -165,10 +151,9 @@ pub mod tests {
         match result {
             Signal::DataFrame(Some(df)) => {
                 assert!(
-                    df.len() > 0,
+                    df.size2().unwrap().0 > 0 && df.size2().unwrap().1 > 0,
                     "Execution should yield a non-empty result DataFrame array"
                 );
-                // println!("Execution Result Size: {} x {}", df.len(), df[0].len());
             }
             _ => {
                 todo!("Execution result is not a DataFrame");
@@ -187,7 +172,7 @@ pub mod tests {
         ];
         let program: Tree = (&expr, vec![]).into();
 
-        let mut runtime = Runtime::new(100, "../data".into());
+        let mut runtime = Runtime::new(100, "../data".into(), None);
 
         let _result = runtime.run(&program);
     }

@@ -184,20 +184,17 @@ mod tests {
         // 3. Run Forward Pass
         let lstm_state: Option<LSTMState> = None;
         let (logits_not_masked, _lstm_state) = model.forward(states, &lstm_state); // not masked
-        assert_eq!(logits_not_masked.size()[2], action_vocab_size as i64);
+        assert_eq!(logits_not_masked.size()[1], action_vocab_size as i64);
         let logits =
             logits_not_masked.masked_fill(&available_actions.logical_not(), f64::NEG_INFINITY);
-        // available_actions: &Tensor, // [batch_size, seq_length, action_vocab_size], bool
-        // let is_invalid = available_actions.logical_not();
-        // logits.masked_fill(&is_invalid, f64::NEG_INFINITY)
 
-        assert_eq!(logits.size(), vec![1, 1, action_vocab_size as i64]);
+        assert_eq!(logits.size(), vec![1, action_vocab_size as i64]);
 
         // 6. Compute probabilities
         let probabilities = logits.softmax(-1, Kind::Float);
 
         // 7. Verify boundaries
-        let probs_array: Vec<f32> = probabilities.squeeze_dims(&[0, 1]).try_into().unwrap();
+        let probs_array: Vec<f32> = probabilities.squeeze_dim(0).try_into().unwrap();
         for i in (0..action_vocab_size).step_by(2) {
             assert!(probs_array[i] > 0.0);
             assert_eq!(probs_array[i + 1], 0.0);

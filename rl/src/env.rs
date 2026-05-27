@@ -150,10 +150,11 @@ impl<'a> Environment<'a> {
 #[cfg(test)]
 mod tests {
     use parser::behavior::test_make_behavior;
-    use runtime::ast::{OperatorSpec, Program};
+    use runtime::ast::Program;
     use runtime::runtime::test_make_param0;
     use runtime::stats::Metric;
     use std::collections::HashMap;
+    use stdlib::OperatorSpec;
 
     // use crate::model::ModelConfig;
     // use crate::model::RnnModelConfig;
@@ -162,7 +163,7 @@ mod tests {
 
     #[test]
     fn test_environment_step() {
-        let mut runtime = Runtime::new(100, "../data".into());
+        let mut runtime = Runtime::new(100, "../data".into(), None);
         let param0: Program = test_make_param0();
         let behavior = test_make_behavior();
         let score_fn = Aggregator {
@@ -210,7 +211,7 @@ mod tests {
 
     #[test]
     fn test_action_finish() {
-        let mut runtime = Runtime::new(100, "../data".into());
+        let mut runtime = Runtime::new(100, "../data".into(), None);
         let param0: Program = test_make_param0();
         let behavior = test_make_behavior();
         let score_fn = Aggregator {

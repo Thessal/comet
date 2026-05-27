@@ -2,9 +2,10 @@ use crate::action::{Action, ActionSpace};
 
 use parser::behavior::BehaviorDecl;
 use parser::expr::Literal;
-use runtime::ast::{OperatorSpec, PolishExpr, Program};
+use runtime::ast::{PolishExpr, Program};
 use runtime::ast::{Token, Tree};
 use runtime::runtime::Runtime;
+use stdlib::OperatorSpec;
 use stdlib::types::Signal;
 
 //////////
@@ -48,13 +49,14 @@ impl SearchState {
             let is_valid: bool = match a {
                 Action::Reduce(OperatorSpec {
                     name: _name,
-                    inputs_type,
-                    output_type: _output_type,
+                    inputs,
+                    output_shape: _output_shape,
+                    execute: _,
                 }) => {
-                    if inputs_type.len() > self.stack.len() {
+                    if inputs.len() > self.stack.len() {
                         false
                     } else {
-                        inputs_type
+                        inputs
                             .iter()
                             .rev()
                             .zip(stack_type_and_data.iter().rev())
@@ -102,7 +104,7 @@ impl SearchState {
                 (vec![Token::Parameter(i)], tree.clone(), runtime.run(&tree))
             }
             Action::Reduce(op) => {
-                let arity = op.inputs_type.len();
+                let arity = op.inputs.len();
                 let inputs = next_state.stack.split_off(next_state.stack.len() - arity);
                 let exprs: Vec<PolishExpr> = inputs.iter().map(|x| x.0.clone()).collect();
                 let trees: Vec<Tree> = inputs.iter().map(|x| x.1.clone()).collect();
@@ -113,7 +115,7 @@ impl SearchState {
                 assert!(
                     datas
                         .iter()
-                        .zip(op.inputs_type.iter())
+                        .zip(op.inputs.iter())
                         .all(|(d, i)| { std::mem::discriminant(d) == std::mem::discriminant(i) })
                 );
 
@@ -177,7 +179,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_get_valid_actions() {
-        let mut runtime = Runtime::new(100, "../data".into());
+        let mut runtime = Runtime::new(100, "../data".into(), None);
         let behavior = BehaviorDecl {
             inputs: vec![("x".to_string(), Signal::DataFrame(None))],
             output: ("result".to_string(), Signal::DataFrame(None)),
@@ -224,7 +226,7 @@ mod tests {
     }
     #[test]
     fn test_action_application() {
-        let mut runtime = Runtime::new(100, "../data".into());
+        let mut runtime = Runtime::new(100, "../data".into(), None);
         let behavior = BehaviorDecl {
             inputs: vec![
                 ("x".to_string(), Signal::DataFrame(None)),

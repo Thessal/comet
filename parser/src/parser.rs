@@ -136,7 +136,7 @@ fn parse_types(pair: pest::iterators::Pair<Rule>) -> Result<Signal, ParserError>
         "Float" => Ok(Signal::Float(None)),
         "Int" => Ok(Signal::Int(None)),
         "String" => Ok(Signal::String(None)),
-        "Vector" => Ok(Signal::Vector(None)),
+        "Vector" => Ok(Signal::DataFrame(None)),
         "DataFrame" => Ok(Signal::DataFrame(None)),
         s => Err(ParserError::SemanticError(format!("Unknown type: {}", s))),
     }

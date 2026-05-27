@@ -1,7 +1,7 @@
 use parser::behavior::BehaviorDecl;
-use runtime::ast::OperatorSpec;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use stdlib::OperatorSpec;
 use tch::Tensor;
 
 //////////

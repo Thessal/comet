@@ -1,58 +1,9 @@
 use std::fmt;
 
 use parser::expr::Literal;
+use stdlib::OperatorSpec;
 use stdlib::types::Signal;
 
-////////////////////////////////
-/* stdlib wrapper for runtime */
-////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct OperatorSpec {
-    pub name: String,
-    pub inputs_type: Vec<Signal>,
-    pub output_type: Signal,
-}
-
-impl OperatorSpec {
-    fn fill(self, arglist: Vec<Tree>) -> Program {
-        let arity = self.inputs_type.len();
-        if arglist.len() < arity {
-            panic!("Stack underflow for operator {}", self.name);
-        }
-        let mut args = Vec::with_capacity(arity);
-        for arg in arglist {
-            args.push(arg);
-        }
-        // args.reverse();
-        let mut polish_expr: Vec<Token> = Vec::new();
-        for arg in args.clone() {
-            match arg {
-                Tree::Program(program) => polish_expr.extend(program.polish_expression.unwrap()),
-                Tree::Literal(literal) => polish_expr.push(Token::Literal(literal)),
-            }
-        }
-        polish_expr.push(Token::Operator(self.clone()));
-        Program {
-            spec: self,
-            polish_expression: Some(polish_expr),
-            parameters: Some(args),
-        }
-    }
-}
-
-impl From<&str> for OperatorSpec {
-    fn from(name: &str) -> Self {
-        let op = OperatorMeta::from(name);
-        OperatorSpec {
-            name: op.name.to_string(),
-            inputs_type: op.inputs.to_vec(),
-            output_type: op.output_shape,
-        }
-    }
-}
-
-use stdlib::OperatorMeta;
 //////////////
 /* AST Node */
 //////////////
@@ -98,6 +49,33 @@ pub struct Program {
     pub polish_expression: Option<PolishExpr>,
     pub parameters: Option<Vec<Tree>>,
 }
+
+impl Program {
+    /// Helper to cleanly construct a Program (and its polish expression) from an operator name and arguments
+    pub fn new(operator_name: &str, args: Vec<Tree>) -> Self {
+        let spec = OperatorSpec::from(operator_name);
+        
+        let mut polish_expr = Vec::new();
+        for arg in &args {
+            match arg {
+                Tree::Program(p) => {
+                    if let Some(pe) = &p.polish_expression {
+                        polish_expr.extend(pe.clone());
+                    }
+                }
+                Tree::Literal(l) => polish_expr.push(Token::Literal(l.clone())),
+            }
+        }
+        polish_expr.push(Token::Operator(spec.clone()));
+
+        Program {
+            spec,
+            polish_expression: Some(polish_expr),
+            parameters: Some(args),
+        }
+    }
+}
+
 pub type PolishExpr = Vec<Token>;
 
 // Polish expression in String, for cache key
@@ -144,13 +122,29 @@ impl From<(&PolishExpr, Vec<Program>)> for Tree {
         for token in tokens.iter() {
             match token {
                 Token::Operator(operator) => {
-                    let arity = operator.inputs_type.len();
+                    let arity = operator.inputs.len();
                     if arglist.len() < arity {
                         panic!("Stack underflow for operator {}", operator.name);
                     }
                     let mut _arglist = arglist.split_off(arglist.len() - arity);
                     //_arglist.reverse();
-                    let program = operator.clone().fill(_arglist);
+
+                    let mut polish_expr: Vec<Token> = Vec::new();
+                    for arg in _arglist.clone() {
+                        match arg {
+                            Tree::Program(program) => {
+                                polish_expr.extend(program.polish_expression.unwrap())
+                            }
+                            Tree::Literal(literal) => polish_expr.push(Token::Literal(literal)),
+                        }
+                    }
+                    polish_expr.push(Token::Operator(operator.clone()));
+                    let program = Program {
+                        spec: operator.clone(),
+                        polish_expression: Some(polish_expr),
+                        parameters: Some(_arglist),
+                    };
+
                     arglist.push(Tree::Program(program));
                 }
                 Token::Literal(literal) => {
@@ -184,7 +178,7 @@ mod tests {
     //         ],
     //         output: parser::program::TypeDecl::DataFrame,
     //     };
-    //     let op = stdlib::OperatorMeta::from(sig.clone());
+    //     let op = stdlib::OperatorSpec::from(sig.clone());
     //     assert!(op.name == "ts_mean");
     //     assert!(op.inputs == vec![stdlib::TypeDecl::ScalarInt, stdlib::TypeDecl::DataFrame]);
     //     assert!(op.output_shape == stdlib::TypeDecl::DataFrame);
