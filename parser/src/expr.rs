@@ -7,12 +7,6 @@ pub enum FlowStmt {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Stmt {
-    Flow(FlowStmt),
-    Expr(Expr),
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Literal(Literal),
     Identifier(Ident),
@@ -89,15 +83,6 @@ pub struct ArgValue {
 }
 
 use std::fmt;
-
-impl fmt::Display for Stmt {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Stmt::Flow(fs) => write!(f, "{}", fs),
-            Stmt::Expr(e) => write!(f, "{}", e), // Return
-        }
-    }
-}
 
 impl fmt::Display for FlowStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

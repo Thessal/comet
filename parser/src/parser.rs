@@ -1,6 +1,10 @@
-use crate::behavior::*;
+use crate::{
+    behavior::*,
+    expr::{Expr, FlowStmt, Stmt},
+};
 use pest::Parser;
 use pest_derive::Parser;
+use runtime::ast::Tree::{Literal, Program};
 use stdlib::types::Signal;
 use thiserror::Error;
 
@@ -20,13 +24,158 @@ pub enum ParserError {
     SemanticError(String),
 }
 
-pub fn parse(input: &str) -> Result<InputCode, ParserError> {
+pub fn parse(input: &str) -> Result<(FlowDecl, Vec<BehaviorDecl>, Vec<Program>), ParserError> {
+    // Parses Flow and behavior.
     let mut pairs = CometParser::parse(Rule::program, input)?;
     let program_pair = pairs.next().ok_or(ParserError::MissingToken)?;
-    Ok(parse_program(program_pair)?)
+    let code: InputCode = parse_program(program_pair)?;
+    let mut flow_opt = None;
+    let behaviors: Vec<BehaviorDecl> = code
+        .into_iter()
+        .filter_map(|decl| match decl {
+            InputDecl::Import(_) => None,
+            InputDecl::Behavior(b) => Some(b),
+            InputDecl::Flow(f) => {
+                flow_opt = Some(f);
+                None
+            }
+        })
+        .collect();
+    let flow = flow_opt.ok_or(ParserError::MissingToken)?;
+
+    // Locates behavior call in the flow's body. (asserts that there's only one)
+    // Locates assignments in the flow's body. Convert them into AST(Programs)
+    // loop over flow.body until it meets FlowStmt::Expr. after it meet first Expr, stop loop and discard.
+    // while looping, it should meet FlowStmt::Assignment
+    // Store Assignments to assignments, and output to output.
+    let mut assignments = Vec::new();
+    let mut output = None;
+
+    for stmt in flow.body.iter() {
+        match stmt {
+            FlowStmt::Assignment { target, expr } => {
+                assignments.push((target.clone(), expr.clone()));
+            }
+            FlowStmt::Expr(expr) => {
+                output = Some(expr.clone());
+                break; // Stop loop after the first Expr is found
+            }
+        }
+    }
+
+    let target_call = extract_single_behavior_call(&assignments, &output, &behaviors)?;
+    let ast_programs = build_ast_programs(target_call, &assignments)?;
+
+    Ok((flow, behaviors, ast_programs))
+}
+
+fn extract_single_behavior_call<'a>(
+    assignments: &'a [(crate::expr::Ident, Expr)],
+    output: &'a Option<Expr>,
+    behaviors: &[BehaviorDecl],
+) -> Result<&'a Expr, ParserError> {
+    let behavior_names: std::collections::HashSet<&str> = behaviors.iter().map(|b| b.output.0.as_str()).collect();
+    let mut behavior_calls = Vec::new();
+
+    fn extract_calls<'a>(expr: &'a Expr, names: &std::collections::HashSet<&str>, calls: &mut Vec<&'a Expr>) {
+        match expr {
+            Expr::Call { path, args } => {
+                if let Some(name) = path.segments.first() {
+                    if names.contains(name.as_str()) {
+                        calls.push(expr);
+                    }
+                }
+                for arg in args {
+                    extract_calls(arg, names, calls);
+                }
+            }
+            Expr::MemberAccess { target, .. } => extract_calls(target, names, calls),
+            Expr::List(exprs) => {
+                for e in exprs {
+                    extract_calls(e, names, calls);
+                }
+            }
+            Expr::Range { start, step, end } => {
+                extract_calls(start, names, calls);
+                if let Some(s) = step {
+                    extract_calls(s, names, calls);
+                }
+                extract_calls(end, names, calls);
+            }
+            _ => {}
+        }
+    }
+
+    for (_, expr) in assignments {
+        extract_calls(expr, &behavior_names, &mut behavior_calls);
+    }
+    if let Some(out_expr) = output {
+        extract_calls(out_expr, &behavior_names, &mut behavior_calls);
+    }
+
+    if behavior_calls.len() != 1 {
+        return Err(ParserError::SemanticError(format!(
+            "Expected exactly 1 behavior call, found {}",
+            behavior_calls.len()
+        )));
+    }
+
+    Ok(behavior_calls[0])
+}
+
+fn build_ast_programs(
+    target_call: &Expr,
+    assignments: &[(crate::expr::Ident, Expr)],
+) -> Result<Vec<Program>, ParserError> {
+    let mut ast_programs = Vec::new();
+
+    if let Expr::Call { args, .. } = target_call {
+        for arg in args {
+            match arg {
+                Expr::Identifier(name) => {
+                    let mut found = false;
+                    for (assign_target, assign_expr) in assignments.iter().rev() {
+                        if assign_target == name {
+                            if let Expr::Call { path, args: call_args } = assign_expr {
+                                if path.segments.first().map(|s| s.as_str()) == Some("data") {
+                                    if let Some(Expr::Literal(crate::expr::Literal::String(data_name))) = call_args.first() {
+                                        ast_programs.push(Program(runtime::ast::Program::new(
+                                            "data",
+                                            vec![runtime::ast::Tree::Literal(crate::expr::Literal::String(data_name.clone()))]
+                                        )));
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if !found {
+                        // Fallback if not a recognized data assignment
+                        ast_programs.push(Program(runtime::ast::Program::new(
+                            "data",
+                            vec![runtime::ast::Tree::Literal(crate::expr::Literal::String("volume".to_string()))]
+                        )));
+                    }
+                }
+                Expr::Literal(lit) => {
+                    ast_programs.push(Literal(lit.clone()));
+                }
+                _ => {
+                    ast_programs.push(Program(runtime::ast::Program::new(
+                        "data",
+                        vec![runtime::ast::Tree::Literal(crate::expr::Literal::String("volume".to_string()))]
+                    )));
+                }
+            }
+        }
+    }
+
+    Ok(ast_programs)
 }
 
 fn parse_program(pair: pest::iterators::Pair<Rule>) -> Result<InputCode, ParserError> {
+    // receives tokens, outputs Behavior and Flows
     let mut declarations = Vec::new();
     for inner in pair.into_inner() {
         match inner.as_rule() {
@@ -270,13 +419,13 @@ fn parse_flow(
                 let mut assn_inner = p.into_inner();
                 let target = assn_inner.next().unwrap().as_str().to_string();
                 let expr = parse_expr(assn_inner.next().unwrap())?;
-                body.push(crate::expr::Stmt::Flow(crate::expr::FlowStmt::Assignment {
+                body.push(crate::expr::FlowStmt::Assignment {
                     target,
                     expr,
-                }));
+                });
             }
             Rule::expr => {
-                body.push(crate::expr::Stmt::Expr(parse_expr(p)?));
+                body.push(crate::expr::FlowStmt::Expr(parse_expr(p)?));
             }
             _ => {}
         }

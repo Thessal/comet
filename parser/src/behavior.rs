@@ -1,6 +1,6 @@
 // input code AST
+use crate::expr::FlowStmt;
 use crate::expr::Ident;
-use crate::expr::Stmt;
 use stdlib::types::Signal;
 pub type InputCode = Vec<InputDecl>;
 pub type NamedSignal = (String, Signal);
@@ -30,7 +30,7 @@ pub struct BehaviorDecl {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlowDecl {
     pub name: Ident,
-    pub body: Vec<Stmt>,
+    pub body: Vec<FlowStmt>,
 }
 
 use std::fmt;

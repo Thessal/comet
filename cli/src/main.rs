@@ -19,9 +19,9 @@ struct Args {
 fn build_data_param(name: String) -> runtime::ast::Program {
     runtime::ast::Program::new(
         "data",
-        vec![runtime::ast::Tree::Literal(
-            parser::expr::Literal::String(name),
-        )],
+        vec![runtime::ast::Tree::Literal(parser::expr::Literal::String(
+            name,
+        ))],
     )
 }
 
@@ -53,67 +53,6 @@ fn _main(args: Args) {
     // Initialize central runtime
     let mut runtime = runtime::runtime::Runtime::new(10000, "data".into(), None);
     runtime.enable = false; // NOTE: dummy runtime
-
-    // Extract bound parameter values from the Flow call syntax
-    let mut params = Vec::new();
-
-    for decl in &program {
-        if let InputDecl::Flow(f) = decl {
-            let mut assignments = std::collections::HashMap::new();
-            for stmt in &f.body {
-                match stmt {
-                    parser::expr::Stmt::Flow(parser::expr::FlowStmt::Assignment {
-                        target,
-                        expr,
-                    }) => {
-                        assignments.insert(target.clone(), expr.clone());
-                    }
-                    parser::expr::Stmt::Expr(Expr::Call { args, .. }) => {
-                        assert!(args.len() == behavior.inputs.len());
-
-                        for arg in args {
-                            match arg {
-                                Expr::Identifier(name) => {
-                                    if let Some(Expr::Call {
-                                        path,
-                                        args: call_args,
-                                    }) = assignments.get(name)
-                                    {
-                                        if path.segments.first().map(|s| s.as_str()) == Some("data")
-                                        {
-                                            if let Some(Expr::Literal(Literal::String(data_name))) =
-                                                call_args.first()
-                                            {
-                                                params.push(runtime::ast::Tree::Program(
-                                                    build_data_param(data_name.clone()),
-                                                ));
-                                                continue;
-                                            }
-                                        }
-                                    }
-                                    // Fallback if not a recognized data assignment
-                                    params.push(runtime::ast::Tree::Program(build_data_param(
-                                        "volume".to_string(),
-                                    )));
-                                }
-                                Expr::Literal(lit) => {
-                                    params.push(runtime::ast::Tree::Literal(lit.clone()));
-                                }
-                                _ => {
-                                    params.push(runtime::ast::Tree::Program(build_data_param(
-                                        "volume".to_string(),
-                                    )));
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
-
-    params.reverse();
 
     let device = if use_cuda {
         tch::Device::Cuda(0)
