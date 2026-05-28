@@ -38,7 +38,7 @@ impl Environment<'_> {
             Tensor::from_slice(&[0.0f64; EMBEDDING_SIZE_PER_TOKEN]),
         ];
         for (i, tok) in state.expr.iter().take(EMBEDDING_TOKEN_CNT).enumerate() {
-            embedding_tokens[i] = tok.into();
+            embedding_tokens[i] = runtime::ast::token_to_tensor(tok); // FIXME
         }
         assert!(embedding_tokens.len() == EMBEDDING_TOKEN_CNT);
         let out = tch::Tensor::cat(&embedding_tokens, 0).to_device(device);

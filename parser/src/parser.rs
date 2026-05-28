@@ -1,10 +1,12 @@
+use crate::ast::{OperatorNode, Tree};
 use crate::{
     behavior::*,
-    expr::{Expr, FlowStmt, Stmt},
+    expr::{Expr, FlowStmt},
 };
 use pest::Parser;
 use pest_derive::Parser;
-use runtime::ast::Tree::{Literal, Program};
+use std::collections::HashMap;
+use stdlib::OperatorSpec;
 use stdlib::types::Signal;
 use thiserror::Error;
 
@@ -24,7 +26,7 @@ pub enum ParserError {
     SemanticError(String),
 }
 
-pub fn parse(input: &str) -> Result<(FlowDecl, Vec<BehaviorDecl>, Vec<Program>), ParserError> {
+pub fn parse(input: &str) -> Result<(Tree, Vec<crate::ast::BehaviorNode>), ParserError> {
     // Parses Flow and behavior.
     let mut pairs = CometParser::parse(Rule::program, input)?;
     let program_pair = pairs.next().ok_or(ParserError::MissingToken)?;
@@ -43,11 +45,7 @@ pub fn parse(input: &str) -> Result<(FlowDecl, Vec<BehaviorDecl>, Vec<Program>),
         .collect();
     let flow = flow_opt.ok_or(ParserError::MissingToken)?;
 
-    // Locates behavior call in the flow's body. (asserts that there's only one)
     // Locates assignments in the flow's body. Convert them into AST(Programs)
-    // loop over flow.body until it meets FlowStmt::Expr. after it meet first Expr, stop loop and discard.
-    // while looping, it should meet FlowStmt::Assignment
-    // Store Assignments to assignments, and output to output.
     let mut assignments = Vec::new();
     let mut output = None;
 
@@ -63,115 +61,72 @@ pub fn parse(input: &str) -> Result<(FlowDecl, Vec<BehaviorDecl>, Vec<Program>),
         }
     }
 
-    let target_call = extract_single_behavior_call(&assignments, &output, &behaviors)?;
-    let ast_programs = build_ast_programs(target_call, &assignments)?;
+    let assignments_map: HashMap<&str, &Expr> =
+        assignments.iter().map(|(k, v)| (k.as_str(), v)).collect();
+    let mut behaviors_map: HashMap<&str, &BehaviorDecl> = HashMap::new();
+    for b in &behaviors {
+        behaviors_map.insert(b.output.0.as_str(), b);
+    }
 
-    Ok((flow, behaviors, ast_programs))
+    let out_expr = output.ok_or(ParserError::SemanticError(
+        "No output expression in flow".into(),
+    ))?;
+    let mut behaviors_ptr: Vec<crate::ast::BehaviorNode> = Vec::new();
+    // extract behavior from the ast. build a vec<crate::ast::BehaviorNode>.
+
+    let ast: Tree = build_ast(
+        &out_expr,
+        &assignments_map,
+        &behaviors_map,
+        &mut behaviors_ptr,
+    )?;
+
+    // full ast (operator nodes and literals), reference to behavior node (undetermined node)
+    Ok((ast, behaviors_ptr))
 }
 
-fn extract_single_behavior_call<'a>(
-    assignments: &'a [(crate::expr::Ident, Expr)],
-    output: &'a Option<Expr>,
-    behaviors: &[BehaviorDecl],
-) -> Result<&'a Expr, ParserError> {
-    let behavior_names: std::collections::HashSet<&str> = behaviors.iter().map(|b| b.output.0.as_str()).collect();
-    let mut behavior_calls = Vec::new();
-
-    fn extract_calls<'a>(expr: &'a Expr, names: &std::collections::HashSet<&str>, calls: &mut Vec<&'a Expr>) {
-        match expr {
-            Expr::Call { path, args } => {
-                if let Some(name) = path.segments.first() {
-                    if names.contains(name.as_str()) {
-                        calls.push(expr);
-                    }
-                }
-                for arg in args {
-                    extract_calls(arg, names, calls);
-                }
-            }
-            Expr::MemberAccess { target, .. } => extract_calls(target, names, calls),
-            Expr::List(exprs) => {
-                for e in exprs {
-                    extract_calls(e, names, calls);
-                }
-            }
-            Expr::Range { start, step, end } => {
-                extract_calls(start, names, calls);
-                if let Some(s) = step {
-                    extract_calls(s, names, calls);
-                }
-                extract_calls(end, names, calls);
-            }
-            _ => {}
-        }
-    }
-
-    for (_, expr) in assignments {
-        extract_calls(expr, &behavior_names, &mut behavior_calls);
-    }
-    if let Some(out_expr) = output {
-        extract_calls(out_expr, &behavior_names, &mut behavior_calls);
-    }
-
-    if behavior_calls.len() != 1 {
-        return Err(ParserError::SemanticError(format!(
-            "Expected exactly 1 behavior call, found {}",
-            behavior_calls.len()
-        )));
-    }
-
-    Ok(behavior_calls[0])
-}
-
-fn build_ast_programs(
-    target_call: &Expr,
-    assignments: &[(crate::expr::Ident, Expr)],
-) -> Result<Vec<Program>, ParserError> {
-    let mut ast_programs = Vec::new();
-
-    if let Expr::Call { args, .. } = target_call {
-        for arg in args {
-            match arg {
-                Expr::Identifier(name) => {
-                    let mut found = false;
-                    for (assign_target, assign_expr) in assignments.iter().rev() {
-                        if assign_target == name {
-                            if let Expr::Call { path, args: call_args } = assign_expr {
-                                if path.segments.first().map(|s| s.as_str()) == Some("data") {
-                                    if let Some(Expr::Literal(crate::expr::Literal::String(data_name))) = call_args.first() {
-                                        ast_programs.push(Program(runtime::ast::Program::new(
-                                            "data",
-                                            vec![runtime::ast::Tree::Literal(crate::expr::Literal::String(data_name.clone()))]
-                                        )));
-                                        found = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if !found {
-                        // Fallback if not a recognized data assignment
-                        ast_programs.push(Program(runtime::ast::Program::new(
-                            "data",
-                            vec![runtime::ast::Tree::Literal(crate::expr::Literal::String("volume".to_string()))]
-                        )));
-                    }
-                }
-                Expr::Literal(lit) => {
-                    ast_programs.push(Literal(lit.clone()));
-                }
-                _ => {
-                    ast_programs.push(Program(runtime::ast::Program::new(
-                        "data",
-                        vec![runtime::ast::Tree::Literal(crate::expr::Literal::String("volume".to_string()))]
-                    )));
-                }
+fn build_ast(
+    output: &Expr,
+    assignments: &HashMap<&str, &Expr>,
+    behaviors: &HashMap<&str, &BehaviorDecl>,
+    behaviors_ptr: &mut Vec<crate::ast::BehaviorNode>,
+) -> Result<Tree, ParserError> {
+    match output {
+        Expr::Literal(l) => Ok(Tree::Literal(l.clone())),
+        Expr::Identifier(id) => {
+            if let Some(expr) = assignments.get(id.as_str()) {
+                build_ast(expr, assignments, behaviors, behaviors_ptr)
+            } else {
+                Err(ParserError::SemanticError(format!(
+                    "Undefined identifier: {}",
+                    id
+                )))
             }
         }
-    }
+        Expr::Call { fn_name, args } => {
+            let mut arg_trees = Vec::new();
+            for arg in args {
+                arg_trees.push(build_ast(arg, assignments, behaviors, behaviors_ptr)?);
+            }
 
-    Ok(ast_programs)
+            if behaviors.contains_key(fn_name.as_str()) {
+                let node = crate::ast::BehaviorNode {
+                    name: fn_name.clone(),
+                    parameters: Some(arg_trees),
+                };
+                behaviors_ptr.push(node.clone());
+                Ok(Tree::Behavior(node))
+            } else {
+                let spec: OperatorSpec = OperatorSpec::from(fn_name.as_str());
+                Ok(Tree::Operator(crate::ast::OperatorNode {
+                    spec,
+                    parameters: Some(arg_trees),
+                }))
+            }
+        }
+        Expr::List(exprs) => panic!("Unexpected list expression"),
+        Expr::Range { start, step, end } => panic!("Unexpected range expression"),
+    }
 }
 
 fn parse_program(pair: pest::iterators::Pair<Rule>) -> Result<InputCode, ParserError> {
@@ -419,10 +374,7 @@ fn parse_flow(
                 let mut assn_inner = p.into_inner();
                 let target = assn_inner.next().unwrap().as_str().to_string();
                 let expr = parse_expr(assn_inner.next().unwrap())?;
-                body.push(crate::expr::FlowStmt::Assignment {
-                    target,
-                    expr,
-                });
+                body.push(crate::expr::FlowStmt::Assignment { target, expr });
             }
             Rule::expr => {
                 body.push(crate::expr::FlowStmt::Expr(parse_expr(p)?));
@@ -459,10 +411,7 @@ fn parse_expr(pair: pest::iterators::Pair<Rule>) -> Result<crate::expr::Expr, Pa
         return parse_expr(first);
     }
 
-    // Prepare a path in case this is a function call
-    let path = crate::expr::Path {
-        segments: vec![first.as_str().to_string()],
-    };
+    let fn_name = first.as_str().to_string();
 
     // Process suffixes to determine if it's a more complex expression
     for suffix in all_inner {
@@ -475,7 +424,7 @@ fn parse_expr(pair: pest::iterators::Pair<Rule>) -> Result<crate::expr::Expr, Pa
                 }
             }
             current_expr = crate::expr::Expr::Call {
-                path: path.clone(),
+                fn_name: fn_name.clone(),
                 args,
             };
         }
@@ -566,7 +515,7 @@ fn test_parse_behavior_decl() {
         println!("Error: {}", e);
     }
     assert!(result.is_ok());
-    for stmt in result.unwrap() {
-        println!("{:?}", stmt);
-    }
+    let (tree, undetermined_nodes) = result.unwrap();
+    println!("{:?}", tree);
+    println!("{:?}", undetermined_nodes);
 }

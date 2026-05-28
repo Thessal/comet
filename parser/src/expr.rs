@@ -11,12 +11,8 @@ pub enum Expr {
     Literal(Literal),
     Identifier(Ident),
     Call {
-        path: Path,
-        args: Vec<Expr>, // Function arguments (positional only)
-    },
-    MemberAccess {
-        target: Box<Expr>,
-        field: Ident,
+        fn_name: Ident,
+        args: Vec<Expr>,
     },
     List(Vec<Expr>),
     Range {
@@ -25,11 +21,6 @@ pub enum Expr {
         end: Box<Expr>,
     },
 } // Question : do we allow expressions in list like [ multiply(1,2), 3 ]? should we allow or not?
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Path {
-    pub segments: Vec<Ident>,
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -76,13 +67,9 @@ impl Hash for Literal {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ArgValue {
-    pub name: Option<Ident>,
-    pub value: Expr,
-}
-
 use std::fmt;
+
+use crate::behavior::BehaviorDecl;
 
 impl fmt::Display for FlowStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -98,11 +85,13 @@ impl fmt::Display for Expr {
         match self {
             Expr::Literal(l) => write!(f, "{}", l),
             Expr::Identifier(i) => write!(f, "{}", i),
-            Expr::Call { path, args } => {
+            Expr::Call {
+                fn_name: fn_name,
+                args,
+            } => {
                 let formatted_args: Vec<String> = args.iter().map(|arg| arg.to_string()).collect();
-                write!(f, "{}({})", path, formatted_args.join(", "))
+                write!(f, "{}({})", fn_name, formatted_args.join(", "))
             }
-            Expr::MemberAccess { target, field } => write!(f, "{}.{}", target, field),
             Expr::List(exprs) => {
                 let s: Vec<String> = exprs.iter().map(|e| e.to_string()).collect();
                 write!(f, "[{}]", s.join(", "))
@@ -125,22 +114,6 @@ impl fmt::Display for Literal {
             Literal::Float(fl) => write!(f, "{}", fl),
             Literal::String(s) => write!(f, "\"{}\"", s),
             Literal::Boolean(b) => write!(f, "{}", b),
-        }
-    }
-}
-
-impl fmt::Display for Path {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.segments.join("::"))
-    }
-}
-
-impl fmt::Display for ArgValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(n) = &self.name {
-            write!(f, "{}={}", n, self.value)
-        } else {
-            write!(f, "{}", self.value)
         }
     }
 }
