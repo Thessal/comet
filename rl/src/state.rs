@@ -1,8 +1,8 @@
 use crate::action::{Action, ActionSpace};
 
+use parser::ast::{Network, Node, NodeType};
 use parser::behavior::BehaviorDecl;
 use parser::expr::Literal;
-use parser::ast::{Network, Node, NodeType};
 
 pub type PolishExpr = Vec<Token>;
 #[derive(Debug, Clone, PartialEq)]
@@ -22,32 +22,58 @@ use stdlib::types::Signal;
 
 #[derive(Debug, Clone)]
 pub struct SearchState {
-    pub params: Vec<(String, Signal, bool)>, // (param name, param type, is_used). all params need to be used in the end.
-    pub stack: Vec<(PolishExpr, usize, Signal)>, // polish expr, tree, data
-    pub expr: PolishExpr,                    // Polish expression (added for convenience)
+    pub stack: Vec<usize>, // reference to callgraph's node
+    pub expr: PolishExpr,
+    pub callgraph: Network,
+    pub cursor: usize, // index of node we are currently building
 }
 
-impl From<BehaviorDecl> for SearchState {
-    fn from(x: BehaviorDecl) -> Self {
+impl From<Network> for SearchState {
+    fn from(callgraph: Network) -> Self {
+        let (behavior_idx, _) = callgraph.get_behavior();
         SearchState {
-            params: x
-                .inputs
-                .iter()
-                .map(|(name, signal)| (name.clone(), signal.clone(), false))
-                .collect(),
             stack: vec![],
-            expr: PolishExpr::new(),
+            callgraph: callgraph,
+            cursor: behavior_idx,
         }
     }
 }
 
 impl SearchState {
-    pub fn is_done_valid(&self) -> (bool, bool, bool) {
-        let params_consumed: bool = self.params.iter().all(|(_, _, used)| *used);
-        let stack_size: bool = self.stack.len() == 1;
-        let is_done_valid: bool = params_consumed && stack_size;
-        (is_done_valid, params_consumed, stack_size)
+    pub fn new_dummy() -> Self {
+        Self {
+            stack: vec![],
+            callgraph: Network { nodes: vec![] },
+            cursor: 0,
+        }
     }
+    pub fn is_done_valid(&self) -> bool {
+        // There may be unused inputs. We allow unused inputs.
+        self.stack.len() == 1
+    }
+
+    pub fn apply_action(&mut self, action: Action) -> (SearchState, bool) {
+        match action {
+            Action::Done => {
+                // TODO: Update callgraph
+                todo!()
+            }
+            other_action => {
+                let token = match &other_action {
+                    Action::ShiftInt(i) => Token::Literal(Literal::Integer(*i)),
+                    Action::ShiftFloat(f) => Token::Literal(Literal::Float(*f)),
+                    Action::ShiftString(s) => Token::Literal(Literal::String(s.clone())),
+                    Action::ShiftParam(i) => Token::Parameter(*i),
+                    Action::Reduce(op) => Token::Operator(op.clone()),
+                    Action::Done => unreachable!(),
+                };
+                self.expr.push(token);
+                // self.stack.push((expr, tree, data));
+                // (next_state, false)
+            }
+        }
+    }
+
     pub fn get_valid_actions(&self, action: &ActionSpace) -> Vec<Action> {
         let stack_type_and_data: Vec<Signal> =
             self.stack.iter().map(|(_, _, s)| s.clone()).collect();
@@ -72,7 +98,7 @@ impl SearchState {
                             .all(|(i, s)| std::mem::discriminant(i) == std::mem::discriminant(s))
                     }
                 }
-                Action::Done => self.is_done_valid().0,
+                Action::Done => self.is_done_valid(),
                 _ => self.stack.len() < 5, // allow introducing variables until stack depth 5
                                            // TODO: adjust
             };
@@ -82,103 +108,70 @@ impl SearchState {
         }
         valid_actions
     }
-    fn make_tree(
-        &self,
-        action: Action,
-        param_values: &Vec<usize>,
-        network: &mut Network,
-        runtime: &mut Runtime,
-    ) -> (SearchState, PolishExpr, usize, Signal) {
-        let mut next_state = self.clone();
-        let (expr, tree, data): (PolishExpr, usize, Signal) = match action {
-            Action::ShiftInt(i) => (
-                vec![Token::Literal(Literal::Integer(i))],
-                network.add_node(NodeType::Literal(Literal::Integer(i))),
-                Signal::Int(Some(i)),
-            ),
-            Action::ShiftFloat(f) => (
-                vec![Token::Literal(Literal::Float(f))],
-                network.add_node(NodeType::Literal(Literal::Float(f))),
-                Signal::Float(Some(f)),
-            ),
-            Action::ShiftString(s) => (
-                vec![Token::Literal(Literal::String(s.clone()))],
-                network.add_node(NodeType::Literal(Literal::String(s.clone()))),
-                Signal::String(Some(s.clone())),
-            ),
-            Action::ShiftParam(i) => {
-                let (_param_name, _output_type, _used) = next_state.params[i].clone();
-                next_state.params[i].2 = true;
-                let tree = param_values[i];
-                (vec![Token::Parameter(i)], tree, runtime.run(network, tree))
-            }
-            Action::Reduce(op) => {
-                let arity = op.inputs.len();
-                let inputs = next_state.stack.split_off(next_state.stack.len() - arity);
-                let exprs: Vec<PolishExpr> = inputs.iter().map(|x| x.0.clone()).collect();
-                let trees: Vec<usize> = inputs.iter().map(|x| x.1.clone()).collect();
-                let datas: Vec<Signal> = inputs.iter().map(|x| x.2.clone()).collect();
+    // fn make_tree(
+    //     &self,
+    //     action: Action,
+    //     param_values: &Vec<usize>,
+    //     network: &mut Network,
+    //     runtime: &mut Runtime,
+    // ) -> (SearchState, PolishExpr, usize, Signal) {
+    //     let mut next_state = self.clone();
+    //     let (expr, tree, data): (PolishExpr, usize, Signal) = match action {
+    //         Action::ShiftInt(i) => (
+    //             vec![Token::Literal(Literal::Integer(i))],
+    //             network.add_node(NodeType::Literal(Literal::Integer(i))),
+    //             Signal::Int(Some(i)),
+    //         ),
+    //         Action::ShiftFloat(f) => (
+    //             vec![Token::Literal(Literal::Float(f))],
+    //             network.add_node(NodeType::Literal(Literal::Float(f))),
+    //             Signal::Float(Some(f)),
+    //         ),
+    //         Action::ShiftString(s) => (
+    //             vec![Token::Literal(Literal::String(s.clone()))],
+    //             network.add_node(NodeType::Literal(Literal::String(s.clone()))),
+    //             Signal::String(Some(s.clone())),
+    //         ),
+    //         Action::ShiftParam(i) => {
+    //             let (_param_name, _output_type, _used) = next_state.params[i].clone();
+    //             next_state.params[i].2 = true;
+    //             let tree = param_values[i];
+    //             (vec![Token::Parameter(i)], tree, runtime.run(network, tree))
+    //         }
+    //         Action::Reduce(op) => {
+    //             let arity = op.inputs.len();
+    //             let inputs = next_state.stack.split_off(next_state.stack.len() - arity);
+    //             let exprs: Vec<PolishExpr> = inputs.iter().map(|x| x.0.clone()).collect();
+    //             let trees: Vec<usize> = inputs.iter().map(|x| x.1.clone()).collect();
+    //             let datas: Vec<Signal> = inputs.iter().map(|x| x.2.clone()).collect();
 
-                assert!(datas.len() == arity);
-                // operator arguments type check - RPN
-                assert!(
-                    datas
-                        .iter()
-                        .zip(op.inputs.iter())
-                        .all(|(d, i)| { std::mem::discriminant(d) == std::mem::discriminant(i) })
-                );
+    //             assert!(datas.len() == arity);
+    //             // operator arguments type check - RPN
+    //             assert!(
+    //                 datas
+    //                     .iter()
+    //                     .zip(op.inputs.iter())
+    //                     .all(|(d, i)| { std::mem::discriminant(d) == std::mem::discriminant(i) })
+    //             );
 
-                let expr: PolishExpr = exprs
-                    .into_iter()
-                    .chain(vec![vec![Token::Operator(op.clone())]].into_iter())
-                    .flatten()
-                    .collect();
+    //             let expr: PolishExpr = exprs
+    //                 .into_iter()
+    //                 .chain(vec![vec![Token::Operator(op.clone())]].into_iter())
+    //                 .flatten()
+    //                 .collect();
 
-                let tree = network.add_node(NodeType::Operator(op.clone()));
-                for child in trees {
-                    network.add_child(tree, child);
-                }
+    //             let tree = network.add_node(NodeType::Operator(op.clone()));
+    //             for child in trees {
+    //                 network.add_child(tree, child);
+    //             }
 
-                let data = runtime.run(network, tree);
-                (expr, tree, data)
-            }
-            Action::Done => panic!("Done action should be handled in prior step."),
-        };
-        (next_state, expr, tree, data)
-    }
-
-    pub fn apply_action(
-        &self,
-        action: Action,
-        network: &mut Network,
-        runtime: &mut Runtime,
-        param_values: &Vec<usize>,
-    ) -> (SearchState, bool) {
-        match action {
-            Action::Done => {
-                let next_state = self.clone();
-                let (is_done_valid, _params_consumed, _stack_size) = next_state.is_done_valid();
-                assert!(is_done_valid);
-                (next_state, true)
-            }
-            other_action => {
-                let token = match &other_action {
-                    Action::ShiftInt(i) => Token::Literal(Literal::Integer(*i)),
-                    Action::ShiftFloat(f) => Token::Literal(Literal::Float(*f)),
-                    Action::ShiftString(s) => Token::Literal(Literal::String(s.clone())),
-                    Action::ShiftParam(i) => Token::Parameter(*i),
-                    Action::Reduce(op) => Token::Operator(op.clone()),
-                    Action::Done => unreachable!(),
-                };
-                let (mut next_state, expr, tree, data) =
-                    self.make_tree(other_action, param_values, network, runtime);
-
-                next_state.expr.push(token);
-                next_state.stack.push((expr, tree, data));
-                (next_state, false)
-            }
-        }
-    }
+    //             let data = runtime.run(network, tree);
+    //             (expr, tree, data)
+    //         }
+    //         Action::Done => panic!("Done action should be handled in prior step."),
+    //     };
+    //     (next_state, expr, tree, data)
+    // }
 }
 
 #[cfg(test)]

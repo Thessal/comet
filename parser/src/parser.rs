@@ -108,11 +108,18 @@ fn build_ast(
         Expr::Call { fn_name, args } => {
             let mut arg_indices: Vec<usize> = Vec::new();
             for arg in args {
-                arg_indices.push(build_ast(network, arg, assignments, behaviors, behaviors_ptr)?);
+                arg_indices.push(build_ast(
+                    network,
+                    arg,
+                    assignments,
+                    behaviors,
+                    behaviors_ptr,
+                )?);
             }
 
             if behaviors.contains_key(fn_name.as_str()) {
-                let node_id = network.add_node(NodeType::Behavior(fn_name.clone()));
+                let node_id =
+                    network.add_node(NodeType::Behavior(behaviors[fn_name.as_str()].clone()));
                 for child_id in arg_indices {
                     network.add_child(node_id, child_id);
                 }

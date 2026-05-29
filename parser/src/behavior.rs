@@ -27,6 +27,12 @@ pub struct BehaviorDecl {
     pub supervised_epochs: Option<usize>,
 }
 
+impl BehaviorDecl {
+    pub fn name(&self) -> &str {
+        &self.output.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlowDecl {
     pub name: Ident,

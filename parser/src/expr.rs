@@ -69,8 +69,6 @@ impl Hash for Literal {
 
 use std::fmt;
 
-use crate::behavior::BehaviorDecl;
-
 impl fmt::Display for FlowStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

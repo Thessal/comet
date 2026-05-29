@@ -17,6 +17,7 @@ pub struct Environment<'a> {
     pub action_space: ActionSpace,
     pub call_graph: Network,
     pub config: BatchConfig,
+    pub orig_behavior: (usize, usize, BehaviorDecl) // node_idx, network_size, behavior_decl
 }
 
 impl<'a> Environment<'a> {
@@ -26,19 +27,11 @@ impl<'a> Environment<'a> {
         max_length: usize,
         batch_size: usize,
     ) -> Self {
-        let behavior_indices = call_graph.get_behavior_indices();
-        assert!(
-            behavior_indices.len() == 1,
-            "Exactly one behavior node in AST is supported, currenlty."
-        );
-        let behavior_idx = behavior_indices[0];
+
+        let (behavior_idx, behavior_ref) = call_graph.get_behavior()
 
         let mut result = Self {
-            state: SearchState {
-                params: vec![],
-                stack: vec![],
-                expr: vec![],
-            },
+            state: SearchState::new_dummy(),
             action_space: action_space,
             call_graph: call_graph.clone(),
             config: BatchConfig {
@@ -46,36 +39,25 @@ impl<'a> Environment<'a> {
                 batch_size,
                 trajectories: vec![],
             },
+            orig_behavior: (behavior_idx, call_graph.nodes.len(), behavior_ref.clone())
         };
         result.reset();
         result
     }
+
     pub fn reset(&mut self) {
-        // self.trajectory = vec![];
-        self.state = todo!()
-        // self.behavior.clone().into();
-        // self.state.clone()
+        let (behavior_idx, network_size, orig_behavior) = &self.orig_behavior;
+        // reset search state
+        self.state.stack = vec![];
+        // reset behavior node
+        self.state.callgraph.nodes[*behavior_idx].node_type = NodeType::Behavior(orig_behavior.clone());
+        self.state.callgraph.nodes.truncate(*network_size);
     }
 
-    pub fn step(&mut self, action: Action) -> Step {
-        let (next_state, done) = self.state.apply_action(
-            action.clone(),
-            &mut self.network,
-            &mut self.runtime,
-            &self.params,
-        );
+    pub fn step(&mut self, action: &Action) -> Step {
+        let (next_state, done) = self.state.apply_action(action);
         let reward = match done {
             false => {
-                // println!("Intermediate Expr (not done) : {:?}", next_state.expr);
-                // println!("Intermediate State (not done) : {:?}", next_state.stack);
-                // println!(
-                //     "stack: {:?}",
-                //     next_state
-                //         .stack
-                //         .iter()
-                //         .map(|x| x.2.clone())
-                //         .collect::<Vec<_>>()
-                // );
                 assert!(
                     next_state
                         .stack

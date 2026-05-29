@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::expr::Literal;
+use crate::{behavior::BehaviorDecl, expr::Literal};
 use stdlib::OperatorSpec;
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -18,7 +18,7 @@ pub struct Node {
 pub enum NodeType {
     Operator(OperatorSpec),
     Literal(Literal),
-    Behavior(String),
+    Behavior(BehaviorDecl),
 }
 
 impl Network {
@@ -75,6 +75,19 @@ impl Network {
             .map(|(i, _)| i)
             .collect()
     }
+
+    pub fn get_behavior(&self) -> (usize, &BehaviorDecl) {
+        let behavior_indices = self.get_behavior_indices();
+        assert!(
+            behavior_indices.len() == 1,
+            "Exactly one behavior node in AST is supported, currenlty."
+        );
+        let behavior_idx = behavior_indices[0];
+        match &self.nodes[behavior_idx].node_type {
+            NodeType::Behavior(b) => (behavior_idx, &b),
+            _ => panic!(),
+        }
+    }
 }
 
 impl fmt::Display for Network {
@@ -88,6 +101,8 @@ impl fmt::Display for Network {
 
 #[cfg(test)]
 mod tests {
+    use stdlib::types::Signal;
+
     use super::*;
 
     #[test]
@@ -105,7 +120,18 @@ mod tests {
         let op2 = network.add_node(NodeType::Operator(OperatorSpec::from("data")));
         network.add_child(op2, lit2);
 
-        let mixed = network.add_node(NodeType::Behavior("Mix".to_string()));
+        let behavior = BehaviorDecl {
+            inputs: vec![],
+            output: ("Mix".to_string(), Signal::Void),
+            operators: None,
+            integers: None,
+            floats: None,
+            strings: None,
+            weights: None,
+            train: None,
+            supervised_epochs: None,
+        };
+        let mixed = network.add_node(NodeType::Behavior(behavior));
         network.add_child(mixed, op1);
         network.add_child(mixed, op2);
 
