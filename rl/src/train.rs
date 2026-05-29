@@ -12,6 +12,7 @@ use tch::{
 
 pub struct BatchConfig {
     pub batch_size: usize,
+    pub max_length: usize,
     pub trajectories: Vec<Trajectory>,
 }
 

@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use crate::pnl::PnlResult;
 
+pub static mut FITNESS_FN: Option<Aggregator> = None;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Metric {
     RankIc,
@@ -12,6 +14,8 @@ pub enum Metric {
 
 pub struct Aggregator {
     pub weights: HashMap<Metric, (f64, f64, f64)>, // weight, a, b
+
+                                                   // TODO: load data for fitness calculation
 }
 
 pub fn transform(x: f64, a: f64, b: f64) -> f64 {

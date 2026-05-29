@@ -2,8 +2,16 @@ use crate::action::{Action, ActionSpace};
 
 use parser::behavior::BehaviorDecl;
 use parser::expr::Literal;
-use runtime::ast::{PolishExpr, Program};
-use runtime::ast::{Token, Tree};
+use parser::ast::{Network, Node, NodeType};
+
+pub type PolishExpr = Vec<Token>;
+#[derive(Debug, Clone, PartialEq)]
+pub enum Token {
+    Operator(stdlib::OperatorSpec),
+    Literal(parser::expr::Literal),
+    Parameter(usize),
+}
+
 use runtime::runtime::Runtime;
 use stdlib::OperatorSpec;
 use stdlib::types::Signal;
@@ -15,7 +23,7 @@ use stdlib::types::Signal;
 #[derive(Debug, Clone)]
 pub struct SearchState {
     pub params: Vec<(String, Signal, bool)>, // (param name, param type, is_used). all params need to be used in the end.
-    pub stack: Vec<(PolishExpr, Tree, Signal)>, // polish expr, tree, data
+    pub stack: Vec<(PolishExpr, usize, Signal)>, // polish expr, tree, data
     pub expr: PolishExpr,                    // Polish expression (added for convenience)
 }
 
@@ -77,37 +85,38 @@ impl SearchState {
     fn make_tree(
         &self,
         action: Action,
-        param_values: &Vec<Tree>,
+        param_values: &Vec<usize>,
+        network: &mut Network,
         runtime: &mut Runtime,
-    ) -> (SearchState, PolishExpr, Tree, Signal) {
+    ) -> (SearchState, PolishExpr, usize, Signal) {
         let mut next_state = self.clone();
-        let (expr, tree, data): (PolishExpr, Tree, Signal) = match action {
+        let (expr, tree, data): (PolishExpr, usize, Signal) = match action {
             Action::ShiftInt(i) => (
                 vec![Token::Literal(Literal::Integer(i))],
-                Tree::Literal(Literal::Integer(i)),
+                network.add_node(NodeType::Literal(Literal::Integer(i))),
                 Signal::Int(Some(i)),
             ),
             Action::ShiftFloat(f) => (
                 vec![Token::Literal(Literal::Float(f))],
-                Tree::Literal(Literal::Float(f)),
+                network.add_node(NodeType::Literal(Literal::Float(f))),
                 Signal::Float(Some(f)),
             ),
             Action::ShiftString(s) => (
                 vec![Token::Literal(Literal::String(s.clone()))],
-                Tree::Literal(Literal::String(s.clone())),
+                network.add_node(NodeType::Literal(Literal::String(s.clone()))),
                 Signal::String(Some(s.clone())),
             ),
             Action::ShiftParam(i) => {
                 let (_param_name, _output_type, _used) = next_state.params[i].clone();
                 next_state.params[i].2 = true;
-                let tree = param_values[i].clone();
-                (vec![Token::Parameter(i)], tree.clone(), runtime.run(&tree))
+                let tree = param_values[i];
+                (vec![Token::Parameter(i)], tree, runtime.run(network, tree))
             }
             Action::Reduce(op) => {
                 let arity = op.inputs.len();
                 let inputs = next_state.stack.split_off(next_state.stack.len() - arity);
                 let exprs: Vec<PolishExpr> = inputs.iter().map(|x| x.0.clone()).collect();
-                let trees: Vec<Tree> = inputs.iter().map(|x| x.1.clone()).collect();
+                let trees: Vec<usize> = inputs.iter().map(|x| x.1.clone()).collect();
                 let datas: Vec<Signal> = inputs.iter().map(|x| x.2.clone()).collect();
 
                 assert!(datas.len() == arity);
@@ -125,13 +134,12 @@ impl SearchState {
                     .flatten()
                     .collect();
 
-                let tree: Tree = Tree::Program(Program {
-                    spec: op,
-                    polish_expression: Some(expr.clone()),
-                    parameters: Some(trees),
-                });
+                let tree = network.add_node(NodeType::Operator(op.clone()));
+                for child in trees {
+                    network.add_child(tree, child);
+                }
 
-                let data = runtime.run(&tree);
+                let data = runtime.run(network, tree);
                 (expr, tree, data)
             }
             Action::Done => panic!("Done action should be handled in prior step."),
@@ -142,8 +150,9 @@ impl SearchState {
     pub fn apply_action(
         &self,
         action: Action,
+        network: &mut Network,
         runtime: &mut Runtime,
-        param_values: &Vec<Tree>,
+        param_values: &Vec<usize>,
     ) -> (SearchState, bool) {
         match action {
             Action::Done => {
@@ -162,7 +171,7 @@ impl SearchState {
                     Action::Done => unreachable!(),
                 };
                 let (mut next_state, expr, tree, data) =
-                    self.make_tree(other_action, param_values, runtime);
+                    self.make_tree(other_action, param_values, network, runtime);
 
                 next_state.expr.push(token);
                 next_state.stack.push((expr, tree, data));

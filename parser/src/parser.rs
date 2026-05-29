@@ -1,4 +1,4 @@
-use crate::ast::{OperatorNode, Tree};
+use crate::ast::{Network, Node, NodeType};
 use crate::{
     behavior::*,
     expr::{Expr, FlowStmt},
@@ -26,7 +26,7 @@ pub enum ParserError {
     SemanticError(String),
 }
 
-pub fn parse(input: &str) -> Result<(Tree, Vec<crate::ast::BehaviorNode>), ParserError> {
+pub fn parse(input: &str) -> Result<(Network, usize, Vec<usize>), ParserError> {
     // Parses Flow and behavior.
     let mut pairs = CometParser::parse(Rule::program, input)?;
     let program_pair = pairs.next().ok_or(ParserError::MissingToken)?;
@@ -71,31 +71,33 @@ pub fn parse(input: &str) -> Result<(Tree, Vec<crate::ast::BehaviorNode>), Parse
     let out_expr = output.ok_or(ParserError::SemanticError(
         "No output expression in flow".into(),
     ))?;
-    let mut behaviors_ptr: Vec<crate::ast::BehaviorNode> = Vec::new();
-    // extract behavior from the ast. build a vec<crate::ast::BehaviorNode>.
+    let mut behaviors_ref: Vec<usize> = Vec::new();
 
-    let ast: Tree = build_ast(
+    let mut network = Network::new();
+    let root = build_ast(
+        &mut network,
         &out_expr,
         &assignments_map,
         &behaviors_map,
-        &mut behaviors_ptr,
+        &mut behaviors_ref,
     )?;
 
     // full ast (operator nodes and literals), reference to behavior node (undetermined node)
-    Ok((ast, behaviors_ptr))
+    Ok((network, root, behaviors_ref))
 }
 
 fn build_ast(
+    network: &mut Network,
     output: &Expr,
     assignments: &HashMap<&str, &Expr>,
     behaviors: &HashMap<&str, &BehaviorDecl>,
-    behaviors_ptr: &mut Vec<crate::ast::BehaviorNode>,
-) -> Result<Tree, ParserError> {
+    behaviors_ptr: &mut Vec<usize>,
+) -> Result<usize, ParserError> {
     match output {
-        Expr::Literal(l) => Ok(Tree::Literal(l.clone())),
+        Expr::Literal(l) => Ok(network.add_node(NodeType::Literal(l.clone()))),
         Expr::Identifier(id) => {
             if let Some(expr) = assignments.get(id.as_str()) {
-                build_ast(expr, assignments, behaviors, behaviors_ptr)
+                build_ast(network, expr, assignments, behaviors, behaviors_ptr)
             } else {
                 Err(ParserError::SemanticError(format!(
                     "Undefined identifier: {}",
@@ -104,24 +106,25 @@ fn build_ast(
             }
         }
         Expr::Call { fn_name, args } => {
-            let mut arg_trees = Vec::new();
+            let mut arg_indices: Vec<usize> = Vec::new();
             for arg in args {
-                arg_trees.push(build_ast(arg, assignments, behaviors, behaviors_ptr)?);
+                arg_indices.push(build_ast(network, arg, assignments, behaviors, behaviors_ptr)?);
             }
 
             if behaviors.contains_key(fn_name.as_str()) {
-                let node = crate::ast::BehaviorNode {
-                    name: fn_name.clone(),
-                    parameters: Some(arg_trees),
-                };
-                behaviors_ptr.push(node.clone());
-                Ok(Tree::Behavior(node))
+                let node_id = network.add_node(NodeType::Behavior(fn_name.clone()));
+                for child_id in arg_indices {
+                    network.add_child(node_id, child_id);
+                }
+                behaviors_ptr.push(node_id);
+                Ok(node_id)
             } else {
                 let spec: OperatorSpec = OperatorSpec::from(fn_name.as_str());
-                Ok(Tree::Operator(crate::ast::OperatorNode {
-                    spec,
-                    parameters: Some(arg_trees),
-                }))
+                let node_id = network.add_node(NodeType::Operator(spec));
+                for child_id in arg_indices {
+                    network.add_child(node_id, child_id);
+                }
+                Ok(node_id)
             }
         }
         Expr::List(exprs) => panic!("Unexpected list expression"),
@@ -515,7 +518,7 @@ fn test_parse_behavior_decl() {
         println!("Error: {}", e);
     }
     assert!(result.is_ok());
-    let (tree, undetermined_nodes) = result.unwrap();
-    println!("{:?}", tree);
+    let (network, root, undetermined_nodes) = result.unwrap();
+    println!("{:?}", network.format_node(root));
     println!("{:?}", undetermined_nodes);
 }

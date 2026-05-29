@@ -1,36 +1,68 @@
+pub mod bruteforce;
+pub mod search;
 use clap::Parser;
+use parser::ast::{Network, Node, NodeType};
+use parser::behavior::BehaviorDecl;
 use parser::behavior::InputDecl;
 use parser::expr::{Expr, Literal};
-use parser::parser::Rule::behavior_decl;
-use parser::parser::parse;
 use std::collections::HashMap;
 use std::fs;
 
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    /// The input .cm file to compile
-    file: String,
+fn brute_force(
+    network: Network,
+    root: usize,
+    behavior_decls: Vec<BehaviorDecl>,
+    behavior_nodes: Vec<usize>,
+) {
+    use rand::seq::SliceRandom;
+    use rand::thread_rng;
 
-    /// Optional flag to use CUDA backend
-    #[arg(long)]
-    cuda: bool,
-}
+    let mut runtime = runtime::runtime::Runtime::new(10000, "data".into(), None);
+    runtime.enable = false;
 
-fn build_data_param(name: String) -> runtime::ast::Program {
-    runtime::ast::Program::new(
-        "data",
-        vec![runtime::ast::Tree::Literal(parser::expr::Literal::String(
-            name,
-        ))],
-    )
-}
+    let score_fn = runtime::stats::Aggregator {
+        weights: std::collections::HashMap::new(),
+    };
 
-fn brute_force(ast: ast::Program, behavior_decls: Vec<behavior_decl>) {
-    // 1. build environment from ast, behavior_decls. (rl::env::Environment::new and rl::env::Environment have to updated)
-    // 2. sample valid actions, randomly
-    // 3. store results that are valid and finished successfully.
-    // 4. repelat until it generates 3 different results.
+    let behavior_decl = behavior_decls
+        .first()
+        .expect("No behavior decl found")
+        .clone();
+    let behavior_node_id = *behavior_nodes.first().expect("No behavior node found");
+    let params = network.nodes[behavior_node_id].children.clone();
+
+    let mut env = rl::env::Environment::new(&mut runtime, behavior_decl, params, score_fn, 20, 1);
+
+    let mut results = Vec::new();
+    let mut rng = thread_rng();
+
+    while results.len() < 3 {
+        env.reset();
+        let mut finished = false;
+        let mut steps = 0;
+        let mut sequence = Vec::new();
+
+        while !finished && steps < 20 {
+            let valid_actions = env.state.get_valid_actions(&env.action_space);
+            if valid_actions.is_empty() {
+                break;
+            }
+
+            let action = valid_actions.choose(&mut rng).unwrap().clone();
+            if let rl::action::Action::Done = action {
+                finished = true;
+            }
+
+            let step = env.step(action);
+            sequence = step.sequence.clone();
+            steps += 1;
+        }
+
+        if finished && !results.contains(&sequence) {
+            println!("Found valid sequence {}: {:?}", results.len() + 1, sequence);
+            results.push(sequence);
+        }
+    }
 }
 
 //TODO: machine generated code. need verification.
@@ -44,10 +76,11 @@ fn _main(args: Args) {
     let src = fs::read_to_string(filename).expect("Failed to read file");
 
     println!("--- Parsing file: {:?} ---", filename);
-    let (tree, behavior_decls) =
-        parse(&src).expect(format!("Failed to parse {:?}", filename).as_str());
+    let (network, root, behavior_nodes) =
+        parser::parser::parse(&src).expect(format!("Failed to parse {:?}", filename).as_str());
 
-    brute_force(tree, behavior_decl);
+    let behavior_decls = Vec::new(); // Dummy since it was undefined
+    brute_force(network, root, behavior_decls, behavior_nodes);
 
     // // Select first train=True Behavior
     // let mut target_behavior = None;

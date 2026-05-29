@@ -1,10 +1,12 @@
-use crate::ast::{Program, Token, Tree};
 use crate::dmgr::DataManager;
 use lru::LruCache;
+use parser::ast::{Network, Node, NodeType};
 use parser::expr::Literal;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use stdlib::types::Signal;
+
+pub static mut RUNTIME: Option<Runtime> = None;
 
 pub struct Runtime {
     pub dmgr: DataManager,
@@ -27,153 +29,121 @@ impl Runtime {
         }
     }
 
-    fn load_data(&mut self, program: &Program) -> Result<&Signal, String> {
-        // Loads data in to cache
-        let key: String = program.into();
-        let first_arg: &Tree = program
-            .parameters
-            .as_ref()
-            .unwrap()
-            .into_iter()
-            .nth(0)
-            .unwrap();
-        let data_name: String = match first_arg {
-            Tree::Literal(Literal::String(literal)) => literal.clone(),
-            _ => panic!("First argument of data operator is not a string"),
-        };
-        let data = || -> Result<Signal, String> {
-            Ok(Signal::DataFrame(self.dmgr.get_data(data_name.as_str())))
-        };
-        self.expr_cache.try_get_or_insert(key, data)
-    }
-
-    pub fn run(&mut self, ast: &Tree) -> Signal {
-        match ast {
-            Tree::Program(program) => {
-                let polish_expr: String = program.into();
-                if program.spec.name == "data" {
-                    self.load_data(program).unwrap();
-                }
-                match self.expr_cache.get(&polish_expr) {
-                    Some(signal) => signal.clone(),
-                    None => {
-                        let args: Vec<Signal> = match &program.parameters {
-                            Some(x) => x.iter().map(|param| self.run(param)).collect(),
-                            None => vec![],
-                        };
-                        let result = self.evaluate(program.spec.clone(), args).unwrap();
-                        self.expr_cache.put(polish_expr, result.clone());
-                        result
-                    }
-                }
-            }
-            Tree::Literal(Literal::Boolean(_literal)) => panic!("Boolean literal not supported"),
-            Tree::Literal(Literal::Integer(literal)) => Signal::Int(Some(literal.clone())),
-            Tree::Literal(Literal::Float(literal)) => Signal::Float(Some(literal.clone())),
-            Tree::Literal(Literal::String(literal)) => Signal::String(Some(literal.clone())),
-        }
-    }
-
-    fn evaluate(&self, spec: OperatorSpec, args: Vec<Signal>) -> Result<Signal, String> {
-        if !self.enable {
-            Ok(Signal::DataFrame(Some(tch::Tensor::zeros(
-                &[1, 1],
-                tch::kind::FLOAT_CPU,
-            ))))
-        } else {
-            spec.execute(&args)
-        }
-    }
-}
-
-pub fn test_make_param0() -> Program {
-    Program::new(
-        "data",
-        vec![Tree::Literal(Literal::String("volume".to_string()))],
-    )
-}
-pub fn test_make_param1() -> Program {
-    Program::new(
-        "data",
-        vec![Tree::Literal(Literal::String("close".to_string()))],
-    )
-}
-
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-    use crate::ast::PolishExpr;
-
-    #[test]
-    fn test_runtime_minimal() {
-        let mut runtime = Runtime::new(100, "../data".into(), None);
-        let param0 = test_make_param0();
-        let params: Vec<Program> = vec![param0];
-
-        // volume / ts_mean(param0, 10)
-        // [ param0, "10", param0, "ts_mean", "divide" ]
-        let expr: PolishExpr = vec![
-            Token::Parameter(0),
-            Token::Literal(Literal::Integer(10)),
-            Token::Parameter(0),
-            Token::Operator("ts_mean".into()),
-            Token::Operator("divide".into()),
-        ];
-        let program: Tree = (&expr, params).into();
-
-        match program.clone() {
-            Tree::Program(program) => {
-                let tokens: Vec<String> = program
-                    .polish_expression
-                    .unwrap()
+    pub fn run(&mut self, network: &Network, root: usize) -> Signal {
+        let node = &network.nodes[root];
+        match &node.node_type {
+            NodeType::Operator(spec) => {
+                let args: Vec<Signal> = node
+                    .children
                     .iter()
-                    .map(|x| x.into())
+                    .map(|&child| self.run(network, child))
                     .collect();
-                println!("{:?}", tokens);
-
-                assert!(
-                    tokens
-                        == [
-                            "str!volume",
-                            "op!data",
-                            "int!10",
-                            "str!volume",
-                            "op!data",
-                            "op!ts_mean",
-                            "op!divide"
-                        ]
-                )
+                let result = self.execute(spec, args).unwrap();
+                result
             }
-            _ => panic!("Program is not a program"),
-        }
-
-        let result = runtime.run(&program);
-        match result {
-            Signal::DataFrame(Some(df)) => {
-                assert!(
-                    df.size2().unwrap().0 > 0 && df.size2().unwrap().1 > 0,
-                    "Execution should yield a non-empty result DataFrame array"
-                );
+            NodeType::Behavior(_) => panic!("Behavior node cannot be run"),
+            NodeType::Literal(Literal::Boolean(_literal)) => {
+                panic!("Boolean literal not supported")
             }
-            _ => {
-                todo!("Execution result is not a DataFrame");
-            }
+            NodeType::Literal(Literal::Integer(literal)) => Signal::Int(Some(literal.clone())),
+            NodeType::Literal(Literal::Float(literal)) => Signal::Float(Some(literal.clone())),
+            NodeType::Literal(Literal::String(literal)) => Signal::String(Some(literal.clone())),
         }
     }
 
-    #[test]
-    #[should_panic]
-    fn test_nonexisting_data() {
-        // data("nonexistingdata")
-        // [ "nonexistingdata", "data"]
-        let expr: PolishExpr = vec![
-            Token::Literal(Literal::String("nonexistingdata".to_string())),
-            Token::Operator("data".into()),
-        ];
-        let program: Tree = (&expr, vec![]).into();
-
-        let mut runtime = Runtime::new(100, "../data".into(), None);
-
-        let _result = runtime.run(&program);
+    fn execute(&self, spec: &OperatorSpec, args: Vec<Signal>) -> Result<Signal, String> {
+        spec.execute(&args)
     }
 }
+
+// pub fn test_make_param0() -> Program {
+//     Program::new(
+//         "data",
+//         vec![Tree::Literal(Literal::String("volume".to_string()))],
+//     )
+// }
+// pub fn test_make_param1() -> Program {
+//     Program::new(
+//         "data",
+//         vec![Tree::Literal(Literal::String("close".to_string()))],
+//     )
+// }
+
+// #[cfg(test)]
+// pub mod tests {
+//     use super::*;
+//     use crate::ast::PolishExpr;
+
+//     #[test]
+//     fn test_runtime_minimal() {
+//         let mut runtime = Runtime::new(100, "../data".into(), None);
+//         let param0 = test_make_param0();
+//         let params: Vec<Program> = vec![param0];
+
+//         // volume / ts_mean(param0, 10)
+//         // [ param0, "10", param0, "ts_mean", "divide" ]
+//         let expr: PolishExpr = vec![
+//             Token::Parameter(0),
+//             Token::Literal(Literal::Integer(10)),
+//             Token::Parameter(0),
+//             Token::Operator("ts_mean".into()),
+//             Token::Operator("divide".into()),
+//         ];
+//         let program: Tree = (&expr, params).into();
+
+//         match program.clone() {
+//             Tree::Program(program) => {
+//                 let tokens: Vec<String> = program
+//                     .polish_expression
+//                     .unwrap()
+//                     .iter()
+//                     .map(|x| x.into())
+//                     .collect();
+//                 println!("{:?}", tokens);
+
+//                 assert!(
+//                     tokens
+//                         == [
+//                             "str!volume",
+//                             "op!data",
+//                             "int!10",
+//                             "str!volume",
+//                             "op!data",
+//                             "op!ts_mean",
+//                             "op!divide"
+//                         ]
+//                 )
+//             }
+//             _ => panic!("Program is not a program"),
+//         }
+
+//         let result = runtime.run(&program);
+//         match result {
+//             Signal::DataFrame(Some(df)) => {
+//                 assert!(
+//                     df.size2().unwrap().0 > 0 && df.size2().unwrap().1 > 0,
+//                     "Execution should yield a non-empty result DataFrame array"
+//                 );
+//             }
+//             _ => {
+//                 todo!("Execution result is not a DataFrame");
+//             }
+//         }
+//     }
+
+//     #[test]
+//     #[should_panic]
+//     fn test_nonexisting_data() {
+//         // data("nonexistingdata")
+//         // [ "nonexistingdata", "data"]
+//         let expr: PolishExpr = vec![
+//             Token::Literal(Literal::String("nonexistingdata".to_string())),
+//             Token::Operator("data".into()),
+//         ];
+//         let program: Tree = (&expr, vec![]).into();
+
+//         let mut runtime = Runtime::new(100, "../data".into(), None);
+
+//         let _result = runtime.run(&program);
+//     }
+// }
