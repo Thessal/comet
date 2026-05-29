@@ -1,26 +1,186 @@
-// #[derive(Clone, PartialEq)]
-// pub enum Token {
-//     Operator(OperatorSpec),
-//     Literal(Literal),
-//     Parameter(usize),
-// }
-// pub type PolishExpr = Vec<Token>;
+use stdlib::OperatorSpec;
 
-// impl fmt::Debug for Token {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         match self {
-//             Token::Operator(operator) => write!(f, "op!{}", operator.name),
-//             Token::Literal(literal) => write!(f, "{}", literal),
-//             Token::Parameter(index) => write!(f, "param!{}", index),
-//         }
-//     }
-// }
-// /// Helper to cleanly construct a Operator (and its polish expression) from an operator name and arguments
+use crate::ast::{Network, Node, NodeType};
+use crate::expr::Literal;
 
-// // pub polish_expression: Option<PolishExpr>,
+#[derive(Debug, Clone, PartialEq)]
+pub struct PolishExpr {
+    pub tokens: Vec<Token>,
+    pub arity: usize,
+}
 
-// //     let mut polish_expr = Vec::new();
-// //     for arg in &args {
+impl PolishExpr {
+    pub fn new() -> Self {
+        Self {
+            tokens: vec![],
+            arity: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Token {
+    Operator(OperatorSpec),
+    Literal(Literal),
+    Parameter(usize),
+    Behavior(crate::behavior::BehaviorDecl),
+}
+
+impl Token {
+    pub fn pops(&self) -> usize {
+        match self {
+            Token::Operator(op) => op.inputs.len(),
+            Token::Literal(_) => 0,
+            Token::Parameter(_) => 0,
+            Token::Behavior(b) => b.inputs.len(),
+        }
+    }
+
+    pub fn pushes(&self) -> usize {
+        1
+    }
+}
+
+pub fn to_rpn(network: &Network, root: usize) -> PolishExpr {
+    let mut expr = Vec::new();
+    let node = &network.nodes[root];
+    for &child in &node.children {
+        expr.extend(to_rpn(network, child).tokens);
+    }
+    match &node.node_type {
+        NodeType::Literal(lit) => expr.push(Token::Literal(lit.clone())),
+        NodeType::Operator(op) => expr.push(Token::Operator(op.clone())),
+        NodeType::Behavior(b) => expr.push(Token::Behavior(b.clone())),
+    }
+    PolishExpr {
+        tokens: expr,
+        arity: 0,
+    }
+}
+
+pub fn from_rpn(expr: &PolishExpr) -> Network {
+    let mut network = Network::new();
+    if expr.tokens.is_empty() {
+        return network;
+    }
+
+    let mut iter = expr.tokens.iter().rev();
+
+    fn parse_recursive<'a>(
+        network: &mut Network,
+        iter: &mut impl Iterator<Item = &'a Token>,
+    ) -> usize {
+        let token = iter.next().expect("Invalid RPN");
+        match token {
+            Token::Literal(lit) => network.add_node(NodeType::Literal(lit.clone())),
+            Token::Operator(op) => {
+                let idx = network.add_node(NodeType::Operator(op.clone()));
+                let mut children = Vec::new();
+                for _ in 0..op.inputs.len() {
+                    children.push(parse_recursive(network, iter));
+                }
+                children.reverse();
+                for child in children {
+                    network.add_child(idx, child);
+                }
+                idx
+            }
+            Token::Behavior(b) => {
+                let idx = network.add_node(NodeType::Behavior(b.clone()));
+                let mut children = Vec::new();
+                for _ in 0..b.inputs.len() {
+                    children.push(parse_recursive(network, iter));
+                }
+                children.reverse();
+                for child in children {
+                    network.add_child(idx, child);
+                }
+                idx
+            }
+            Token::Parameter(_) => {
+                panic!("Parameter token should not exist in final RPN");
+            }
+        }
+    }
+
+    parse_recursive(&mut network, &mut iter);
+    network
+}
+
+#[cfg(test)]
+mod tests {
+    use stdlib::types::Signal;
+
+    use crate::behavior::BehaviorDecl;
+
+    use super::*;
+    #[test]
+    fn test_to_rpn() {
+        // * Example flow:
+        // a = data("x")
+        // b = data("y")
+        // c = Mix(a, b)
+        // add(c, b)
+
+        // * A possible instance of behavior Mix :
+        // ShiftParam(0), ShiftParam(1), Reduce("Mix")
+
+        // * Initial call graph before Mix instantiation (index may be shuffled) :
+        // Equation : add(Mix(data("x"), data("y")), data("y"))
+        // 0 : Operator(add), params : [1,3]
+        // 1 : Behavior(Mix), params : [2,3]
+        // 2 : Operator(data), params : [4]
+        // 3 : Operator(data), params : [5]
+        // 4 : "x", params : []
+        // 5 : "y", params : []
+        // undetermined node index : 1 (Mix)
+        let add_spec = OperatorSpec::from("add");
+        let mix_spec = BehaviorDecl::new(
+            "mix",
+            vec![Signal::DataFrame(None), Signal::DataFrame(None)],
+            Signal::DataFrame(None),
+        );
+        let data_x_spec = OperatorSpec::from("data");
+        let data_y_spec = OperatorSpec::from("data");
+        let network = Network {
+            nodes: vec![
+                Node {
+                    node_type: NodeType::Operator(add_spec),
+                    children: vec![1, 3],
+                },
+                Node {
+                    node_type: NodeType::Behavior(mix_spec),
+                    children: vec![2, 3],
+                },
+                Node {
+                    node_type: NodeType::Operator(data_x_spec),
+                    children: vec![4],
+                },
+                Node {
+                    node_type: NodeType::Operator(data_y_spec),
+                    children: vec![5],
+                },
+                Node {
+                    node_type: NodeType::Literal(Literal::String("x".to_string())),
+                    children: vec![],
+                },
+                Node {
+                    node_type: NodeType::Literal(Literal::String("y".to_string())),
+                    children: vec![],
+                },
+            ],
+        };
+        println!("{}", network.format_node(0));
+        let rpn = to_rpn(&network, 0);
+        let network_recovered = from_rpn(&rpn);
+        println!("{}", network_recovered.format_node(0));
+        assert_eq!(network, network_recovered);
+    }
+}
+
+// fn test_parse_behavior_decl() {
+//     let input = r#"
+
 // //         match arg {
 // //             Tree::Operator(p) => {
 // //                 if let Some(pe) = &p.polish_expression {

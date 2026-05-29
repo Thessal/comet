@@ -14,8 +14,9 @@ pub enum InputDecl {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BehaviorDecl {
-    pub inputs: Vec<NamedSignal>,
-    pub output: NamedSignal,
+    pub name: Option<String>,
+    pub inputs: Vec<Signal>,
+    pub output: Signal,
 
     pub operators: Option<Vec<Ident>>,
     pub integers: Option<Vec<i64>>,
@@ -28,8 +29,19 @@ pub struct BehaviorDecl {
 }
 
 impl BehaviorDecl {
-    pub fn name(&self) -> &str {
-        &self.output.0
+    pub fn new(name: &str, inputs: Vec<Signal>, output: Signal) -> Self {
+        Self {
+            name: Some(name.to_string()),
+            inputs: inputs,
+            output: output, //Signal::DataFrame(None),
+            operators: None,
+            integers: None,
+            floats: None,
+            strings: None,
+            weights: None,
+            train: None,
+            supervised_epochs: None,
+        }
     }
 }
 
@@ -53,11 +65,7 @@ impl fmt::Display for InputDecl {
 
 impl fmt::Display for BehaviorDecl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let args: Vec<String> = self
-            .inputs
-            .iter()
-            .map(|(name, dtype)| format!("{}: {:?}", name, dtype))
-            .collect();
+        let args: Vec<String> = self.inputs.iter().map(|sig| format!("{:?}", sig)).collect();
         let mut props = Vec::new();
         if let Some(w) = &self.weights {
             props.push(format!("weights = \"{}\"", w));
@@ -84,24 +92,13 @@ impl fmt::Display for BehaviorDecl {
             props.push(format!("strings = [{}]", s.join(", ")));
         }
 
-        if props.is_empty() {
-            writeln!(
-                f,
-                "Behavior {}({}) -> {:?}",
-                self.output.0,
-                args.join(", "),
-                self.output.1
-            )
-        } else {
-            writeln!(
-                f,
-                "Behavior {}({}) {{ {} }} ->  {:?}",
-                self.output.0,
-                args.join(", "),
-                props.join(", "),
-                self.output.1
-            )
-        }
+        writeln!(
+            f,
+            "Behavior {}({}) -> {:?}",
+            &self.name.clone().unwrap_or("_".to_string()),
+            args.join(", "),
+            self.output
+        )
     }
 }
 
@@ -115,26 +112,26 @@ impl fmt::Display for FlowDecl {
     }
 }
 
-pub fn test_make_behavior() -> BehaviorDecl {
-    let inputs = vec![("vol".to_string(), Signal::DataFrame(None))];
-    let output: NamedSignal = ("result".to_string(), Signal::DataFrame(None));
-    let operators = Some(vec![Ident::from("ts_mean"), Ident::from("ts_rank")]);
-    let integers = Some(vec![5, 21]);
-    let floats = Some(vec![1.0, 2.0]);
-    let strings = None;
-    let weights = None;
-    let train = Some(false);
-    let supervised_epochs = Some(10);
-    let behavior = BehaviorDecl {
-        inputs,
-        output,
-        operators,
-        integers,
-        floats,
-        strings,
-        weights,
-        train,
-        supervised_epochs,
-    };
-    behavior
-}
+// pub fn test_make_behavior() -> BehaviorDecl {
+//     let inputs = vec![("vol".to_string(), Signal::DataFrame(None))];
+//     let output: NamedSignal = ("result".to_string(), Signal::DataFrame(None));
+//     let operators = Some(vec![Ident::from("ts_mean"), Ident::from("ts_rank")]);
+//     let integers = Some(vec![5, 21]);
+//     let floats = Some(vec![1.0, 2.0]);
+//     let strings = None;
+//     let weights = None;
+//     let train = Some(false);
+//     let supervised_epochs = Some(10);
+//     let behavior = BehaviorDecl {
+//         inputs,
+//         output,
+//         operators,
+//         integers,
+//         floats,
+//         strings,
+//         weights,
+//         train,
+//         supervised_epochs,
+//     };
+//     behavior
+// }

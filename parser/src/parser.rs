@@ -65,7 +65,7 @@ pub fn parse(input: &str) -> Result<(Network, usize, Vec<usize>), ParserError> {
         assignments.iter().map(|(k, v)| (k.as_str(), v)).collect();
     let mut behaviors_map: HashMap<&str, &BehaviorDecl> = HashMap::new();
     for b in &behaviors {
-        behaviors_map.insert(b.output.0.as_str(), b);
+        behaviors_map.insert(b.name.as_ref().unwrap().as_str(), b);
     }
 
     let out_expr = output.ok_or(ParserError::SemanticError(
@@ -185,9 +185,9 @@ fn parse_behavior(
             Rule::typed_arg_list => {
                 for typed_arg in p.into_inner() {
                     let mut arg_inner = typed_arg.into_inner();
-                    let arg_name = arg_inner.next().unwrap().as_str().to_string();
+                    // let arg_name = arg_inner.next().unwrap().as_str().to_string();
                     let arg_type = parse_types(arg_inner.next().unwrap())?;
-                    inputs.push((arg_name, arg_type));
+                    inputs.push(arg_type);
                 }
             }
             Rule::behavior_props_block => {
@@ -201,17 +201,7 @@ fn parse_behavior(
     }
 
     let output_type = parse_types(types_pair.unwrap())?;
-    let mut bdecl = crate::behavior::BehaviorDecl {
-        inputs,
-        output: (name.clone(), output_type),
-        operators: None,
-        integers: None,
-        floats: None,
-        strings: None,
-        weights: None,
-        train: None,
-        supervised_epochs: None,
-    };
+    let mut bdecl = crate::behavior::BehaviorDecl::new(&name, inputs, output_type);
 
     if let Some(block) = props_pair {
         if let Some(props) = block.into_inner().next() {

@@ -50,10 +50,14 @@ impl Network {
                     node.children.iter().map(|&c| self.format_node(c)).collect();
                 format!("{}({})", op.name, params.join(", "))
             }
-            NodeType::Behavior(name) => {
+            NodeType::Behavior(behavior) => {
                 let params: Vec<String> =
                     node.children.iter().map(|&c| self.format_node(c)).collect();
-                format!("{}({})", name, params.join(", "))
+                format!(
+                    "{}({})",
+                    behavior.name.as_ref().unwrap_or(&"_".into()),
+                    params.join(", ")
+                )
             }
             NodeType::Literal(lit) => {
                 format!("{}", lit)
@@ -95,7 +99,14 @@ impl fmt::Display for Network {
         if self.nodes.is_empty() {
             return write!(f, "Empty Network");
         }
-        write!(f, "{}", self.format_node(0))
+        let mut is_child = vec![false; self.nodes.len()];
+        for node in &self.nodes {
+            for &child in &node.children {
+                is_child[child] = true;
+            }
+        }
+        let root = is_child.iter().position(|&c| !c).unwrap_or(0);
+        write!(f, "{}", self.format_node(root))
     }
 }
 
@@ -120,17 +131,11 @@ mod tests {
         let op2 = network.add_node(NodeType::Operator(OperatorSpec::from("data")));
         network.add_child(op2, lit2);
 
-        let behavior = BehaviorDecl {
-            inputs: vec![],
-            output: ("Mix".to_string(), Signal::Void),
-            operators: None,
-            integers: None,
-            floats: None,
-            strings: None,
-            weights: None,
-            train: None,
-            supervised_epochs: None,
-        };
+        let behavior = BehaviorDecl::new(
+            "Mix",
+            vec![Signal::DataFrame(None), Signal::DataFrame(None)],
+            Signal::DataFrame(None),
+        );
         let mixed = network.add_node(NodeType::Behavior(behavior));
         network.add_child(mixed, op1);
         network.add_child(mixed, op2);
