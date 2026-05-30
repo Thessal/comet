@@ -47,7 +47,7 @@ impl SearchState {
         self.stack.len() == 1
     }
 
-    pub fn apply_action(&mut self, action: Action) {
+    pub fn apply_action(&mut self, action: &Action) {
         match action {
             Action::Done => {
                 // TODO: Update callgraph

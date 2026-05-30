@@ -1,5 +1,5 @@
 use crate::{action::Action, state::SearchState};
-use runtime::ast::PolishExpr;
+use runtime::polish::PolishExpr;
 
 pub type Trajectory = Vec<Step>;
 #[derive(Clone)]

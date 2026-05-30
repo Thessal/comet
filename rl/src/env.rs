@@ -17,7 +17,7 @@ pub struct Environment<'a> {
     pub action_space: ActionSpace,
     pub call_graph: Network,
     pub config: BatchConfig,
-    pub orig_behavior: (usize, usize, BehaviorDecl) // node_idx, network_size, behavior_decl
+    pub orig_behavior: (usize, usize, BehaviorDecl), // node_idx, network_size, behavior_decl
 }
 
 impl<'a> Environment<'a> {
@@ -27,8 +27,7 @@ impl<'a> Environment<'a> {
         max_length: usize,
         batch_size: usize,
     ) -> Self {
-
-        let (behavior_idx, behavior_ref) = call_graph.get_behavior()
+        let (behavior_idx, behavior_ref) = call_graph.get_behavior();
 
         let mut result = Self {
             state: SearchState::new_dummy(),
@@ -39,7 +38,7 @@ impl<'a> Environment<'a> {
                 batch_size,
                 trajectories: vec![],
             },
-            orig_behavior: (behavior_idx, call_graph.nodes.len(), behavior_ref.clone())
+            orig_behavior: (behavior_idx, call_graph.nodes.len(), behavior_ref.clone()),
         };
         result.reset();
         result
@@ -50,23 +49,15 @@ impl<'a> Environment<'a> {
         // reset search state
         self.state.stack = vec![];
         // reset behavior node
-        self.state.callgraph.nodes[*behavior_idx].node_type = NodeType::Behavior(orig_behavior.clone());
+        self.state.callgraph.nodes[*behavior_idx].node_type =
+            NodeType::Behavior(orig_behavior.clone());
         self.state.callgraph.nodes.truncate(*network_size);
     }
 
     pub fn step(&mut self, action: &Action) -> Step {
-        let (next_state, done) = self.state.apply_action(action);
-        let reward = match done {
-            false => {
-                assert!(
-                    next_state
-                        .stack
-                        .iter()
-                        .all(|(_expr, _tree, data)| !data.is_none())
-                );
-                loss::policy_gradient::calc_intermediate_reward()
-            }
-            true => {
+        self.state.apply_action(action);
+        let reward = match action {
+            Action::Done => {
                 // let expr: Tree = expr_polish.into();
                 assert!(next_state.stack.len() == 1);
                 let (_expr, tree, _data) = next_state.stack.get(0).unwrap();
@@ -75,6 +66,15 @@ impl<'a> Environment<'a> {
                 let stats: Stats = (&pnl_result).into();
                 let fitness = self.score_fn.fitness(&stats);
                 loss::policy_gradient::calc_terminal_reward(fitness)
+            }
+            _ => {
+                assert!(
+                    next_state
+                        .stack
+                        .iter()
+                        .all(|(_expr, _tree, data)| !data.is_none())
+                );
+                loss::policy_gradient::calc_intermediate_reward()
             }
         };
 
