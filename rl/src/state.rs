@@ -1,11 +1,6 @@
-use crate::action::{Action, ActionSpace};
-
-use parser::ast::{Network, Node, NodeType};
-use parser::behavior::BehaviorDecl;
+use crate::action::Action;
+use parser::ast::{Network, NodeType};
 use parser::expr::Literal;
-use parser::polish::{PolishExpr, Token};
-
-use runtime::runtime::Runtime;
 use stdlib::OperatorSpec;
 use stdlib::types::Signal;
 
@@ -16,13 +11,14 @@ use stdlib::types::Signal;
 #[derive(Debug, Clone)]
 struct AbstractMachine {
     // A signal is represented as a root node in callgraph, and an item in stack.
-    // 1. When you introduce a function parameter, you add a node in callgraph,
-    // and add a new item in stack.
-    // 2. When you reduce an operator, you merge root nodes in callgraph into a single node,
-    // and pop the arguments from stack. Push the output signal to stack.
-    stack: Vec<Signal>, // instructions
-    addr: Vec<usize>,   // address of root nodes
-    callgraph: Network, // memory
+    // 1. When you introduce a function parameter, you add a new item in stack.
+    //    Add address of the node in addr. (add a node in callgraph if it is not already in the graph.)
+    // 2. When you reduce an operator, merge root nodes in callgraph into a single node.
+    //    Pop the arguments from stack and addr. Push the output signal to stack.
+    params: Vec<(Signal, usize)>, // parameter indices of the function. maps parameter order into address.
+    // params need to be initialized when AbstractMachine is created from SearchState::from(Network)
+    stack: Vec<(Signal, usize)>, // stack (types, address)
+    callgraph: Network,          // memory
 }
 
 impl AbstractMachine {
@@ -30,78 +26,60 @@ impl AbstractMachine {
         // type checking
         assert!(operator_spec.inputs.len() <= self.stack.len());
         for (op_input, stack_item) in operator_spec.inputs.iter().zip(self.stack.iter().rev()) {
-            if std::mem::discriminant(op_input) != std::mem::discriminant(stack_item) {
+            if std::mem::discriminant(op_input) != std::mem::discriminant(&stack_item.0) {
                 return false;
             }
         }
         true
     }
-
-    // TODO: addr and callgraph update
-
-
-
-    fn update_ast(&mut self, action: &Action) {
-
-        match action {
-                Action::ShiftInt(i) => {
-                    let idx = self
-                        .callgraph
-                        .add_node(NodeType::Literal(Literal::Integer(*i)));
-                }
-                Action::ShiftFloat(f) => {
-                    let idx = self
-                        .callgraph
-                        .add_node(NodeType::Literal(Literal::Float(*f)));
-                }
-                Action::ShiftString(s) => {
-                    let idx = self
-                        .callgraph
-                        .add_node(NodeType::Literal(Literal::String(s.clone())));
-                }
-                Action::ShiftParam(p) => {
-                    node_stack.push(behavior_children[*p]);
-                }
-                Action::Reduce(op) => {
-                    let idx = self.callgraph.add_node(NodeType::Operator(op.clone()));
-                    let arity = op.inputs.len();
-                    let mut children = Vec::new();
-                    for _ in 0..arity {
-                        children.push(node_stack.pop().expect("Stack underflow in Reduce"));
-                    }
-                    children.reverse();
-                    for child in children {
-                        self.callgraph.add_child(idx, child);
-                    }
-                    node_stack.push(idx);
-                }
-                Action::Done => unreachable!(),
+    fn get_param_addr(&mut self, action: &Action) -> Option<usize> {
+        // Modifies only callgraph
+        // write data to callgraph(memory) if not exist
+        match &action {
+            Action::ShiftInt(i) => Some(
+                self.callgraph
+                    .add_node(NodeType::Literal(Literal::Integer(*i))),
+            ),
+            Action::ShiftFloat(f) => Some(
+                self.callgraph
+                    .add_node(NodeType::Literal(Literal::Float(*f))),
+            ),
+            Action::ShiftString(s) => Some(
+                self.callgraph
+                    .add_node(NodeType::Literal(Literal::String(s.clone()))),
+            ),
+            Action::ShiftParam(p) => {
+                let (_signal_type, addr) = &self.params[*p];
+                Some(*addr)
             }
+            Action::Reduce(op) => {
+                let idx = self.callgraph.add_node(NodeType::Operator(op.clone()));
+                let arity = op.inputs.len();
+                for (_, addr) in self.stack.iter().rev().take(arity) {
+                    // or is it self.stack.iter().skip(stack_len - arity) ?
+                    self.callgraph.add_child(idx, *addr);
+                }
+                Some(idx)
+            }
+            Action::Done => None,
         }
-
-        // let mut node_stack: Vec<usize> = Vec::new();
-        // let behavior_children = self.callgraph.nodes[self.cursor].children.clone();
-
-        // if let Some(root) = node_stack.pop() {
-        //     let root_node = self.callgraph.nodes[root].clone();
-        //     self.callgraph.nodes[self.cursor] = root_node;
-        // }
     }
 
-    
-    fn push(&mut self, instruction: &Action) {
-        match instruction {
-            Action::Reduce(operator_spec) => {
-                assert!(self.check_reduce(operator_spec));
-                // pop arguments
-                self.stack
-                    .truncate(self.stack.len() - operator_spec.inputs.len());
-            }
-            Action::Done => unreachable!(),
-            _ => {}
+    // addr and callgraph update
+    fn push(&mut self, action: &Action) {
+        let addr_incoming = self.get_param_addr(action);
+
+        // Consume stack
+        if let Action::Reduce(op) = action {
+            assert!(self.check_reduce(op));
+            self.stack.truncate(self.stack.len() - op.inputs.len());
         }
-        let signal = self.action_to_signal(instruction);
-        self.stack.push(signal);
+
+        // Push addr_incoming to stack
+        let signal_incoming = self.action_to_signal(action);
+        if let Some(addr) = addr_incoming {
+            self.stack.push((signal_incoming, addr));
+        };
     }
 
     fn action_to_signal(&self, action: &Action) -> Signal {
@@ -109,7 +87,7 @@ impl AbstractMachine {
             Action::ShiftInt(i) => Signal::Int(Some(*i)),
             Action::ShiftFloat(f) => Signal::Float(Some(*f)),
             Action::ShiftString(s) => Signal::String(Some(s.clone())),
-            Action::ShiftParam(i) => self.params[*i].clone(),
+            Action::ShiftParam(i) => self.params[*i].0.clone(),
             Action::Reduce(op_spec) => op_spec.output_shape.clone(),
             Action::Done => unreachable!(),
         }
@@ -128,8 +106,14 @@ impl From<Network> for SearchState {
         let (behavior_idx, behavior_decl) = callgraph.get_behavior();
         Self {
             machine: AbstractMachine {
+                params: behavior_decl
+                    .inputs
+                    .iter()
+                    .zip(callgraph.nodes[behavior_idx].children.iter())
+                    .map(|(sig, &addr)| (sig.clone(), addr))
+                    .collect(),
                 stack: vec![],
-                params: behavior_decl.inputs.clone(),
+                callgraph: callgraph.clone(),
             },
             callgraph,
             cursor: behavior_idx,
@@ -138,11 +122,15 @@ impl From<Network> for SearchState {
 }
 
 impl SearchState {
+    pub fn new(callgraph: &Network) -> Self {
+        callgraph.clone().into()
+    }
     pub fn new_dummy() -> Self {
         Self {
             machine: AbstractMachine {
                 stack: vec![],
                 params: vec![],
+                callgraph: Network { nodes: vec![] },
             },
             callgraph: Network { nodes: vec![] },
             cursor: 0,
@@ -156,12 +144,15 @@ impl SearchState {
     pub fn apply_action(&mut self, action: &Action) {
         match action {
             Action::Done => {
-                // TODO: Update callgraph
-                // Replace the current behavior node with the new one.
+                assert!(self.machine.stack.len() == 1);
+                // do the rewiring to replace behavior node with the subgraph
+                let subgraph_root_idx = self.machine.stack[0].1;
+                // let behavior_node: &Node = &self.callgraph.nodes[self.cursor];
+                self.callgraph.nodes[self.cursor] = self.callgraph.nodes[subgraph_root_idx].clone();
+                // leave the old node (cursor) behind.
             }
             a => {
                 self.machine.push(a);
-                self.update_ast(a);
             }
         }
     }
