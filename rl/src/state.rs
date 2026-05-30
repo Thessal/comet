@@ -14,21 +14,125 @@ use stdlib::types::Signal;
 //////////
 
 #[derive(Debug, Clone)]
+struct AbstractMachine {
+    // A signal is represented as a root node in callgraph, and an item in stack.
+    // 1. When you introduce a function parameter, you add a node in callgraph,
+    // and add a new item in stack.
+    // 2. When you reduce an operator, you merge root nodes in callgraph into a single node,
+    // and pop the arguments from stack. Push the output signal to stack.
+    stack: Vec<Signal>, // instructions
+    addr: Vec<usize>,   // address of root nodes
+    callgraph: Network, // memory
+}
+
+impl AbstractMachine {
+    fn check_reduce(&self, operator_spec: &OperatorSpec) -> bool {
+        // type checking
+        assert!(operator_spec.inputs.len() <= self.stack.len());
+        for (op_input, stack_item) in operator_spec.inputs.iter().zip(self.stack.iter().rev()) {
+            if std::mem::discriminant(op_input) != std::mem::discriminant(stack_item) {
+                return false;
+            }
+        }
+        true
+    }
+
+    // TODO: addr and callgraph update
+
+
+
+    fn update_ast(&mut self, action: &Action) {
+
+        match action {
+                Action::ShiftInt(i) => {
+                    let idx = self
+                        .callgraph
+                        .add_node(NodeType::Literal(Literal::Integer(*i)));
+                }
+                Action::ShiftFloat(f) => {
+                    let idx = self
+                        .callgraph
+                        .add_node(NodeType::Literal(Literal::Float(*f)));
+                }
+                Action::ShiftString(s) => {
+                    let idx = self
+                        .callgraph
+                        .add_node(NodeType::Literal(Literal::String(s.clone())));
+                }
+                Action::ShiftParam(p) => {
+                    node_stack.push(behavior_children[*p]);
+                }
+                Action::Reduce(op) => {
+                    let idx = self.callgraph.add_node(NodeType::Operator(op.clone()));
+                    let arity = op.inputs.len();
+                    let mut children = Vec::new();
+                    for _ in 0..arity {
+                        children.push(node_stack.pop().expect("Stack underflow in Reduce"));
+                    }
+                    children.reverse();
+                    for child in children {
+                        self.callgraph.add_child(idx, child);
+                    }
+                    node_stack.push(idx);
+                }
+                Action::Done => unreachable!(),
+            }
+        }
+
+        // let mut node_stack: Vec<usize> = Vec::new();
+        // let behavior_children = self.callgraph.nodes[self.cursor].children.clone();
+
+        // if let Some(root) = node_stack.pop() {
+        //     let root_node = self.callgraph.nodes[root].clone();
+        //     self.callgraph.nodes[self.cursor] = root_node;
+        // }
+    }
+
+    
+    fn push(&mut self, instruction: &Action) {
+        match instruction {
+            Action::Reduce(operator_spec) => {
+                assert!(self.check_reduce(operator_spec));
+                // pop arguments
+                self.stack
+                    .truncate(self.stack.len() - operator_spec.inputs.len());
+            }
+            Action::Done => unreachable!(),
+            _ => {}
+        }
+        let signal = self.action_to_signal(instruction);
+        self.stack.push(signal);
+    }
+
+    fn action_to_signal(&self, action: &Action) -> Signal {
+        match action {
+            Action::ShiftInt(i) => Signal::Int(Some(*i)),
+            Action::ShiftFloat(f) => Signal::Float(Some(*f)),
+            Action::ShiftString(s) => Signal::String(Some(s.clone())),
+            Action::ShiftParam(i) => self.params[*i].clone(),
+            Action::Reduce(op_spec) => op_spec.output_shape.clone(),
+            Action::Done => unreachable!(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct SearchState {
-    pub stack: Vec<usize>, // reference to callgraph's node
-    pub expr: PolishExpr,
-    pub callgraph: Network,
-    pub cursor: usize, // index of node we are currently building
+    pub machine: AbstractMachine, // used to track arguments and actions of episode
+    pub callgraph: Network,       // full callgraph of the flow, including outside the behavior.
+    pub cursor: usize, // index of node we are currently building. (location of expr in callgraph)
 }
 
 impl From<Network> for SearchState {
     fn from(callgraph: Network) -> Self {
-        let (behavior_idx, _) = callgraph.get_behavior();
-        SearchState {
-            stack: vec![],
-            callgraph: callgraph,
+        let (behavior_idx, behavior_decl) = callgraph.get_behavior();
+        Self {
+            machine: AbstractMachine {
+                stack: vec![],
+                params: behavior_decl.inputs.clone(),
+            },
+            callgraph,
             cursor: behavior_idx,
-            expr: todo!(),
         }
     }
 }
@@ -36,99 +140,30 @@ impl From<Network> for SearchState {
 impl SearchState {
     pub fn new_dummy() -> Self {
         Self {
-            stack: vec![],
+            machine: AbstractMachine {
+                stack: vec![],
+                params: vec![],
+            },
             callgraph: Network { nodes: vec![] },
             cursor: 0,
-            expr: PolishExpr::new(),
         }
     }
     pub fn is_done_valid(&self) -> bool {
         // There may be unused inputs. We allow unused inputs.
-        self.stack.len() == 1
+        self.machine.stack.len() == 1
     }
 
     pub fn apply_action(&mut self, action: &Action) {
         match action {
             Action::Done => {
                 // TODO: Update callgraph
-                self.update_callgraph();
+                // Replace the current behavior node with the new one.
             }
-            other_action => {
-                let token = match &other_action {
-                    Action::ShiftInt(i) => Token::Literal(Literal::Integer(*i)),
-                    Action::ShiftFloat(f) => Token::Literal(Literal::Float(*f)),
-                    Action::ShiftString(s) => Token::Literal(Literal::String(s.clone())),
-                    Action::ShiftParam(i) => Token::Parameter(*i),
-                    Action::Reduce(op) => Token::Operator(op.clone()),
-                    Action::Done => unreachable!(),
-                };
-                self.expr.tokens.push(token);
-                // self.stack.push((expr, tree, data));
+            a => {
+                self.machine.push(a);
+                self.update_ast(a);
             }
         }
-    }
-
-    fn update_callgraph(&mut self) {
-        let expr = &self.expr;
-        let cursor = self.cursor;
-        let mut is_child = vec![false; self.callgraph.nodes.len()];
-        for node in &self.callgraph.nodes {
-            for &child in &node.children {
-                is_child[child] = true;
-            }
-        }
-        let root = is_child.iter().position(|&c| !c).unwrap_or(0);
-
-        let rpn = parser::polish::to_rpn(&self.callgraph, root);
-
-        let behavior_pos = rpn
-            .tokens
-            .iter()
-            .position(|t| matches!(t, Token::Behavior(_)))
-            .expect("Behavior not found in RPN");
-        let Token::Behavior(bdecl) = &rpn.tokens[behavior_pos] else {
-            unreachable!()
-        };
-        let arity = bdecl.inputs.len();
-
-        let mut args_rpns = vec![Vec::new(); arity];
-        let mut curr_end = behavior_pos;
-        for i in (0..arity).rev() {
-            let mut balance = 1;
-            let mut start = curr_end - 1;
-            loop {
-                let token = &rpn.tokens[start];
-                balance += token.pops();
-                balance -= token.pushes();
-                if balance == 0 {
-                    break;
-                }
-                start -= 1;
-            }
-            args_rpns[i] = rpn.tokens[start..curr_end].to_vec();
-            curr_end = start;
-        }
-
-        let args_start = curr_end;
-
-        let mut new_rpn = Vec::new();
-        new_rpn.extend_from_slice(&rpn.tokens[0..args_start]);
-
-        for token in &expr.tokens {
-            if let Token::Parameter(i) = token {
-                new_rpn.extend(args_rpns[*i].clone());
-            } else {
-                new_rpn.push(token.clone());
-            }
-        }
-
-        new_rpn.extend_from_slice(&rpn.tokens[behavior_pos + 1..]);
-
-        let new_network = parser::polish::from_rpn(&PolishExpr {
-            tokens: new_rpn,
-            arity: 0,
-        });
-        self.callgraph = new_network;
     }
 
     // pub fn get_valid_actions(&self, action: &ActionSpace) -> Vec<Action> {

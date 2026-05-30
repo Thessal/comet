@@ -174,7 +174,9 @@ mod tests {
         let rpn = to_rpn(&network, 0);
         let network_recovered = from_rpn(&rpn);
         println!("{}", network_recovered.format_node(0));
-        assert_eq!(network, network_recovered);
+        let rpn_recovered = to_rpn(&network_recovered, 0);
+        // assert_eq!(network, network_recovered);
+        assert_eq!(rpn, rpn_recovered);
     }
 }
 

@@ -7,6 +7,7 @@ use crate::train::BatchConfig;
 use crate::trajectory::Step;
 use parser::ast::{Network, Node, NodeType};
 use parser::behavior::BehaviorDecl;
+use parser::polish::to_rpn;
 use runtime::pnl;
 use runtime::runtime::Runtime;
 use runtime::stats::{Aggregator, Stats}; // todo : store returns matrix inside stats struct
@@ -47,7 +48,7 @@ impl<'a> Environment<'a> {
     pub fn reset(&mut self) {
         let (behavior_idx, network_size, orig_behavior) = &self.orig_behavior;
         // reset search state
-        self.state.stack = vec![];
+        self.state.machine = vec![];
         // reset behavior node
         self.state.callgraph.nodes[*behavior_idx].node_type =
             NodeType::Behavior(orig_behavior.clone());
@@ -56,39 +57,16 @@ impl<'a> Environment<'a> {
 
     pub fn step(&mut self, action: &Action) -> Step {
         self.state.apply_action(action);
-        let reward = match action {
-            Action::Done => {
-                // let expr: Tree = expr_polish.into();
-                assert!(next_state.stack.len() == 1);
-                let (_expr, tree, _data) = next_state.stack.get(0).unwrap();
-                let position = self.runtime.run(&self.network, *tree); // FIXME: this can be slow. maybe we have to cahnge Signal::DataFrame(Vec<Vec<f64>>) into Signal::DataFrame(tch::Tensor)
-                let pnl_result = self.pnl_calc.pnl(&position);
-                let stats: Stats = (&pnl_result).into();
-                let fitness = self.score_fn.fitness(&stats);
-                loss::policy_gradient::calc_terminal_reward(fitness)
-            }
-            _ => {
-                assert!(
-                    next_state
-                        .stack
-                        .iter()
-                        .all(|(_expr, _tree, data)| !data.is_none())
-                );
-                loss::policy_gradient::calc_intermediate_reward()
-            }
-        };
-
-        let traj_item = Step {
-            state: self.state.clone(),
-            action,
+        let reward = reward::calc_reward(&self.state, &action);
+        let state_emb = self.state.embed();
+        let expr = to_rpn(&self.state.expr, 0);
+        Step {
+            state: (),
+            action: (),
             reward,
-            next_state: Some(next_state.clone()),
-            sequence: next_state.expr.clone(),
-        };
-
-        self.state = next_state.clone();
-
-        traj_item
+            next_state: (),
+            sequence: (),
+        }
     }
 }
 

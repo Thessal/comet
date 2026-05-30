@@ -2,6 +2,7 @@ use parser::behavior::BehaviorDecl;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use stdlib::OperatorSpec;
+use stdlib::types::Signal;
 use tch::Tensor;
 
 //////////
