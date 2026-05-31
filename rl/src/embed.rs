@@ -7,17 +7,17 @@ use crate::state::SearchState;
 static EMBEDDING_SIZE_PER_TOKEN: usize = 5; // 5 floats per token
 static EMBEDDING_TOKEN_CNT: usize = 2; // two tokens
 pub static EMBEDDING_SIZE: usize = EMBEDDING_SIZE_PER_TOKEN * EMBEDDING_TOKEN_CNT;
-// pub static EMBEDDER: Option<EmbeddingModel> = None;
+pub static EMBEDDER: Option<EmbeddingModel> = None;
 
 struct EmbeddingModel {
-    embedding: tch::nn::Embedding,
+    // embedding: tch::nn::Embedding,
 }
 
 impl EmbeddingModel {
     pub fn new() -> Self {
         todo!()
     }
-    pub fn state_embed(&self, state: &SearchState, device: tch::Device) -> tch::Tensor {
+    pub fn state_embed(&self, state: &SearchState, device: &tch::Device) -> tch::Tensor {
         // Petersen(2021): last two token, 1 float per token.
         let mut embedding_tokens: Vec<Tensor> = vec![
             Tensor::from_slice(&[0.0f64; EMBEDDING_SIZE_PER_TOKEN]),
@@ -33,7 +33,7 @@ impl EmbeddingModel {
 
         // TODO
         // for now simply output zero
-        let out: Tensor = tch::Tensor::zeros(&[EMBEDDING_SIZE as i64], (tch::Kind::Float, device));
+        let out: Tensor = tch::Tensor::zeros(&[EMBEDDING_SIZE as i64], (tch::Kind::Float, *device));
         out
     }
 }

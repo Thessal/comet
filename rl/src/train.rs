@@ -16,7 +16,7 @@ pub struct BatchConfig {
     pub trajectories: Vec<Trajectory>,
 }
 
-impl<'a> Environment<'a> {
+impl Environment {
     pub fn sample_trajectory(&mut self, model: &Model, device: Device) -> Trajectory {
         self.reset(); // resets state
         let mut lstmstate: Option<LSTMState> = None; // resets lstm hidden input 
