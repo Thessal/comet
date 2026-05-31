@@ -7,7 +7,7 @@ use crate::train::BatchConfig;
 use crate::trajectory::Step;
 use parser::ast::{Network, Node, NodeType};
 use parser::behavior::BehaviorDecl;
-use parser::polish::to_rpn;
+// use parser::polish::to_rpn;
 use runtime::pnl;
 use runtime::runtime::Runtime;
 use runtime::stats::{Aggregator, Stats}; // todo : store returns matrix inside stats struct
@@ -47,6 +47,7 @@ impl<'a> Environment<'a> {
 
     pub fn reset(&mut self) {
         let (behavior_idx, network_size, orig_behavior) = &self.orig_behavior;
+        self.state = 
         // reset search state
         self.state.machine = vec![];
         // reset behavior node
