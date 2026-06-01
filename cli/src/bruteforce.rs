@@ -29,21 +29,20 @@ pub fn brute_force(
     network: Network,
     root: usize,
     action_space: rl::action::ActionSpace,
-    behavior_decls: Vec<BehaviorDecl>,
-    behavior_nodes: Vec<usize>,
+    // behavior_decls: Vec<BehaviorDecl>,
+    // behavior_nodes: Vec<usize>,
 ) {
     let device = Device::Cpu;
     let mut runtime = Runtime::new(10000, "data".into(), None);
-    let mut dmgr = dmgr::DataManager::new(HashMap::new(), HashMap::new());
-    let backtester = BasicBacktest::new(&mut dmgr, "returns");
+    let backtester = BasicBacktest::new(&mut runtime.dmgr, "returns");
     let mut pool = Pool::new(runtime, backtester, device);
 
     let env = Environment::new(
         &network,
         action_space,
         pool,
-        10000, // max_length
-        100,   // batch_size
+        30,  // max_length
+        100, // batch_size
     );
 
     // We create a minimal Environment

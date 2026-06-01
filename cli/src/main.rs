@@ -1,10 +1,11 @@
 pub mod bruteforce;
-pub mod search;
+// pub mod search;
 use clap::Parser;
 use parser::ast::{Network, Node, NodeType};
 use parser::behavior::BehaviorDecl;
 use parser::behavior::InputDecl;
 use parser::expr::{Expr, Literal};
+use rl::action::ActionSpace;
 use std::collections::HashMap;
 use std::fs;
 
@@ -17,11 +18,6 @@ struct Args {
     cuda: bool,
 }
 
-//TODO: machine generated code. need verification.
-// fn main() {
-//     let args = Args::parse();
-//     _main(args);
-// }
 fn main() {
     let args = Args::parse();
     let use_cuda = args.cuda || std::env::var("CUDA_PATH").is_ok();
@@ -32,9 +28,14 @@ fn main() {
     let (network, root, behavior_nodes) =
         parser::parser::parse(&src).expect(format!("Failed to parse {:?}", filename).as_str());
 
-    let behavior_decls = Vec::new(); // Dummy since it was undefined
-    let action_space = rl::action::ActionSpace::new();
-    bruteforce::brute_force(network, root, action_space, behavior_decls, behavior_nodes);
+    let behavior_decl: &BehaviorDecl = match &network.nodes[behavior_nodes[0]].node_type {
+        NodeType::Behavior(b) => b,
+        _ => unreachable!(),
+    };
+    // let behavior_decls = Vec::new(); // Dummy since it was undefined
+    let action_space: ActionSpace = behavior_decl.into();
+    // impl From<&BehaviorDecl> for ActionSpace {
+    bruteforce::brute_force(network, root, action_space);
 
     // // Select first train=True Behavior
     // let mut target_behavior = None;
