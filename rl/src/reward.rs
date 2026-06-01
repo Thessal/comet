@@ -74,6 +74,7 @@ impl Pool {
     }
 
     fn insert(&mut self, sub_ast: Network) {
+        // you can use Network::extract_subtree to get subtrees
         let hash_str: String = sub_ast.format_node(0);
         let pos = self.runtime.lookup_or_run(&sub_ast, 0);
         let returns = self.backtester.calc_returns(&pos.to_dataframe(self.device));

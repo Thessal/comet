@@ -39,9 +39,13 @@ pub trait Model {
 }
 
 pub struct RandomModel {
-    // Brute force
-    action_space: ActionSpace,
-    runtime: Runtime,
+    pub action_space: ActionSpace,
+}
+
+impl RandomModel {
+    pub fn new(action_space: ActionSpace) -> Self {
+        Self { action_space }
+    }
 }
 
 impl Model for RandomModel {

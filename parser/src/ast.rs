@@ -39,6 +39,26 @@ impl Network {
         self.nodes[parent].children.push(child);
     }
 
+    pub fn extract_subtree(&self, node_id: usize) -> Network {
+        let mut new_network = Network::new();
+
+        fn copy_node(old_net: &Network, new_net: &mut Network, current_id: usize) -> usize {
+            let node = &old_net.nodes[current_id];
+            let node_type = node.node_type.clone();
+            let children = node.children.clone();
+
+            let new_id = new_net.add_node(node_type);
+            for child_id in children {
+                let new_child_id = copy_node(old_net, new_net, child_id);
+                new_net.add_child(new_id, new_child_id);
+            }
+            new_id
+        }
+
+        copy_node(self, &mut new_network, node_id);
+        new_network
+    }
+
     pub fn format_node(&self, node_id: usize) -> String {
         // Used to hash for caching
         if node_id >= self.nodes.len() {
