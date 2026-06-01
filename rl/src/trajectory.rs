@@ -1,12 +1,12 @@
 use crate::{action::Action, state::SearchState};
+use tch::Tensor;
 
 pub type Trajectory = Vec<Step>;
-#[derive(Clone)]
 pub struct Step {
-    pub state: SearchState,
+    pub state_embedding: Tensor,
     pub action: Action,
     pub reward: f64,
-    pub next_state: Option<SearchState>,
+    pub next_state_embedding: Option<Tensor>,
     // pub sequence: PolishExpr, //For debugging
 }
 impl Step {

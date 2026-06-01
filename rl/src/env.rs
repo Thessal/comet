@@ -3,6 +3,8 @@ use crate::action::ActionSpace;
 use crate::loss;
 use crate::model::LstmModel;
 use crate::model::Model;
+use crate::reward;
+use crate::reward::RewardCalculator;
 use crate::state::SearchState;
 use crate::train::BatchConfig;
 use crate::trajectory::Step;
@@ -22,6 +24,7 @@ pub struct Environment<T: Model> {
     pub state: SearchState,
     pub action_space: ActionSpace,
     pub config: BatchConfig,
+    reward_calculator: RewardCalculator,
     orig_call_graph_size: usize, //network_size
     orig_behavior_addr: usize,   //node_idx
     orig_behavior: BehaviorDecl, //behavior_decl
@@ -31,6 +34,7 @@ impl<T: Model> Environment<T> {
     pub fn new(
         call_graph: &Network,
         action_space: ActionSpace,
+        reward_calculator: RewardCalculator,
         max_length: usize,
         batch_size: usize,
     ) -> Self {
@@ -44,6 +48,7 @@ impl<T: Model> Environment<T> {
                 batch_size,
                 trajectories: vec![],
             },
+            reward_calculator,
             orig_call_graph_size: call_graph.nodes.len(),
             orig_behavior_addr: behavior_idx,
             orig_behavior: behavior_ref.clone(),
@@ -66,15 +71,15 @@ impl<T: Model> Environment<T> {
         }
     }
 
-    fn get_action_mask(&self) -> Vec<usize> {
+    fn get_action_mask(&self, device: &Device) -> Tensor {
         todo!()
     }
 
-    fn sample_one(&mut self, runtime: &Runtime, model: &mut T, device: &Device) {
+    fn sample_one(&mut self, runtime: &Runtime, model: &mut T, device: &Device) -> Trajectory{
         self.reset();
         let mut trajectory: Trajectory = Vec::new();
         for i in 0..self.config.max_length {
-            let mask: Vec<usize> = self.get_action_mask();
+            let mask: Tensor = self.get_action_mask(device);
             let (state_embedding, action_logits): (Tensor, Tensor) =
                 model.forward(&self.state, &mask, device);
             let sampled_action_idx: Vec<Vec<i64>> = // [batch_size=1, sample_number=1]
@@ -85,30 +90,18 @@ impl<T: Model> Environment<T> {
             let action: Action = self.action_space.get_action(action_idx as usize);
             self.step(&action);
 
-            let (stack, callgraph) = self.state.machine.get_stack();
-            todo!()
-            // cast literals into tensor
-            // assert tensor size
-            // For intermediate reward
-            // * Measure data entropy / symbolic entropy
-            // * Measure data performance (how?)
-            // * Let's read the Polya's book, "How to Solve it."
-            // For final reward
-            // * compute performance of result
-            // compute reward
-            /// We need to think before implement this part....
+            let reward: f64 = self.reward_calculator.calc_reward(&self.state.machine);
 
-            // runtime.lookup_or_run(&self.state.call_graph, &self.state.expr);
-            // let (_, reward) = runtime.run(&self.state);
-            // let step = Step{ state: state_embedding, action, reward: reward, next_state: todo!() }
+            let step = Step{ state_embedding, action, reward, next_state_embedding: None }
 
-            // trajectory.push(step);
-            // if action == Action::Done {
-            //     self.config.trajectories.push(trajectory);
-            //     break;
-            // }
+            trajectory.push(step);
+            if action == Action::Done {
+                break;
+            }
         }
+        trajectory
     }
+
     // pub fn sample(&mut self, model: &Model, device: Device) -> Trajectory {
     //     self.reset(); // resets state
     //     for _ in 0..self.config.max_length {

@@ -1,3 +1,4 @@
+use parser::parser::Rule::list_identifier;
 use runtime::runtime::Runtime;
 use stdlib::types::Signal;
 use tch::{
@@ -37,6 +38,32 @@ pub trait Model {
     }
 }
 
+pub struct RandomModel {
+    // Brute force
+    action_space: ActionSpace,
+    runtime: Runtime,
+}
+
+impl Model for RandomModel {
+    fn reset(&self) {
+        todo!() // Initilaize lstm_hidden
+    }
+    fn forward(
+        &mut self,
+        state: &SearchState,
+        masks: &Tensor,
+        device: &Device,
+    ) -> (Tensor, Tensor) {
+        // (state_embedding, action_logits)}
+        let logits = tch::Tensor::ones(
+            [self.action_space.size() as i64],
+            (tch::Kind::Float, *device),
+        );
+        let dummy_emb = tch::Tensor::zeros([], (tch::Kind::Float, *device));
+        (dummy_emb, logits)
+    }
+}
+
 pub struct LstmModel {
     data_embedding_model: nn::Embedding,
     policy_model: nn::LSTM,
@@ -46,7 +73,9 @@ pub struct LstmModel {
 }
 
 impl Model for LstmModel {
-    fn reset(&self) {}
+    fn reset(&self) {
+        todo!() // Initilaize lstm_hidden
+    }
     fn forward(
         &mut self,
         state: &SearchState,

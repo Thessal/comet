@@ -1,6 +1,8 @@
 use std::fmt::{self};
 use tch::Tensor;
 
+pub static SIZE: [i64; 2] = [128, 128];
+
 #[repr(usize)]
 pub enum Signal {
     // Used to evaluate parameters in runtime
@@ -98,14 +100,22 @@ impl Signal {
         }
     }
     // cast data into dataframe, for embedding
-    pub fn to_dataframe(&self, size: (usize, usize), device: tch::Device) -> Tensor {
-        let shape = [size.0 as i64, size.1 as i64];
+    pub fn to_dataframe(&self, device: tch::Device) -> Tensor {
+        // let shape = [size.0 as i64, size.1 as i64];
+        let shape = &SIZE;
         match self {
-            Signal::Void => Tensor::zeros(&shape, (tch::Kind::Float, device)),
-            Signal::Float(Some(x)) => Tensor::full(&shape, *x, (tch::Kind::Float, device)),
-            Signal::Int(Some(i)) => Tensor::full(&shape, *i as f64, (tch::Kind::Float, device)),
-            Signal::String(Some(_s)) => Tensor::zeros(&shape, (tch::Kind::Float, device)),
-            Signal::DataFrame(Some(df)) => df.shallow_clone(),
+            Signal::Void => Tensor::zeros(shape, (tch::Kind::Float, device)),
+            Signal::Float(Some(x)) => Tensor::full(shape, *x, (tch::Kind::Float, device)),
+            Signal::Int(Some(i)) => Tensor::full(shape, *i as f64, (tch::Kind::Float, device)),
+            Signal::String(Some(_s)) => Tensor::zeros(shape, (tch::Kind::Float, device)),
+            Signal::DataFrame(Some(df)) => {
+                assert_eq!(
+                    df.size(),
+                    *shape,
+                    "DataFrame size does not match expected size"
+                );
+                df.shallow_clone()
+            }
             _ => panic!("Cannot cast empty signal to dataframe"),
         }
     }
