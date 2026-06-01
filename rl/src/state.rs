@@ -23,6 +23,10 @@ pub struct AbstractMachine {
 }
 
 impl AbstractMachine {
+    pub fn get_stack(&self) -> (&Vec<(Signal, usize)>, &Network) {
+        (&self.stack, &self.callgraph)
+    }
+
     fn check_reduce(&self, operator_spec: &OperatorSpec) -> bool {
         // type checking
         assert!(operator_spec.inputs.len() <= self.stack.len());

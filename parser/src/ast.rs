@@ -40,6 +40,7 @@ impl Network {
     }
 
     pub fn format_node(&self, node_id: usize) -> String {
+        // Used to hash for caching
         if node_id >= self.nodes.len() {
             return String::new();
         }

@@ -1,7 +1,5 @@
 use crate::action::Action;
-use crate::action::Action;
 use crate::action::ActionSpace;
-use crate::env::Environment;
 use crate::loss;
 use crate::model::Model;
 use crate::state::SearchState;
@@ -70,14 +68,14 @@ impl Environment {
         todo!()
     }
 
-    fn sample_one(&mut self, model: &Model, device: &Device) {
+    fn sample_one(&mut self, model: &mut Model, device: &Device) {
         self.reset();
         let mut trajectory: Trajectory = Vec::new();
         for i in 0..self.config.max_length {
             let mask: Vec<usize> = self.get_action_mask();
-            let (state_embedding, logits): (Tensor, Tensor) = model.forward(&self.state, &mask, device);
+            let (state_embedding, action_logits): (Tensor, Tensor) = model.forward(&self.state, &mask, device);
             let sampled_action_idx: Vec<Vec<i64>> = // [batch_size=1, sample_number=1]
-                tch::no_grad(|| logits.softmax(1, Float).multinomial(1, true))
+                tch::no_grad(|| action_logits.softmax(1, Float).multinomial(1, true))
                     .try_into()
                     .unwrap();
             let action_idx: i64 = sampled_action_idx[0][0];

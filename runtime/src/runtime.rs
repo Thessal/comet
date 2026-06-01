@@ -29,7 +29,17 @@ impl Runtime {
         }
     }
 
-    pub fn run(&mut self, network: &Network, root: usize) -> Signal {
+    pub fn lookup_or_run(&mut self, callgraph: &Network, root: usize) -> &Signal {
+        let hash_key: String = callgraph.format_node(root);
+
+        if self.expr_cache.get(&hash_key).is_none() {
+            let data = self.run(callgraph, root);
+            self.expr_cache.put(hash_key.clone(), data);
+        }
+        self.expr_cache.get(&hash_key).unwrap()
+    }
+
+    fn run(&mut self, network: &Network, root: usize) -> Signal {
         let node = &network.nodes[root];
         match &node.node_type {
             NodeType::Operator(spec) => {

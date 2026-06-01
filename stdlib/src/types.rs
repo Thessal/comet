@@ -70,6 +70,12 @@ impl fmt::Debug for Signal {
 
 impl Into<usize> for Signal {
     fn into(self) -> usize {
+        (&self).into()
+    }
+}
+
+impl Into<usize> for &Signal {
+    fn into(self) -> usize {
         match self {
             Signal::Void => 0,
             Signal::Float(_) => 1,
