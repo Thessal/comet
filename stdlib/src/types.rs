@@ -1,7 +1,7 @@
 use std::fmt::{self};
 use tch::Tensor;
 
-pub static SIZE: [i64; 2] = [128, 128];
+pub static SIZE: [i64; 2] = [1755, 5];
 
 #[repr(usize)]
 pub enum Signal {

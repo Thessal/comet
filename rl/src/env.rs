@@ -66,7 +66,7 @@ impl Environment {
 }
 
 impl Environment {
-    pub fn sample<T: Model>(&mut self, runtime: &Runtime, model: &mut T, device: &Device) {
+    pub fn sample<T: Model>(&mut self, runtime: &mut Runtime, model: &mut T, device: &Device) {
         for _ in 0..self.config.batch_size {
             self.sample_one(runtime, model, device);
         }
@@ -97,7 +97,7 @@ impl Environment {
 
     fn sample_one<T: Model>(
         &mut self,
-        runtime: &Runtime,
+        runtime: &mut Runtime,
         model: &mut T,
         device: &Device,
     ) -> Trajectory {
@@ -116,7 +116,7 @@ impl Environment {
             self.step(&action);
 
             let is_done = action == Action::Done;
-            let reward: f64 = self.pool.calc_reward(&self.state.machine, is_done);
+            let reward: f64 = self.pool.calc_reward(runtime, &self.state.machine, is_done);
 
             let step = Step {
                 state_embedding,

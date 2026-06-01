@@ -10,10 +10,9 @@ pub struct BasicBacktest {
 
 impl BasicBacktest {
     pub fn new(dmgr: &mut DataManager, target_field: &str) -> Self {
-        let mut returns: Tensor = Tensor::new();
-        dmgr.get_data(target_field)
+        let returns = dmgr.get_data(target_field)
             .expect("Failed to load close data")
-            .clone(&mut returns);
+            .shallow_clone();
         assert_eq!(returns.size(), DATA_SIZE);
         Self { returns }
     }

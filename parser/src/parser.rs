@@ -185,7 +185,7 @@ fn parse_behavior(
             Rule::typed_arg_list => {
                 for typed_arg in p.into_inner() {
                     let mut arg_inner = typed_arg.into_inner();
-                    // let arg_name = arg_inner.next().unwrap().as_str().to_string();
+                    let _arg_name = arg_inner.next().unwrap().as_str().to_string();
                     let arg_type = parse_types(arg_inner.next().unwrap())?;
                     inputs.push(arg_type);
                 }

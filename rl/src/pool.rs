@@ -37,7 +37,6 @@ static SIGNAL_LENGTH: i64 = stdlib::types::SIZE[0] as i64;
 // }
 
 pub struct Pool {
-    runtime: Runtime,
     asts: HashMap<String, Network>,
     returns: HashMap<String, Tensor>,
     portfolio_returns: Tensor,
@@ -46,9 +45,8 @@ pub struct Pool {
 }
 
 impl Pool {
-    pub fn new(runtime: Runtime, backtester: BasicBacktest, device: tch::Device) -> Self {
+    pub fn new(backtester: BasicBacktest, device: tch::Device) -> Self {
         Pool {
-            runtime,
             asts: HashMap::new(),
             returns: HashMap::new(),
             portfolio_returns: tch::Tensor::zeros(
@@ -74,10 +72,10 @@ impl Pool {
         }
     }
 
-    fn insert(&mut self, sub_ast: Network) {
+    fn insert(&mut self, runtime: &mut Runtime, sub_ast: Network) {
         // you can use Network::extract_subtree to get subtrees
         let hash_str: String = sub_ast.format_node(0);
-        let pos = self.runtime.lookup_or_run(&sub_ast, 0);
+        let pos = runtime.lookup_or_run(&sub_ast, 0);
         let returns = self.backtester.calc_returns(&pos.to_dataframe(self.device));
         self.asts.insert(hash_str.clone(), sub_ast);
         self.returns.insert(hash_str, returns);
@@ -90,9 +88,8 @@ impl Pool {
 
     // Bailey, David H., and Marcos Lopez de Prado. "The Sharpe ratio efficient frontier." Journal of Risk 15.2 (2012): 13.
     // Bailey, David H., Marcos López de Prado, and Eva del Pozo. "The strategy approval decision: A sharpe ratio indifference curve approach." Algorithmic Finance 2.1 (2013): 99-109.
-    fn marginal_utility(&mut self, callgraph: &Network, root: usize) -> f64 {
-        let incoming_pos = self
-            .runtime
+    fn marginal_utility(&mut self, runtime: &mut Runtime, callgraph: &Network, root: usize) -> f64 {
+        let incoming_pos = runtime
             .lookup_or_run(callgraph, root)
             .to_dataframe(self.device);
         let incoming_ret = self.backtester.calc_returns(&incoming_pos);
@@ -112,7 +109,12 @@ impl Pool {
 }
 
 impl Pool {
-    pub fn calc_reward(&mut self, machine: &AbstractMachine, is_done: bool) -> f64 {
+    pub fn calc_reward(
+        &mut self,
+        runtime: &mut Runtime,
+        machine: &AbstractMachine,
+        is_done: bool,
+    ) -> f64 {
         if is_done {
             // Terminal reward
             // refer runtime.stats.rs
@@ -125,7 +127,7 @@ impl Pool {
             // Calculate marginal utility for each root in stack
             let mut marginal_utility_all = vec![];
             for (_signal_spec, addr) in stack {
-                let utility = self.marginal_utility(callgraph, *addr);
+                let utility = self.marginal_utility(runtime, callgraph, *addr);
                 marginal_utility_all.push(utility);
             }
 

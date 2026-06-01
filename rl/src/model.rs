@@ -60,11 +60,12 @@ impl Model for RandomModel {
     ) -> (Tensor, Tensor) {
         // (state_embedding, action_logits)}
         let logits = tch::Tensor::ones(
-            [self.action_space.size() as i64],
+            [1, self.action_space.size() as i64],
             (tch::Kind::Float, *device),
         );
-        let dummy_emb = tch::Tensor::zeros([], (tch::Kind::Float, *device));
-        (dummy_emb, logits * masks.to_kind(tch::Kind::Float))
+        let dummy_emb = tch::Tensor::zeros([1, 1], (tch::Kind::Float, *device));
+        let masked_logits = logits.masked_fill(&masks.logical_not().unsqueeze(0), std::f64::NEG_INFINITY);
+        (dummy_emb, masked_logits)
     }
 }
 

@@ -94,16 +94,16 @@ fn main() {
     // }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::_main;
-//     use crate::Args;
+#[cfg(test)]
+mod tests {
+    use std::fs;
 
-//     #[test]
-//     fn test_behavior_1() {
-//         _main(Args {
-//             file: "../examples/behavior_1.cm".to_string(),
-//             cuda: false,
-//         })
-//     }
-// }
+    #[test]
+    fn test_behavior_1() {
+        let filename = "../examples/behavior_1.cm";
+        let src = fs::read_to_string(filename).expect("Failed to read file");
+        println!("--- Parsing file: {:?} ---", filename);
+        let (network, root, behavior_nodes) =
+            parser::parser::parse(&src).expect(format!("Failed to parse {:?}", filename).as_str());
+    }
+}
