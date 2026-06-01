@@ -23,7 +23,7 @@ fn _main(args: Args) {
         parser::parser::parse(&src).expect(format!("Failed to parse {:?}", filename).as_str());
 
     let behavior_decls = Vec::new(); // Dummy since it was undefined
-    brute_force(network, root, behavior_decls, behavior_nodes);
+    bruteforce::brute_force(network, root, behavior_decls, behavior_nodes);
 
     // // Select first train=True Behavior
     // let mut target_behavior = None;

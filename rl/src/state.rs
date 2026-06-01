@@ -27,7 +27,7 @@ impl AbstractMachine {
         (&self.stack, &self.callgraph)
     }
 
-    fn check_reduce(&self, operator_spec: &OperatorSpec) -> bool {
+    pub fn check_reduce(&self, operator_spec: &OperatorSpec) -> bool {
         // type checking
         assert!(operator_spec.inputs.len() <= self.stack.len());
         for (op_input, stack_item) in operator_spec.inputs.iter().zip(self.stack.iter().rev()) {

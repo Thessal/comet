@@ -12,6 +12,7 @@ use crate::trajectory::Trajectory;
 use parser::ast::Network;
 use parser::behavior::BehaviorDecl;
 use runtime::runtime::Runtime;
+use stdlib::types::Signal;
 use tch::IndexOp;
 use tch::{
     Device,
@@ -20,7 +21,7 @@ use tch::{
     nn::{self, LSTMState, OptimizerConfig},
 };
 
-pub struct Environment<T: Model> {
+pub struct Environment {
     pub state: SearchState,
     pub action_space: ActionSpace,
     pub config: BatchConfig,
@@ -30,7 +31,7 @@ pub struct Environment<T: Model> {
     orig_behavior: BehaviorDecl, //behavior_decl
 }
 
-impl<T: Model> Environment<T> {
+impl Environment {
     pub fn new(
         call_graph: &Network,
         action_space: ActionSpace,
@@ -64,22 +65,46 @@ impl<T: Model> Environment<T> {
     }
 }
 
-impl<T: Model> Environment<T> {
-    pub fn sample(&mut self, runtime: &Runtime, model: &mut T, device: &Device) {
+impl Environment {
+    pub fn sample<T: Model>(&mut self, runtime: &Runtime, model: &mut T, device: &Device) {
         for _ in 0..self.config.batch_size {
             self.sample_one(runtime, model, device);
         }
     }
 
-    fn get_action_mask(&self, device: &Device) -> Tensor {
-        todo!()
+    fn get_valid_action_mask(&self, device: &Device) -> Tensor {
+        let (stack, callgraph) = self.state.machine.get_stack();
+        let mut valid_actions: Vec<Action> = vec![];
+        for action_idx in 0..self.action_space.size() {
+            let action: Action = self.action_space.get_action(action_idx);
+            let valid = match &action {
+                Action::Done => stack.len() == 1,
+                Action::Reduce(op_spec) => {
+                    stack.len() >= op_spec.inputs.len() && // stack size checking
+                    self.state.machine.check_reduce(&op_spec) // type checking
+                }
+                _ => {
+                    // introducing new variable is always valid
+                    true
+                }
+            };
+            if valid {
+                valid_actions.push(action);
+            }
+        }
+        self.action_space.calculate_mask(&valid_actions)
     }
 
-    fn sample_one(&mut self, runtime: &Runtime, model: &mut T, device: &Device) -> Trajectory{
+    fn sample_one<T: Model>(
+        &mut self,
+        runtime: &Runtime,
+        model: &mut T,
+        device: &Device,
+    ) -> Trajectory {
         self.reset();
         let mut trajectory: Trajectory = Vec::new();
         for i in 0..self.config.max_length {
-            let mask: Tensor = self.get_action_mask(device);
+            let mask: Tensor = self.get_valid_action_mask(device);
             let (state_embedding, action_logits): (Tensor, Tensor) =
                 model.forward(&self.state, &mask, device);
             let sampled_action_idx: Vec<Vec<i64>> = // [batch_size=1, sample_number=1]
@@ -92,10 +117,16 @@ impl<T: Model> Environment<T> {
 
             let reward: f64 = self.reward_calculator.calc_reward(&self.state.machine);
 
-            let step = Step{ state_embedding, action, reward, next_state_embedding: None }
+            let done = action == Action::Done;
+            let step = Step {
+                state_embedding,
+                action,
+                reward,
+                next_state_embedding: None,
+            };
 
             trajectory.push(step);
-            if action == Action::Done {
+            if done {
                 break;
             }
         }

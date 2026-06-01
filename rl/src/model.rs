@@ -60,7 +60,7 @@ impl Model for RandomModel {
             (tch::Kind::Float, *device),
         );
         let dummy_emb = tch::Tensor::zeros([], (tch::Kind::Float, *device));
-        (dummy_emb, logits)
+        (dummy_emb, logits * masks.to_kind(tch::Kind::Float))
     }
 }
 

@@ -2,7 +2,6 @@ use rl::env::Environment;
 
 pub struct BruteforceSearch {
     env: Environment,
-    result: SearchResult,
 }
 
 // impl Search for BruteforceSearch {

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::pnl::PnlResult;
+// use crate::pnl::PnlResult;
 
 pub static mut FITNESS_FN: Option<Aggregator> = None;
 
@@ -51,44 +51,44 @@ pub struct Stats {
     pub values: HashMap<Metric, f64>,
 }
 
-impl From<&PnlResult> for Stats {
-    fn from(pnl: &PnlResult) -> Self {
-        let n = pnl.logret.len() as f64;
-        if n == 0.0 {
-            return Self::default();
-        }
+// impl From<&PnlResult> for Stats {
+//     fn from(pnl: &PnlResult) -> Self {
+//         let n = pnl.logret.len() as f64;
+//         if n == 0.0 {
+//             return Self::default();
+//         }
 
-        let ret = pnl.logret.iter().sum::<f64>();
-        let mean_ret = ret / n;
+//         let ret = pnl.logret.iter().sum::<f64>();
+//         let mean_ret = ret / n;
 
-        // Calculate standard deviation for Sharpe ratio
-        let var_ret = pnl
-            .logret
-            .iter()
-            .map(|&x| (x - mean_ret).powi(2))
-            .sum::<f64>()
-            / n;
-        let std_ret = var_ret.sqrt();
+//         // Calculate standard deviation for Sharpe ratio
+//         let var_ret = pnl
+//             .logret
+//             .iter()
+//             .map(|&x| (x - mean_ret).powi(2))
+//             .sum::<f64>()
+//             / n;
+//         let std_ret = var_ret.sqrt();
 
-        // Annualized Sharpe ratio assuming daily data
-        let sharpe = if std_ret > 1e-10 {
-            (mean_ret / std_ret) * (252.0_f64).sqrt()
-        } else {
-            0.0
-        };
+//         // Annualized Sharpe ratio assuming daily data
+//         let sharpe = if std_ret > 1e-10 {
+//             (mean_ret / std_ret) * (252.0_f64).sqrt()
+//         } else {
+//             0.0
+//         };
 
-        let turnover = if pnl.turnover.is_empty() {
-            0.0
-        } else {
-            pnl.turnover.iter().sum::<f64>() / pnl.turnover.len() as f64
-        };
+//         let turnover = if pnl.turnover.is_empty() {
+//             0.0
+//         } else {
+//             pnl.turnover.iter().sum::<f64>() / pnl.turnover.len() as f64
+//         };
 
-        let mut values = HashMap::new();
-        values.insert(Metric::RankIc, 0.0); // rankic cannot be directly calculated from PnlResult alone
-        values.insert(Metric::Sharpe, sharpe);
-        values.insert(Metric::Ret, ret);
-        values.insert(Metric::Turnover, turnover);
+//         let mut values = HashMap::new();
+//         values.insert(Metric::RankIc, 0.0); // rankic cannot be directly calculated from PnlResult alone
+//         values.insert(Metric::Sharpe, sharpe);
+//         values.insert(Metric::Ret, ret);
+//         values.insert(Metric::Turnover, turnover);
 
-        Self { values }
-    }
-}
+//         Self { values }
+//     }
+// }

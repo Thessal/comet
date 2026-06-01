@@ -14,6 +14,7 @@ use tch::Tensor;
 
 use crate::state::AbstractMachine;
 use crate::state::SearchState;
+use runtime::backtest::BasicBacktest;
 use runtime::runtime::Runtime;
 
 static SIGNAL_LENGTH: i64 = stdlib::types::SIZE[0] as i64;
@@ -39,11 +40,12 @@ pub struct Pool {
     asts: HashMap<String, Network>,
     returns: HashMap<String, Tensor>,
     portfolio_returns: Tensor,
-    backtester: Backtester,
+    backtester: BasicBacktest,
+    device: tch::Device,
 }
 
 impl Pool {
-    fn new(runtime: Runtime, backtester: Backtester) -> Self {
+    fn new(runtime: Runtime, backtester: BasicBacktest, device: tch::Device) -> Self {
         Pool {
             runtime,
             asts: HashMap::new(),
@@ -53,11 +55,12 @@ impl Pool {
                 (tch::Kind::Float, tch::Device::Cpu),
             ),
             backtester,
+            device,
         }
     }
 
     fn calc_portfolio_returns(&mut self) {
-        let returns: Vec<Tensor> = self.returns.values().map(|ret| ret.clone()).collect();
+        let returns: Vec<&Tensor> = self.returns.values().map(|ret| ret).collect();
         if returns.is_empty() {
             self.portfolio_returns =
                 tch::Tensor::zeros(SIGNAL_LENGTH, (tch::Kind::Float, tch::Device::Cpu));
@@ -73,7 +76,7 @@ impl Pool {
     fn insert(&mut self, sub_ast: Network) {
         let hash_str: String = sub_ast.format_node(0);
         let pos = self.runtime.lookup_or_run(&sub_ast, 0);
-        let returns = self.backtester.calc_returns(pos);
+        let returns = self.backtester.calc_returns(&pos.to_dataframe(self.device));
         self.asts.insert(hash_str.clone(), sub_ast);
         self.returns.insert(hash_str, returns);
     }
@@ -86,8 +89,11 @@ impl Pool {
     // Bailey, David H., and Marcos Lopez de Prado. "The Sharpe ratio efficient frontier." Journal of Risk 15.2 (2012): 13.
     // Bailey, David H., Marcos López de Prado, and Eva del Pozo. "The strategy approval decision: A sharpe ratio indifference curve approach." Algorithmic Finance 2.1 (2013): 99-109.
     fn marginal_utility(&mut self, callgraph: &Network, root: usize) -> f64 {
-        let incoming_pos = self.runtime.lookup_or_run(callgraph, root);
-        let incoming_ret = self.backtester.calc_returns(incoming_pos);
+        let incoming_pos = self
+            .runtime
+            .lookup_or_run(callgraph, root)
+            .to_dataframe(self.device);
+        let incoming_ret = self.backtester.calc_returns(&incoming_pos);
 
         // Calculate correlation manually if corrcoef is not easily accessible
         let cov = (&self.portfolio_returns - self.portfolio_returns.mean(None))
