@@ -1,6 +1,7 @@
 use crate::action::Action;
 use crate::action::ActionSpace;
 use crate::loss;
+use crate::model::LstmModel;
 use crate::model::Model;
 use crate::state::SearchState;
 use crate::train::BatchConfig;
@@ -8,6 +9,7 @@ use crate::trajectory::Step;
 use crate::trajectory::Trajectory;
 use parser::ast::Network;
 use parser::behavior::BehaviorDecl;
+use runtime::runtime::Runtime;
 use tch::IndexOp;
 use tch::{
     Device,
@@ -16,7 +18,7 @@ use tch::{
     nn::{self, LSTMState, OptimizerConfig},
 };
 
-pub struct Environment {
+pub struct Environment<T: Model> {
     pub state: SearchState,
     pub action_space: ActionSpace,
     pub config: BatchConfig,
@@ -25,7 +27,7 @@ pub struct Environment {
     orig_behavior: BehaviorDecl, //behavior_decl
 }
 
-impl Environment {
+impl<T: Model> Environment<T> {
     pub fn new(
         call_graph: &Network,
         action_space: ActionSpace,
@@ -57,10 +59,10 @@ impl Environment {
     }
 }
 
-impl Environment {
-    pub fn sample(&mut self, model: &Model, device: &Device) {
+impl<T: Model> Environment<T> {
+    pub fn sample(&mut self, runtime: &Runtime, model: &mut T, device: &Device) {
         for _ in 0..self.config.batch_size {
-            self.sample_one(model, device);
+            self.sample_one(runtime, model, device);
         }
     }
 
@@ -68,12 +70,13 @@ impl Environment {
         todo!()
     }
 
-    fn sample_one(&mut self, model: &mut Model, device: &Device) {
+    fn sample_one(&mut self, runtime: &Runtime, model: &mut T, device: &Device) {
         self.reset();
         let mut trajectory: Trajectory = Vec::new();
         for i in 0..self.config.max_length {
             let mask: Vec<usize> = self.get_action_mask();
-            let (state_embedding, action_logits): (Tensor, Tensor) = model.forward(&self.state, &mask, device);
+            let (state_embedding, action_logits): (Tensor, Tensor) =
+                model.forward(&self.state, &mask, device);
             let sampled_action_idx: Vec<Vec<i64>> = // [batch_size=1, sample_number=1]
                 tch::no_grad(|| action_logits.softmax(1, Float).multinomial(1, true))
                     .try_into()
@@ -82,14 +85,28 @@ impl Environment {
             let action: Action = self.action_space.get_action(action_idx as usize);
             self.step(&action);
 
-            let (_, reward) = self.config.runtime.run(&self.state);
-            let step = Step{ state: state_embedding, action, reward: reward, next_state: todo!() }
+            let (stack, callgraph) = self.state.machine.get_stack();
+            todo!()
+            // cast literals into tensor
+            // assert tensor size
+            // For intermediate reward
+            // * Measure data entropy / symbolic entropy
+            // * Measure data performance (how?)
+            // * Let's read the Polya's book, "How to Solve it."
+            // For final reward
+            // * compute performance of result
+            // compute reward
+            /// We need to think before implement this part....
 
-            trajectory.push(step);
-            if action == Action::Done {
-                self.config.trajectories.push(trajectory);
-                break;
-            }
+            // runtime.lookup_or_run(&self.state.call_graph, &self.state.expr);
+            // let (_, reward) = runtime.run(&self.state);
+            // let step = Step{ state: state_embedding, action, reward: reward, next_state: todo!() }
+
+            // trajectory.push(step);
+            // if action == Action::Done {
+            //     self.config.trajectories.push(trajectory);
+            //     break;
+            // }
         }
     }
     // pub fn sample(&mut self, model: &Model, device: Device) -> Trajectory {
