@@ -9,6 +9,7 @@
 use std::collections::HashMap;
 
 use parser::ast::Network;
+use parser::behavior::BehaviorDecl;
 use stdlib::types::Signal;
 use tch::Tensor;
 
@@ -45,7 +46,7 @@ pub struct Pool {
 }
 
 impl Pool {
-    fn new(runtime: Runtime, backtester: BasicBacktest, device: tch::Device) -> Self {
+    pub fn new(runtime: Runtime, backtester: BasicBacktest, device: tch::Device) -> Self {
         Pool {
             runtime,
             asts: HashMap::new(),
@@ -110,29 +111,33 @@ impl Pool {
     }
 }
 
-pub struct RewardCalculator {
-    runtime: Runtime,
-    pool: Pool,
-}
+impl Pool {
+    pub fn calc_reward(&mut self, machine: &AbstractMachine, is_done: bool) -> f64 {
+        if is_done {
+            // Terminal reward
+            // refer runtime.stats.rs
+            todo!()
+        } else {
+            // Intermediate reward
+            let (stack, callgraph): (&Vec<(Signal, usize)>, &Network) = machine.get_stack();
+            // stack (types, address)
 
-impl RewardCalculator {
-    pub fn calc_reward(&mut self, machine: &AbstractMachine) -> f64 {
-        let (stack, callgraph): (&Vec<(Signal, usize)>, &Network) = machine.get_stack();
-        // stack (types, address)
+            // Calculate marginal utility for each root in stack
+            let mut marginal_utility_all = vec![];
+            for (_signal_spec, addr) in stack {
+                let utility = self.marginal_utility(callgraph, *addr);
+                marginal_utility_all.push(utility);
+            }
 
-        let mut marginal_utility_all = vec![];
-        for (_signal_spec, addr) in stack {
-            let utility = self.pool.marginal_utility(callgraph, *addr);
-            marginal_utility_all.push(utility);
+            if marginal_utility_all.is_empty() {
+                return 0.0;
+            }
+
+            // Use maximum marginal utility among stack
+            *marginal_utility_all
+                .iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap()
         }
-
-        if marginal_utility_all.is_empty() {
-            return 0.0;
-        }
-
-        *marginal_utility_all
-            .iter()
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap()
     }
 }

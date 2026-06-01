@@ -3,8 +3,8 @@ use crate::action::ActionSpace;
 use crate::loss;
 use crate::model::LstmModel;
 use crate::model::Model;
-use crate::reward;
-use crate::reward::RewardCalculator;
+use crate::pool;
+use crate::pool::Pool;
 use crate::state::SearchState;
 use crate::train::BatchConfig;
 use crate::trajectory::Step;
@@ -25,7 +25,7 @@ pub struct Environment {
     pub state: SearchState,
     pub action_space: ActionSpace,
     pub config: BatchConfig,
-    reward_calculator: RewardCalculator,
+    pub pool: Pool,
     orig_call_graph_size: usize, //network_size
     orig_behavior_addr: usize,   //node_idx
     orig_behavior: BehaviorDecl, //behavior_decl
@@ -35,7 +35,7 @@ impl Environment {
     pub fn new(
         call_graph: &Network,
         action_space: ActionSpace,
-        reward_calculator: RewardCalculator,
+        pool: Pool,
         max_length: usize,
         batch_size: usize,
     ) -> Self {
@@ -49,7 +49,7 @@ impl Environment {
                 batch_size,
                 trajectories: vec![],
             },
-            reward_calculator,
+            pool,
             orig_call_graph_size: call_graph.nodes.len(),
             orig_behavior_addr: behavior_idx,
             orig_behavior: behavior_ref.clone(),
@@ -115,9 +115,9 @@ impl Environment {
             let action: Action = self.action_space.get_action(action_idx as usize);
             self.step(&action);
 
-            let reward: f64 = self.reward_calculator.calc_reward(&self.state.machine);
+            let is_done = action == Action::Done;
+            let reward: f64 = self.pool.calc_reward(&self.state.machine, is_done);
 
-            let done = action == Action::Done;
             let step = Step {
                 state_embedding,
                 action,
@@ -126,7 +126,7 @@ impl Environment {
             };
 
             trajectory.push(step);
-            if done {
+            if is_done {
                 break;
             }
         }

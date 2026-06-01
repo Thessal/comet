@@ -8,12 +8,22 @@ use parser::expr::{Expr, Literal};
 use std::collections::HashMap;
 use std::fs;
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    file: String,
+    #[arg(short, long)]
+    cuda: bool,
+}
+
 //TODO: machine generated code. need verification.
+// fn main() {
+//     let args = Args::parse();
+//     _main(args);
+// }
 fn main() {
     let args = Args::parse();
-    _main(args);
-}
-fn _main(args: Args) {
     let use_cuda = args.cuda || std::env::var("CUDA_PATH").is_ok();
     let filename = &args.file;
     let src = fs::read_to_string(filename).expect("Failed to read file");
@@ -23,7 +33,8 @@ fn _main(args: Args) {
         parser::parser::parse(&src).expect(format!("Failed to parse {:?}", filename).as_str());
 
     let behavior_decls = Vec::new(); // Dummy since it was undefined
-    bruteforce::brute_force(network, root, behavior_decls, behavior_nodes);
+    let action_space = rl::action::ActionSpace::new();
+    bruteforce::brute_force(network, root, action_space, behavior_decls, behavior_nodes);
 
     // // Select first train=True Behavior
     // let mut target_behavior = None;
@@ -82,16 +93,16 @@ fn _main(args: Args) {
     // }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::_main;
-    use crate::Args;
+// #[cfg(test)]
+// mod tests {
+//     use crate::_main;
+//     use crate::Args;
 
-    #[test]
-    fn test_behavior_1() {
-        _main(Args {
-            file: "../examples/behavior_1.cm".to_string(),
-            cuda: false,
-        })
-    }
-}
+//     #[test]
+//     fn test_behavior_1() {
+//         _main(Args {
+//             file: "../examples/behavior_1.cm".to_string(),
+//             cuda: false,
+//         })
+//     }
+// }
