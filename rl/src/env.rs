@@ -5,6 +5,7 @@ use crate::model::LstmModel;
 use crate::model::Model;
 use crate::pool;
 use crate::pool::Pool;
+use crate::state::AbstractMachine;
 use crate::state::SearchState;
 use crate::train::BatchConfig;
 use crate::trajectory::Step;
@@ -74,10 +75,12 @@ impl Environment {
         runtime: &mut Runtime,
         model: &mut T,
         device: &Device,
-    ) -> Vec<(Trajectory, String)> {
+    ) -> Vec<(Trajectory, String, AbstractMachine)> {
         let mut trajectories = vec![];
         for _ in 0..self.config.batch_size {
-            trajectories.push(self.sample_one(runtime, model, device));
+            let (steps, expr) = self.sample_one(runtime, model, device);
+            let machine = self.state.machine.clone();
+            trajectories.push((steps, expr, machine));
         }
         trajectories
     }

@@ -18,7 +18,7 @@ pub struct AbstractMachine {
     params: Vec<(Signal, usize)>, // parameter indices of the function. maps parameter order into address.
     // params need to be initialized when AbstractMachine is created from SearchState::from(Network)
     stack: Vec<(Signal, usize)>,   // stack (types, address)
-    pub(crate) callgraph: Network, // memory
+    pub callgraph: Network,        // memory
     callgraph_behavior_idx: usize, // location of the behavior node in callgraph
 }
 

@@ -53,18 +53,23 @@ pub fn brute_force(
         &mut RandomModel::new(env.action_space.clone()),
         &device,
     );
-    trajectories.iter().for_each(|(traj, expr)| {
+
+    // rather than beginning empty alpha pool, insert all for testing
+    trajectories.iter().for_each(|(traj, expr, machine)| {
         if let Some(last_step) = traj.last() {
-            if last_step.action == Action::Done {
-                println!("Expr: {}", expr);
-            } else {
-                println!("Expression failed to terminate");
-            }
+            env.pool.insert(&mut runtime, machine.callgraph.clone());
         }
     });
 
-    // env.pool
-    // We create a minimal Environment
-    // RewardCalculator requires Runtime and Pool, we'll assume it has a default or skip if we can't build it easily
-    // But BruteforceSearch is just what the user asked. Let's just create a dummy if needed or leave brute_force empty.
+    // calc utility for each trajectory
+    trajectories.iter().for_each(|(traj, expr, machine)| {
+        if let Some(last_step) = traj.last() {
+            if last_step.action == Action::Done {
+                let utility = env.pool.calc_reward(&mut runtime, &machine, true);
+                println!("Utility: {}\t Expr: {}", utility, expr);
+            } else {
+                println!("Expression failed to terminate: {}", expr);
+            }
+        }
+    });
 }

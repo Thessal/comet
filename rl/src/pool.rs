@@ -72,7 +72,7 @@ impl Pool {
         }
     }
 
-    fn insert(&mut self, runtime: &mut Runtime, sub_ast: Network) {
+    pub fn insert(&mut self, runtime: &mut Runtime, sub_ast: Network) {
         // you can use Network::extract_subtree to get subtrees
         let hash_str: String = sub_ast.format_node(0);
         let pos = runtime.lookup_or_run(&sub_ast, 0);
@@ -97,7 +97,7 @@ impl Pool {
 
     // Bailey, David H., and Marcos Lopez de Prado. "The Sharpe ratio efficient frontier." Journal of Risk 15.2 (2012): 13.
     // Bailey, David H., Marcos López de Prado, and Eva del Pozo. "The strategy approval decision: A sharpe ratio indifference curve approach." Algorithmic Finance 2.1 (2013): 99-109.
-    fn marginal_utility(&mut self, incoming_ret: &Tensor) -> f64 {
+    fn marginal_utility(&self, incoming_ret: &Tensor) -> f64 {
         // Calculate correlation manually if corrcoef is not easily accessible
         let cov = (&self.portfolio_returns - self.portfolio_returns.mean(None))
             * (incoming_ret - (incoming_ret.mean(None)));
@@ -119,7 +119,7 @@ impl Pool {
 
 impl Pool {
     pub fn calc_reward(
-        &mut self,
+        &self,
         runtime: &mut Runtime,
         machine: &AbstractMachine,
         is_done: bool,
