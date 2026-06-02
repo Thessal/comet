@@ -39,17 +39,34 @@ impl Runtime {
         self.expr_cache.get(&hash_key).unwrap()
     }
 
+    fn data_operator(&mut self, network: &Network, node: &Node) -> Signal {
+        let child_sig = self.run(network, node.children[0]);
+        if let Signal::String(Some(s)) = child_sig {
+            return Signal::DataFrame(Some(
+                self.dmgr
+                    .get_data(&s)
+                    .expect("Data not found")
+                    .shallow_clone(),
+            ));
+        } else {
+            panic!("data operator requires a String argument");
+        }
+    }
+
     fn run(&mut self, network: &Network, root: usize) -> Signal {
         let node = &network.nodes[root];
         match &node.node_type {
             NodeType::Operator(spec) => {
-                let args: Vec<Signal> = node
-                    .children
-                    .iter()
-                    .map(|&child| self.run(network, child))
-                    .collect();
-                let result = self.execute(spec, args).unwrap();
-                result
+                if spec.name == "data" {
+                    self.data_operator(network, node)
+                } else {
+                    let args: Vec<Signal> = node
+                        .children
+                        .iter()
+                        .map(|&child| self.run(network, child))
+                        .collect();
+                    self.execute(spec, args).unwrap()
+                }
             }
             NodeType::Behavior(_) => panic!("Behavior node cannot be run"),
             NodeType::Literal(Literal::Boolean(_literal)) => {

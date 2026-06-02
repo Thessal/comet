@@ -29,11 +29,13 @@ pub struct Environment {
     orig_call_graph_size: usize, //network_size
     orig_behavior_addr: usize,   //node_idx
     orig_behavior: BehaviorDecl, //behavior_decl
+    root: usize,                 // Root node index of the network
 }
 
 impl Environment {
     pub fn new(
         call_graph: &Network,
+        root: usize,
         action_space: ActionSpace,
         pool: Pool,
         max_length: usize,
@@ -53,6 +55,7 @@ impl Environment {
             orig_call_graph_size: call_graph.nodes.len(),
             orig_behavior_addr: behavior_idx,
             orig_behavior: behavior_ref.clone(),
+            root,
         };
         result
     }
@@ -66,10 +69,17 @@ impl Environment {
 }
 
 impl Environment {
-    pub fn sample<T: Model>(&mut self, runtime: &mut Runtime, model: &mut T, device: &Device) {
+    pub fn sample<T: Model>(
+        &mut self,
+        runtime: &mut Runtime,
+        model: &mut T,
+        device: &Device,
+    ) -> Vec<(Trajectory, String)> {
+        let mut trajectories = vec![];
         for _ in 0..self.config.batch_size {
-            self.sample_one(runtime, model, device);
+            trajectories.push(self.sample_one(runtime, model, device));
         }
+        trajectories
     }
 
     fn get_valid_action_mask(&self, device: &Device) -> Tensor {
@@ -100,7 +110,7 @@ impl Environment {
         runtime: &mut Runtime,
         model: &mut T,
         device: &Device,
-    ) -> Trajectory {
+    ) -> (Trajectory, String) {
         self.reset();
         let mut trajectory: Trajectory = Vec::new();
         for i in 0..self.config.max_length {
@@ -130,7 +140,8 @@ impl Environment {
                 break;
             }
         }
-        trajectory
+        let expr = self.state.machine.callgraph.format_node(self.root);
+        (trajectory, expr)
     }
 
     // pub fn sample(&mut self, model: &Model, device: Device) -> Trajectory {

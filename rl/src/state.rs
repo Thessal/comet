@@ -18,7 +18,7 @@ pub struct AbstractMachine {
     params: Vec<(Signal, usize)>, // parameter indices of the function. maps parameter order into address.
     // params need to be initialized when AbstractMachine is created from SearchState::from(Network)
     stack: Vec<(Signal, usize)>,   // stack (types, address)
-    callgraph: Network,            // memory
+    pub(crate) callgraph: Network, // memory
     callgraph_behavior_idx: usize, // location of the behavior node in callgraph
 }
 
@@ -120,39 +120,32 @@ impl From<Network> for AbstractMachine {
 pub struct SearchState {
     pub machine: AbstractMachine, // used to track arguments and actions of episode
     orig_callgraph_size: usize,
-    reference_to_behaviors: Vec<(usize, usize)>, // location of parameters that calls behavior
+    orig_behavior_node: Node,
 }
 
 impl SearchState {
     pub fn new(callgraph: &Network) -> Self {
         let machine: AbstractMachine = callgraph.clone().into();
         let behavior_idx = machine.callgraph_behavior_idx;
-        let mut reference_to_behaviors: Vec<(usize, usize)> = vec![];
-        for (i, node) in callgraph.nodes.iter().enumerate() {
-            for (j, child_idx) in node.children.iter().enumerate() {
-                if *child_idx == behavior_idx {
-                    reference_to_behaviors.push((i, j));
-                }
-            }
-        }
+        let orig_behavior_node = callgraph.nodes[behavior_idx].clone();
         Self {
             machine,
             orig_callgraph_size: callgraph.nodes.len(),
-            reference_to_behaviors,
+            orig_behavior_node,
         }
     }
 
     pub fn reset(&mut self) {
+        // clear the stack to avoid leftover nodes from previous trajectories
+        self.machine.stack.clear();
         // drop appended nodes
         self.machine
             .callgraph
             .nodes
             .truncate(self.orig_callgraph_size);
-        // reset missing reference to behavior node
-        for (parent, child_idx) in &self.reference_to_behaviors {
-            self.machine.callgraph.nodes[*parent].children[*child_idx] =
-                self.machine.callgraph_behavior_idx;
-        }
+        // restore behavior node
+        self.machine.callgraph.nodes[self.machine.callgraph_behavior_idx] =
+            self.orig_behavior_node.clone();
     }
 
     pub fn apply_action(&mut self, action: &Action) {
@@ -162,16 +155,11 @@ impl SearchState {
                 assert!(self.machine.stack.len() == 1);
                 // do the rewiring to replace behavior node with the subgraph
                 // 1. get subgraph address
-                let (subgraph_output_type, subgraph_root_idx) = self.machine.stack.pop().unwrap();
+                let (subgraph_output_type, subgraph_root_idx) = self.machine.stack.last().unwrap();
                 assert!(matches!(subgraph_output_type, Signal::DataFrame(_)));
-                // 2. replace reference to behavior node with subgraph root
-                for node in self.machine.callgraph.nodes.iter_mut() {
-                    for i in 0..node.children.len() {
-                        if node.children[i] == self.machine.callgraph_behavior_idx {
-                            node.children[i] = subgraph_root_idx;
-                        }
-                    }
-                }
+                // 2. replace behavior node with subgraph root
+                let root_node = self.machine.callgraph.nodes[*subgraph_root_idx].clone();
+                self.machine.callgraph.nodes[self.machine.callgraph_behavior_idx] = root_node;
             }
             a => {
                 self.machine.push(a);

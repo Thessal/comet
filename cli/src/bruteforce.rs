@@ -2,9 +2,11 @@ use std::collections::HashMap;
 
 use parser::ast::Network;
 use parser::behavior::BehaviorDecl;
+use rl::action::Action;
 use rl::env::Environment;
 use rl::model::RandomModel;
 use rl::pool::Pool;
+use rl::trajectory::Step;
 use runtime::backtest::BasicBacktest;
 use runtime::dmgr;
 use runtime::runtime::Runtime;
@@ -39,18 +41,29 @@ pub fn brute_force(
 
     let mut env = Environment::new(
         &network,
+        root,
         action_space,
         pool,
-        30,  // max_length
-        100, // batch_size
+        30, // max_length
+        10, // batch_size
     );
 
-    env.sample(
+    let trajectories = env.sample(
         &mut runtime,
         &mut RandomModel::new(env.action_space.clone()),
         &device,
     );
+    trajectories.iter().for_each(|(traj, expr)| {
+        if let Some(last_step) = traj.last() {
+            if last_step.action == Action::Done {
+                println!("Expr: {}", expr);
+            } else {
+                println!("Expression failed to terminate");
+            }
+        }
+    });
 
+    // env.pool
     // We create a minimal Environment
     // RewardCalculator requires Runtime and Pool, we'll assume it has a default or skip if we can't build it easily
     // But BruteforceSearch is just what the user asked. Let's just create a dummy if needed or leave brute_force empty.

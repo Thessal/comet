@@ -30,9 +30,7 @@ impl From<&str> for OperatorSpec {
                 name: "data",
                 inputs: &[Signal::String(None)],
                 output_shape: Signal::DataFrame(None),
-                execute: |_args| {
-                    Signal::DataFrame(Some(tch::Tensor::zeros(&[1, 1], tch::kind::FLOAT_CPU)))
-                },
+                execute: |_args| panic!("Data operator cannot be executed directly"),
             },
             "add" => OperatorSpec {
                 name: "add",
@@ -60,20 +58,18 @@ impl From<&str> for OperatorSpec {
                 name: "ts_diff",
                 inputs: &[Signal::Int(None), Signal::DataFrame(None)],
                 output_shape: Signal::DataFrame(None),
-                execute: |args| {
-                    match (&args[0], &args[1]) {
-                        (Signal::Int(Some(period)), Signal::DataFrame(Some(a))) => {
-                            let p = *period as i64;
-                            let shifted = a.roll(&[p], &[0]);
-                            if p > 0 && p <= a.size()[0] {
-                                let mut slice = shifted.narrow(0, 0, p);
-                                let nan = tch::Tensor::full(&[1], f64::NAN, (a.kind(), a.device()));
-                                let _ = slice.copy_(&nan);
-                            }
-                            Signal::DataFrame(Some(a - shifted))
+                execute: |args| match (&args[0], &args[1]) {
+                    (Signal::Int(Some(period)), Signal::DataFrame(Some(a))) => {
+                        let p = *period as i64;
+                        let shifted = a.roll(&[p], &[0]);
+                        if p > 0 && p <= a.size()[0] {
+                            let mut slice = shifted.narrow(0, 0, p);
+                            let nan = tch::Tensor::full(&[1], f64::NAN, (a.kind(), a.device()));
+                            let _ = slice.copy_(&nan);
                         }
-                        _ => panic!("ts_diff expected Int and DataFrame"),
+                        Signal::DataFrame(Some(a - shifted))
                     }
+                    _ => panic!("ts_diff expected Int and DataFrame"),
                 },
             },
             "ts_mean" => OperatorSpec {
@@ -110,9 +106,7 @@ impl From<&str> for OperatorSpec {
                 name: "consume_float",
                 inputs: &[Signal::Float(None)],
                 output_shape: Signal::Void,
-                execute: |_args| {
-                    Signal::Void
-                },
+                execute: |_args| Signal::Void,
             },
             "ts_rank" => OperatorSpec {
                 name: "ts_rank",

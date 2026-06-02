@@ -83,28 +83,37 @@ impl Pool {
 
     fn utility(&self, returns: &Tensor) -> f64 {
         let sharpe = returns.mean(None) / returns.std(false);
-        f64::try_from(sharpe).unwrap_or(0.0)
+        let val = f64::try_from(sharpe).unwrap_or(0.0);
+        if val.is_nan() { 0.0 } else { val }
     }
 
-    // Bailey, David H., and Marcos Lopez de Prado. "The Sharpe ratio efficient frontier." Journal of Risk 15.2 (2012): 13.
-    // Bailey, David H., Marcos López de Prado, and Eva del Pozo. "The strategy approval decision: A sharpe ratio indifference curve approach." Algorithmic Finance 2.1 (2013): 99-109.
-    fn marginal_utility(&mut self, runtime: &mut Runtime, callgraph: &Network, root: usize) -> f64 {
+    fn signal_to_returns(&self, runtime: &mut Runtime, callgraph: &Network, root: usize) -> Tensor {
         let incoming_pos = runtime
             .lookup_or_run(callgraph, root)
             .to_dataframe(self.device);
         let incoming_ret = self.backtester.calc_returns(&incoming_pos);
+        incoming_ret
+    }
 
+    // Bailey, David H., and Marcos Lopez de Prado. "The Sharpe ratio efficient frontier." Journal of Risk 15.2 (2012): 13.
+    // Bailey, David H., Marcos López de Prado, and Eva del Pozo. "The strategy approval decision: A sharpe ratio indifference curve approach." Algorithmic Finance 2.1 (2013): 99-109.
+    fn marginal_utility(&mut self, incoming_ret: &Tensor) -> f64 {
         // Calculate correlation manually if corrcoef is not easily accessible
         let cov = (&self.portfolio_returns - self.portfolio_returns.mean(None))
-            * (&incoming_ret - incoming_ret.mean(None));
+            * (incoming_ret - (incoming_ret.mean(None)));
         let corr_tensor =
             cov.mean(None) / (self.portfolio_returns.std(false) * incoming_ret.std(false));
         let corr = f64::try_from(corr_tensor).unwrap_or(0.0);
+        let corr = if corr.is_nan() { 0.0 } else { corr };
 
         let incoming_utility = self.utility(&incoming_ret) * corr;
         let portfolio_utility = self.utility(&self.portfolio_returns);
         let marginal_utility = incoming_utility - portfolio_utility;
-        marginal_utility
+        if marginal_utility.is_nan() {
+            0.0
+        } else {
+            marginal_utility
+        }
     }
 }
 
@@ -115,20 +124,25 @@ impl Pool {
         machine: &AbstractMachine,
         is_done: bool,
     ) -> f64 {
+        let (stack, callgraph): (&Vec<(Signal, usize)>, &Network) = machine.get_stack();
         if is_done {
             // Terminal reward
-            // refer runtime.stats.rs
-            todo!()
+            // TODO: refer runtime::stats
+            // let's simply use sharpe for now
+            assert!(stack.len() == 1);
+            let (_signal_spec, addr) = &stack[0];
+            let returns = self.signal_to_returns(runtime, callgraph, *addr);
+            self.utility(&returns)
         } else {
             // Intermediate reward
-            let (stack, callgraph): (&Vec<(Signal, usize)>, &Network) = machine.get_stack();
             // stack (types, address)
 
             // Calculate marginal utility for each root in stack
             let mut marginal_utility_all = vec![];
             for (_signal_spec, addr) in stack {
-                let utility = self.marginal_utility(runtime, callgraph, *addr);
-                marginal_utility_all.push(utility);
+                let returns = self.signal_to_returns(runtime, callgraph, *addr);
+                let marginal_utility = self.marginal_utility(&returns);
+                marginal_utility_all.push(marginal_utility);
             }
 
             if marginal_utility_all.is_empty() {
