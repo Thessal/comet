@@ -100,9 +100,11 @@ impl Pool {
     }
 
     fn utility(&self, returns: &Tensor) -> f64 {
-        let sharpe = returns.mean(None) / returns.std(false);
-        let val = f64::try_from(sharpe).unwrap_or(0.0);
-        if val.is_nan() { 0.0 } else { val }
+        let mean = f64::try_from(returns.mean(None)).unwrap();
+        let std = f64::try_from(returns.std(false)).unwrap();
+        let val = mean / std.max(1e-9);
+        // if val.is_nan() { 0.0 } else { val }
+        val
     }
 
     fn signal_to_returns(&self, runtime: &mut Runtime, callgraph: &Network, root: usize) -> Tensor {
@@ -114,10 +116,14 @@ impl Pool {
     }
 
     fn corr(&self, r1: &Tensor, r2: &Tensor) -> f64 {
+        assert_eq!(r1.size(), r2.size());
         let cov = (r1 - r1.mean(None)) * (r2 - r2.mean(None));
-        let corr_tensor = cov.mean(None) / (r1.std(false) * r2.std(false));
-        let corr = f64::try_from(corr_tensor).unwrap_or(0.0);
-        if corr.is_nan() { 0.0 } else { corr }
+        let cov = f64::try_from(cov.mean(None)).unwrap();
+        let std = f64::try_from(r1.std(false) * r2.std(false)).unwrap();
+        let std = std.max(1e-9);
+        cov / std
+        // let corr = f64::try_from(corr_tensor).unwrap_or(0.0);
+        // if corr.is_nan() { 0.0 } else { corr }
     }
 
     // Bailey, David H., and Marcos Lopez de Prado. "The Sharpe ratio efficient frontier." Journal of Risk 15.2 (2012): 13.
@@ -125,11 +131,14 @@ impl Pool {
     fn marginal_utility(&self, incoming_ret: &Tensor) -> f64 {
         // Calculate correlation manually if corrcoef is not easily accessible
         let corr = self.corr(&self.portfolio_returns, incoming_ret);
-        let incoming_utility = self.utility(&incoming_ret) * corr;
+        let incoming_utility = self.utility(&incoming_ret);
         let portfolio_utility = self.utility(&self.portfolio_returns);
-        let marginal_utility = incoming_utility - portfolio_utility;
+        assert!(!corr.is_nan());
+        assert!(!incoming_utility.is_nan());
+        assert!(!portfolio_utility.is_nan());
+        let marginal_utility = incoming_utility - portfolio_utility * corr;
         if marginal_utility.is_nan() {
-            0.0
+            f64::NAN
         } else {
             marginal_utility
         }
@@ -164,15 +173,11 @@ impl Pool {
                 marginal_utility_all.push(marginal_utility);
             }
 
-            if marginal_utility_all.is_empty() {
-                return 0.0;
-            }
-
-            // Use maximum marginal utility among stack
-            *marginal_utility_all
-                .iter()
+            marginal_utility_all
+                .into_iter()
+                .filter(|x| !x.is_nan())
                 .max_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap()
+                .unwrap_or(f64::NAN)
         }
     }
 }

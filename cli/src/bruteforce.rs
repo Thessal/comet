@@ -35,7 +35,7 @@ pub fn brute_force(
 ) {
     let device = Device::Cpu;
     let mut runtime = Runtime::new(10000, "data".into(), None);
-    let backtester = BasicBacktest::new(&mut runtime.dmgr, "returns");
+    let backtester = BasicBacktest::new(&mut runtime.dmgr, "returns_next");
     let pool = Pool::new(backtester, device);
 
     let mut env = Environment::new(
@@ -67,10 +67,10 @@ pub fn brute_force(
         if let Some(last_step) = traj.last() {
             if last_step.action == Action::Done {
                 let marginal_utility = env.pool.calc_reward(&mut runtime, &machine, true);
-                let utility_traj: f64 = traj.iter().map(|step| step.reward).sum::<f64>();
+                let utility_traj: Vec<f64> = traj.iter().map(|step| step.reward).collect();
                 let (_utility, _marginal_utility, corr) = pool_stats.get(expr).unwrap();
                 println!(
-                    "marginal_utility: {}\t utility_traj: {}\t Expr: {}\t _utility: {}, _marginal_utility: {}, corr:{}",
+                    "marginal_utility: {}\t utility_traj: {:?}\t Expr: {}\t _utility: {}, _marginal_utility: {}, corr:{}",
                     marginal_utility, utility_traj, expr, _utility, _marginal_utility, corr
                 );
             } else {

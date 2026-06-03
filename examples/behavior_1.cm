@@ -1,12 +1,16 @@
-Behavior Comparator(signal: DataFrame, reference: DataFrame) {
+Behavior TechnicalIndicator(o:DataFrame, h: DataFrame, l:DataFrame, c:DataFrame , v:DataFrame, adv20:DataFrame) {
     weights="behavior_1_compare.pth", train=true, supervised_epochs=100,
     operators = [add, divide],
-    integers = [ ], floats = [ ], strings=[ ]
+    integers = [ ], floats = [ ], strings=[]
 } -> DataFrame
    #  integers = [5, 21, 252], floats = [0.1, 0.5, 0.9, 5.0, 21.0, 252.0], strings=["volume", "adv20"]
 
 Flow volume_spike {
+    o = data("open")
+    h = data("high")
+    l = data("low")
+    c = data("close")
     volume = data("volume")
     adv20 = data("adv20")
-    Comparator(volume, adv20)
+    TechnicalIndicator(o, h, l, c, volume, adv20)
 }
