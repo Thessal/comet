@@ -1,16 +1,19 @@
-Behavior TechnicalIndicator(o:DataFrame, h: DataFrame, l:DataFrame, c:DataFrame , v:DataFrame, adv20:DataFrame) {
+Behavior TechnicalIndicator(o:DataFrame, h: DataFrame, l:DataFrame, c:DataFrame , v:DataFrame, adv20:DataFrame, r: DataFrame) {
     weights="behavior_1_compare.pth", train=true, supervised_epochs=100,
-    operators = [add, divide],
+    operators = [add, cs_rank, subtract, multiply, flip],
     integers = [ ], floats = [ ], strings=[]
 } -> DataFrame
    #  integers = [5, 21, 252], floats = [0.1, 0.5, 0.9, 5.0, 21.0, 252.0], strings=["volume", "adv20"]
 
-Flow volume_spike {
+Flow technicalindicator_example {
     o = data("open")
     h = data("high")
     l = data("low")
     c = data("close")
     volume = data("volume")
     adv20 = data("adv20")
-    TechnicalIndicator(o, h, l, c, volume, adv20)
+    r = data("returns")
+    TechnicalIndicator(o, h, l, c, volume, adv20, r)
 }
+
+# divide,, subtract, multiply

@@ -43,15 +43,48 @@ impl From<&str> for OperatorSpec {
                     _ => panic!("add expected two DataFrames"),
                 },
             },
+            "subtract" => OperatorSpec {
+                name: "subtract",
+                inputs: &[Signal::DataFrame(None), Signal::DataFrame(None)],
+                output_shape: Signal::DataFrame(None),
+                execute: |args| match (&args[0], &args[1]) {
+                    (Signal::DataFrame(Some(a)), Signal::DataFrame(Some(b))) => {
+                        Signal::DataFrame(Some(a - b))
+                    }
+                    _ => panic!("subtract expected two DataFrames"),
+                },
+            },
             "divide" => OperatorSpec {
                 name: "divide",
                 inputs: &[Signal::DataFrame(None), Signal::DataFrame(None)],
                 output_shape: Signal::DataFrame(None),
                 execute: |args| match (&args[0], &args[1]) {
                     (Signal::DataFrame(Some(a)), Signal::DataFrame(Some(b))) => {
-                        Signal::DataFrame(Some(a / b))
+                        let result = a / b;
+                        let result = result.nan_to_num(Some(0.0), Some(1e9), Some(-1e9));
+                        Signal::DataFrame(Some(result))
                     }
                     _ => panic!("divide expected two DataFrames"),
+                },
+            },
+            "multiply" => OperatorSpec {
+                name: "multiply",
+                inputs: &[Signal::DataFrame(None), Signal::DataFrame(None)],
+                output_shape: Signal::DataFrame(None),
+                execute: |args| match (&args[0], &args[1]) {
+                    (Signal::DataFrame(Some(a)), Signal::DataFrame(Some(b))) => {
+                        Signal::DataFrame(Some(a * b))
+                    }
+                    _ => panic!("multiply expected two DataFrames"),
+                },
+            },
+            "flip" => OperatorSpec {
+                name: "flip",
+                inputs: &[Signal::DataFrame(None)],
+                output_shape: Signal::DataFrame(None),
+                execute: |args| match &args[0] {
+                    (Signal::DataFrame(Some(a))) => Signal::DataFrame(Some(a * -1.0)),
+                    _ => panic!("flip expected a DataFrame"),
                 },
             },
             "ts_diff" => OperatorSpec {
