@@ -6,6 +6,7 @@ use stdlib::OperatorSpec;
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Network {
     pub nodes: Vec<Node>,
+    pub root: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -23,7 +24,7 @@ pub enum NodeType {
 
 impl Network {
     pub fn new() -> Self {
-        Self { nodes: Vec::new() }
+        Self { nodes: Vec::new(), root: 0 }
     }
 
     pub fn add_node(&mut self, node_type: NodeType) -> usize {
@@ -55,7 +56,8 @@ impl Network {
             new_id
         }
 
-        copy_node(self, &mut new_network, node_id);
+        let new_root = copy_node(self, &mut new_network, node_id);
+        new_network.root = new_root;
         new_network
     }
 
@@ -120,14 +122,7 @@ impl fmt::Display for Network {
         if self.nodes.is_empty() {
             return write!(f, "Empty Network");
         }
-        let mut is_child = vec![false; self.nodes.len()];
-        for node in &self.nodes {
-            for &child in &node.children {
-                is_child[child] = true;
-            }
-        }
-        let root = is_child.iter().position(|&c| !c).unwrap_or(0);
-        write!(f, "{}", self.format_node(root))
+        write!(f, "{}", self.format_node(self.root))
     }
 }
 
@@ -163,6 +158,7 @@ mod tests {
 
         let lit3 = network.add_node(NodeType::Literal(Literal::Float(2.0)));
         let root = network.add_node(NodeType::Operator(OperatorSpec::from("divide")));
+        network.root = root;
         network.add_child(root, mixed);
         network.add_child(root, lit3);
 

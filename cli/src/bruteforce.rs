@@ -29,7 +29,6 @@ impl BruteforceSearch {
 
 pub fn brute_force(
     network: Network,
-    root: usize,
     action_space: rl::action::ActionSpace,
     // behavior_decls: Vec<BehaviorDecl>,
     // behavior_nodes: Vec<usize>,
@@ -41,11 +40,10 @@ pub fn brute_force(
 
     let mut env = Environment::new(
         &network,
-        root,
         action_space,
         pool,
-        30, // max_length
-        10, // batch_size
+        30,   // max_length
+        1000, // batch_size
     );
 
     let trajectories = env.sample(
@@ -57,16 +55,24 @@ pub fn brute_force(
     // rather than beginning empty alpha pool, insert all for testing
     trajectories.iter().for_each(|(traj, expr, machine)| {
         if let Some(last_step) = traj.last() {
-            env.pool.insert(&mut runtime, machine.callgraph.clone());
+            if last_step.action == Action::Done {
+                env.pool.insert(&mut runtime, machine.callgraph.clone());
+            }
         }
     });
+    let pool_stats = env.pool.stats();
 
-    // calc utility for each trajectory
+    // Calc utility for each trajectory
     trajectories.iter().for_each(|(traj, expr, machine)| {
         if let Some(last_step) = traj.last() {
             if last_step.action == Action::Done {
-                let utility = env.pool.calc_reward(&mut runtime, &machine, true);
-                println!("Utility: {}\t Expr: {}", utility, expr);
+                let marginal_utility = env.pool.calc_reward(&mut runtime, &machine, true);
+                let utility_traj: f64 = traj.iter().map(|step| step.reward).sum::<f64>();
+                let (_utility, _marginal_utility, corr) = pool_stats.get(expr).unwrap();
+                println!(
+                    "marginal_utility: {}\t utility_traj: {}\t Expr: {}\t _utility: {}, _marginal_utility: {}, corr:{}",
+                    marginal_utility, utility_traj, expr, _utility, _marginal_utility, corr
+                );
             } else {
                 println!("Expression failed to terminate: {}", expr);
             }

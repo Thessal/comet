@@ -28,7 +28,7 @@ fn _main(args: Args) {
     let src = fs::read_to_string(filename).expect("Failed to read file");
 
     println!("--- Parsing file: {:?} ---", filename);
-    let (network, root, behavior_nodes) =
+    let (network, behavior_nodes) =
         parser::parser::parse(&src).expect(format!("Failed to parse {:?}", filename).as_str());
 
     let behavior_decl: &BehaviorDecl = match &network.nodes[behavior_nodes[0]].node_type {
@@ -36,7 +36,7 @@ fn _main(args: Args) {
         _ => unreachable!(),
     };
     let action_space: ActionSpace = behavior_decl.into();
-    bruteforce::brute_force(network, root, action_space);
+    bruteforce::brute_force(network, action_space);
 }
 
 #[cfg(test)]

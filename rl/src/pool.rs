@@ -58,6 +58,22 @@ impl Pool {
         }
     }
 
+    pub fn exprs(&self) -> Vec<String> {
+        // self.asts.keys().cloned().collect()
+        self.returns.keys().cloned().collect()
+    }
+
+    pub fn stats(&self) -> HashMap<String, (f64, f64, f64)> {
+        let mut stats: HashMap<String, (f64, f64, f64)> = HashMap::new();
+        for (expr, r) in self.returns.iter() {
+            let utility: f64 = self.utility(r);
+            let marginal_utility = self.marginal_utility(r);
+            let corr = self.corr(&self.portfolio_returns, r);
+            stats.insert(expr.clone(), (utility, marginal_utility, corr));
+        }
+        stats
+    }
+
     fn calc_portfolio_returns(&mut self) {
         let returns: Vec<&Tensor> = self.returns.values().map(|ret| ret).collect();
         if returns.is_empty() {
@@ -74,11 +90,13 @@ impl Pool {
 
     pub fn insert(&mut self, runtime: &mut Runtime, sub_ast: Network) {
         // you can use Network::extract_subtree to get subtrees
-        let hash_str: String = sub_ast.format_node(0);
-        let pos = runtime.lookup_or_run(&sub_ast, 0);
-        let returns = self.backtester.calc_returns(&pos.to_dataframe(self.device));
-        self.asts.insert(hash_str.clone(), sub_ast);
-        self.returns.insert(hash_str, returns);
+        let hash_str: String = sub_ast.format_node(sub_ast.root);
+        if !self.asts.contains_key(&hash_str) {
+            let pos = runtime.lookup_or_run(&sub_ast, sub_ast.root);
+            let returns = self.backtester.calc_returns(&pos.to_dataframe(self.device));
+            self.asts.insert(hash_str.clone(), sub_ast);
+            self.returns.insert(hash_str, returns);
+        }
     }
 
     fn utility(&self, returns: &Tensor) -> f64 {
@@ -95,17 +113,18 @@ impl Pool {
         incoming_ret
     }
 
+    fn corr(&self, r1: &Tensor, r2: &Tensor) -> f64 {
+        let cov = (r1 - r1.mean(None)) * (r2 - r2.mean(None));
+        let corr_tensor = cov.mean(None) / (r1.std(false) * r2.std(false));
+        let corr = f64::try_from(corr_tensor).unwrap_or(0.0);
+        if corr.is_nan() { 0.0 } else { corr }
+    }
+
     // Bailey, David H., and Marcos Lopez de Prado. "The Sharpe ratio efficient frontier." Journal of Risk 15.2 (2012): 13.
     // Bailey, David H., Marcos López de Prado, and Eva del Pozo. "The strategy approval decision: A sharpe ratio indifference curve approach." Algorithmic Finance 2.1 (2013): 99-109.
     fn marginal_utility(&self, incoming_ret: &Tensor) -> f64 {
         // Calculate correlation manually if corrcoef is not easily accessible
-        let cov = (&self.portfolio_returns - self.portfolio_returns.mean(None))
-            * (incoming_ret - (incoming_ret.mean(None)));
-        let corr_tensor =
-            cov.mean(None) / (self.portfolio_returns.std(false) * incoming_ret.std(false));
-        let corr = f64::try_from(corr_tensor).unwrap_or(0.0);
-        let corr = if corr.is_nan() { 0.0 } else { corr };
-
+        let corr = self.corr(&self.portfolio_returns, incoming_ret);
         let incoming_utility = self.utility(&incoming_ret) * corr;
         let portfolio_utility = self.utility(&self.portfolio_returns);
         let marginal_utility = incoming_utility - portfolio_utility;

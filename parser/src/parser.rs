@@ -26,7 +26,7 @@ pub enum ParserError {
     SemanticError(String),
 }
 
-pub fn parse(input: &str) -> Result<(Network, usize, Vec<usize>), ParserError> {
+pub fn parse(input: &str) -> Result<(Network, Vec<usize>), ParserError> {
     // Parses Flow and behavior.
     let mut pairs = CometParser::parse(Rule::program, input)?;
     let program_pair = pairs.next().ok_or(ParserError::MissingToken)?;
@@ -81,9 +81,10 @@ pub fn parse(input: &str) -> Result<(Network, usize, Vec<usize>), ParserError> {
         &behaviors_map,
         &mut behaviors_ref,
     )?;
+    network.root = root;
 
     // full ast (operator nodes and literals), reference to behavior node (undetermined node)
-    Ok((network, root, behaviors_ref))
+    Ok((network, behaviors_ref))
 }
 
 fn build_ast(
@@ -515,7 +516,7 @@ fn test_parse_behavior_decl() {
         println!("Error: {}", e);
     }
     assert!(result.is_ok());
-    let (network, root, undetermined_nodes) = result.unwrap();
-    println!("{:?}", network.format_node(root));
+    let (network, undetermined_nodes) = result.unwrap();
+    println!("{:?}", network.format_node(network.root));
     println!("{:?}", undetermined_nodes);
 }

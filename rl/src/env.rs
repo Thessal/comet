@@ -30,13 +30,11 @@ pub struct Environment {
     orig_call_graph_size: usize, //network_size
     orig_behavior_addr: usize,   //node_idx
     orig_behavior: BehaviorDecl, //behavior_decl
-    root: usize,                 // Root node index of the network
 }
 
 impl Environment {
     pub fn new(
         call_graph: &Network,
-        root: usize,
         action_space: ActionSpace,
         pool: Pool,
         max_length: usize,
@@ -56,7 +54,6 @@ impl Environment {
             orig_call_graph_size: call_graph.nodes.len(),
             orig_behavior_addr: behavior_idx,
             orig_behavior: behavior_ref.clone(),
-            root,
         };
         result
     }
@@ -143,7 +140,7 @@ impl Environment {
                 break;
             }
         }
-        let expr = self.state.machine.callgraph.format_node(self.root);
+        let expr = self.state.machine.callgraph.format_node(self.state.machine.callgraph.root);
         (trajectory, expr)
     }
 
