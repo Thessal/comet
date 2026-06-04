@@ -42,8 +42,8 @@ pub fn brute_force(
         &network,
         action_space,
         pool,
-        30,   // max_length
-        1000, // batch_size
+        50,     // max_length
+        100000, // batch_size
     );
 
     let trajectories = env.sample(
@@ -70,7 +70,7 @@ pub fn brute_force(
                 let utility_traj: Vec<f64> = traj.iter().map(|step| step.reward).collect();
                 let (_utility, _marginal_utility, corr) = pool_stats.get(expr).unwrap();
                 println!(
-                    "marginal_utility: {}\t utility_traj: {:?}\t Expr: {}\t _utility: {}, _marginal_utility: {}, corr:{}",
+                    "marginal_utility: {}\t utility_traj: {:?}\t Expr: {}\t _utility: {}\t _marginal_utility: {}\t corr:{}",
                     marginal_utility, utility_traj, expr, _utility, _marginal_utility, corr
                 );
             } else {

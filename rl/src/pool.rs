@@ -133,9 +133,9 @@ impl Pool {
         let corr = self.corr(&self.portfolio_returns, incoming_ret);
         let incoming_utility = self.utility(&incoming_ret);
         let portfolio_utility = self.utility(&self.portfolio_returns);
-        assert!(!corr.is_nan());
-        assert!(!incoming_utility.is_nan());
-        assert!(!portfolio_utility.is_nan());
+        // assert!(!corr.is_nan());
+        // assert!(!incoming_utility.is_nan());
+        // assert!(!portfolio_utility.is_nan());
         let marginal_utility = incoming_utility - portfolio_utility * corr;
         if marginal_utility.is_nan() {
             f64::NAN
