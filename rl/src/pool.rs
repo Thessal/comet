@@ -96,6 +96,7 @@ impl Pool {
             let returns = self.backtester.calc_returns(&pos.to_dataframe(self.device));
             self.asts.insert(hash_str.clone(), sub_ast);
             self.returns.insert(hash_str, returns);
+            self.calc_portfolio_returns();
         }
     }
 
