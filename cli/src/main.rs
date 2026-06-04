@@ -1,5 +1,5 @@
 pub mod bruteforce;
-// pub mod search;
+pub mod transformer;
 use clap::Parser;
 use parser::ast::NodeType;
 use parser::behavior::BehaviorDecl;
@@ -33,7 +33,8 @@ fn _main(args: Args) {
         _ => unreachable!(),
     };
     let action_space: ActionSpace = behavior_decl.into();
-    bruteforce::brute_force(network, action_space, use_cuda);
+    // bruteforce::brute_force(network, action_space, use_cuda);
+    transformer::transformer_search(network, action_space, use_cuda);
 }
 
 #[cfg(test)]
