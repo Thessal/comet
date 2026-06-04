@@ -27,14 +27,13 @@ impl BruteforceSearch {
     }
 }
 
-pub fn brute_force(
-    network: Network,
-    action_space: rl::action::ActionSpace,
-    // behavior_decls: Vec<BehaviorDecl>,
-    // behavior_nodes: Vec<usize>,
-) {
-    let device = Device::Cpu;
-    let mut runtime = Runtime::new(10000, "data".into(), None);
+pub fn brute_force(network: Network, action_space: rl::action::ActionSpace, use_cuda: bool) {
+    let device = if use_cuda {
+        Device::cuda_if_available()
+    } else {
+        Device::Cpu
+    };
+    let mut runtime = Runtime::new(10000, "data".into(), Some(device));
     let backtester = BasicBacktest::new(&mut runtime.dmgr, "returns_next");
     let pool = Pool::new(backtester, device);
 
@@ -42,8 +41,8 @@ pub fn brute_force(
         &network,
         action_space,
         pool,
-        50,    // max_length
-        10000, // batch_size
+        50,   // max_length
+        1000, // batch_size
     );
 
     println!("Sampling trajectories...");
@@ -71,10 +70,10 @@ pub fn brute_force(
             if last_step.action == Action::Done {
                 let marginal_utility = env.pool.calc_reward(&mut runtime, &machine, true);
                 let utility_traj: Vec<f64> = traj.iter().map(|step| step.reward).collect();
-                let (_utility, _marginal_utility, corr) = pool_stats.get(expr).unwrap();
+                let (_utility, _marginal_utility, corr, maxcorr) = pool_stats.get(expr).unwrap();
                 println!(
-                    "marginal_utility: {}\t utility_traj: {:?}\t Expr: {}\t _utility: {}\t _marginal_utility: {}\t corr:{}",
-                    marginal_utility, utility_traj, expr, _utility, _marginal_utility, corr
+                    "marginal_utility: {}\t utility_traj: {:?}\t Expr: {}\t _utility: {}\t _marginal_utility: {}\t corr:{}\t maxcorr:{}",
+                    marginal_utility, utility_traj, expr, _utility, _marginal_utility, corr, maxcorr
                 );
             } else {
                 println!("Expression failed to terminate: {}", expr);

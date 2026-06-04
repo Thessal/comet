@@ -102,7 +102,7 @@ impl Environment {
                 valid_actions.push(action);
             }
         }
-        self.action_space.calculate_mask(&valid_actions)
+        self.action_space.calculate_mask(&valid_actions).to(*device)
     }
 
     fn sample_one<T: Model>(

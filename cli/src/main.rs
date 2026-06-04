@@ -36,7 +36,7 @@ fn _main(args: Args) {
         _ => unreachable!(),
     };
     let action_space: ActionSpace = behavior_decl.into();
-    bruteforce::brute_force(network, action_space);
+    bruteforce::brute_force(network, action_space, use_cuda);
 }
 
 #[cfg(test)]
