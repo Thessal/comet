@@ -1,19 +1,12 @@
-Behavior TechnicalIndicator(o:DataFrame, h: DataFrame, l:DataFrame, c:DataFrame , v:DataFrame, adv20:DataFrame, r: DataFrame) {
+Behavior TechnicalIndicator(volume_ratio: DataFrame, returns: DataFrame, intraday_ret: DataFrame) {
     weights="behavior_1_compare.pth", train=true, supervised_epochs=100,
-    operators = [add, cs_rank, subtract, multiply, flip],
+    operators = [add, subtract, multiply, divide, flip, cs_rank, cs_zscore],
     integers = [ ], floats = [ ], strings=[]
 } -> DataFrame
-   #  integers = [5, 21, 252], floats = [0.1, 0.5, 0.9, 5.0, 21.0, 252.0], strings=["volume", "adv20"]
 
 Flow technicalindicator_example {
-    o = data("open")
-    h = data("high")
-    l = data("low")
-    c = data("close")
-    volume = data("volume")
-    adv20 = data("adv20")
+    v = divide(data("volume"), data("adv20"))
     r = data("returns")
-    TechnicalIndicator(o, h, l, c, volume, adv20, r)
+    i = divide(data("close"), data("open"))
+    TechnicalIndicator(v, r, i)
 }
-
-# divide,, subtract, multiply

@@ -42,10 +42,11 @@ pub fn brute_force(
         &network,
         action_space,
         pool,
-        50,     // max_length
-        100000, // batch_size
+        50,    // max_length
+        10000, // batch_size
     );
 
+    println!("Sampling trajectories...");
     let trajectories = env.sample(
         &mut runtime,
         &mut RandomModel::new(env.action_space.clone()),
@@ -53,6 +54,7 @@ pub fn brute_force(
     );
 
     // rather than beginning empty alpha pool, insert all for testing
+    println!("Adding trajectories to pool...");
     trajectories.iter().for_each(|(traj, expr, machine)| {
         if let Some(last_step) = traj.last() {
             if last_step.action == Action::Done {
@@ -63,6 +65,7 @@ pub fn brute_force(
     let pool_stats = env.pool.stats();
 
     // Calc utility for each trajectory
+    println!("Calculating utility for each trajectory...");
     trajectories.iter().for_each(|(traj, expr, machine)| {
         if let Some(last_step) = traj.last() {
             if last_step.action == Action::Done {

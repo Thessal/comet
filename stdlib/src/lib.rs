@@ -1,6 +1,7 @@
 // Minimal version of stdlib
 #![allow(clippy::not_unsafe_ptr_arg_deref, clippy::missing_safety_doc)]
 pub mod types;
+use tch::Kind;
 use types::Signal;
 
 #[derive(Clone)]
@@ -135,6 +136,19 @@ impl From<&str> for OperatorSpec {
                     }
                 },
             },
+            "cs_zscore" => OperatorSpec {
+                name: "cs_zscore",
+                inputs: &[Signal::DataFrame(None)],
+                output_shape: Signal::DataFrame(None),
+                execute: |args| match &args[0] {
+                    Signal::DataFrame(Some(a)) => {
+                        let mean = a.mean_dim(1, true, Kind::Float);
+                        let std = a.std_dim(1, false, true);
+                        Signal::DataFrame(Some((a - mean) / (std + 1e-10)))
+                    }
+                    _ => panic!("cs_zscore expected DataFrame"),
+                },
+            },
             "consume_float" => OperatorSpec {
                 name: "consume_float",
                 inputs: &[Signal::Float(None)],
@@ -180,3 +194,9 @@ impl OperatorSpec {
         Ok((self.execute)(args))
     }
 }
+
+// TODO:
+// 1. split operators into files
+// 2. define macro to avoid repeated code
+// 3. operator should not modify input data
+// 4. numerical accuracy neeed to be checked.
