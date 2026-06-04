@@ -168,47 +168,8 @@ impl SearchState {
     }
 }
 
-// pub fn get_valid_actions(&self, action: &ActionSpace) -> Vec<Action> {
-//     let stack_type_and_data: Vec<Signal> =
-//         self.stack.iter().map(|(_, _, s)| s.clone()).collect();
-//     let mut valid_actions: Vec<Action> = vec![];
-//     for i in 0..action.size() {
-//         let a = action.get_action(i);
-//         let is_valid: bool = match a {
-//             Action::Reduce(OperatorSpec {
-//                 name: _name,
-//                 inputs,
-//                 output_shape: _output_shape,
-//                 execute: _,
-//             }) => {
-//                 if inputs.len() > self.stack.len() {
-//                     false
-//                 } else {
-//                     inputs
-//                         .iter()
-//                         .rev()
-//                         .zip(stack_type_and_data.iter().rev())
-//                         // compare variant only. (not data)
-//                         .all(|(i, s)| std::mem::discriminant(i) == std::mem::discriminant(s))
-//                 }
-//             }
-//             Action::Done => self.is_done_valid(),
-//             _ => self.stack.len() < 5, // allow introducing variables until stack depth 5
-//                                        // TODO: adjust
-//         };
-//         if is_valid {
-//             valid_actions.push(action.get_action(i));
-//         }
-//     }
-//     valid_actions
-// }
-
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use parser::behavior::BehaviorDecl;
-    use runtime::runtime::Runtime;
-    use stdlib::types::Signal;
     #[test]
     fn test_action_apply_reduce() {
         todo!()

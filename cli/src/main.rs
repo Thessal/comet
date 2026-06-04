@@ -1,12 +1,9 @@
 pub mod bruteforce;
 // pub mod search;
 use clap::Parser;
-use parser::ast::{Network, Node, NodeType};
+use parser::ast::NodeType;
 use parser::behavior::BehaviorDecl;
-use parser::behavior::InputDecl;
-use parser::expr::{Expr, Literal};
 use rl::action::ActionSpace;
-use std::collections::HashMap;
 use std::fs;
 
 #[derive(Parser, Debug)]
@@ -47,7 +44,7 @@ mod tests {
     #[test]
     fn test_behavior_1() {
         let filename = "../examples/behavior_1.cm";
-        let src = fs::read_to_string(filename).expect("Failed to read file");
+        let _src = fs::read_to_string(filename).expect("Failed to read file");
         _main(Args {
             file: String::from(filename),
             cuda: true,

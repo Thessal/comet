@@ -1,4 +1,4 @@
-use crate::ast::{Network, Node, NodeType};
+use crate::ast::{Network, NodeType};
 use crate::{
     behavior::*,
     expr::{Expr, FlowStmt},
@@ -135,8 +135,12 @@ fn build_ast(
                 Ok(node_id)
             }
         }
-        Expr::List(exprs) => panic!("Unexpected list expression"),
-        Expr::Range { start, step, end } => panic!("Unexpected range expression"),
+        Expr::List(_exprs) => panic!("Unexpected list expression"),
+        Expr::Range {
+            start: _,
+            step: _,
+            end: _,
+        } => panic!("Unexpected range expression"),
     }
 }
 

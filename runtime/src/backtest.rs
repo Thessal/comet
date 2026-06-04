@@ -1,5 +1,4 @@
 use crate::dmgr::DataManager;
-use stdlib::types::Signal;
 use tch::{Kind, Tensor};
 
 static DATA_SIZE: [i64; 2] = [stdlib::types::SIZE[0] as i64, stdlib::types::SIZE[1] as i64];
@@ -10,7 +9,8 @@ pub struct BasicBacktest {
 
 impl BasicBacktest {
     pub fn new(dmgr: &mut DataManager, target_field: &str) -> Self {
-        let returns = dmgr.get_data(target_field)
+        let returns = dmgr
+            .get_data(target_field)
             .expect("Failed to load close data")
             .shallow_clone();
         assert_eq!(returns.size(), DATA_SIZE);

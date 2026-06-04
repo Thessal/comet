@@ -1,42 +1,42 @@
 // TODO: dataframe embedding model
 // I guess log transform and CNN will work?
-use tch::Tensor;
+// use tch::Tensor;
 
-use crate::state::SearchState;
+// use crate::state::SearchState;
 
 static EMBEDDING_SIZE_PER_TOKEN: usize = 5; // 5 floats per token
 static EMBEDDING_TOKEN_CNT: usize = 2; // two tokens
 pub static EMBEDDING_SIZE: usize = EMBEDDING_SIZE_PER_TOKEN * EMBEDDING_TOKEN_CNT;
 // pub static EMBEDDER: Option<EmbeddingModel> = None;
 
-struct EmbeddingModel {
-    embedding: tch::nn::Embedding,
-}
+// struct EmbeddingModel {
+//     embedding: tch::nn::Embedding,
+// }
 
-impl EmbeddingModel {
-    pub fn new() -> Self {
-        todo!()
-    }
-    pub fn state_embed(&self, state: &SearchState, device: tch::Device) -> tch::Tensor {
-        // Petersen(2021): last two token, 1 float per token.
-        let mut embedding_tokens: Vec<Tensor> = vec![
-            Tensor::from_slice(&[0.0f64; EMBEDDING_SIZE_PER_TOKEN]),
-            Tensor::from_slice(&[0.0f64; EMBEDDING_SIZE_PER_TOKEN]),
-        ];
-        // for (i, tok) in state.expr.iter().take(EMBEDDING_TOKEN_CNT).enumerate() {
-        //     embedding_tokens[i] = runtime::ast::token_to_tensor(tok); // FIXME
-        // }
-        // assert!(embedding_tokens.len() == EMBEDDING_TOKEN_CNT);
-        // let out = tch::Tensor::cat(&embedding_tokens, 0).to_device(device);
-        // assert!(out.dim() == 1);
-        // assert!(out.size()[0] as usize == EMBEDDING_SIZE);
+// impl EmbeddingModel {
+//     pub fn new() -> Self {
+//         todo!()
+//     }
+//     pub fn state_embed(&self, state: &SearchState, device: tch::Device) -> tch::Tensor {
+//         // Petersen(2021): last two token, 1 float per token.
+//         let mut embedding_tokens: Vec<Tensor> = vec![
+//             Tensor::from_slice(&[0.0f64; EMBEDDING_SIZE_PER_TOKEN]),
+//             Tensor::from_slice(&[0.0f64; EMBEDDING_SIZE_PER_TOKEN]),
+//         ];
+//         // for (i, tok) in state.expr.iter().take(EMBEDDING_TOKEN_CNT).enumerate() {
+//         //     embedding_tokens[i] = runtime::ast::token_to_tensor(tok); // FIXME
+//         // }
+//         // assert!(embedding_tokens.len() == EMBEDDING_TOKEN_CNT);
+//         // let out = tch::Tensor::cat(&embedding_tokens, 0).to_device(device);
+//         // assert!(out.dim() == 1);
+//         // assert!(out.size()[0] as usize == EMBEDDING_SIZE);
 
-        // TODO
-        // for now simply output zero
-        let out: Tensor = tch::Tensor::zeros(&[EMBEDDING_SIZE as i64], (tch::Kind::Float, device));
-        out
-    }
-}
+//         // TODO
+//         // for now simply output zero
+//         let out: Tensor = tch::Tensor::zeros(&[EMBEDDING_SIZE as i64], (tch::Kind::Float, device));
+//         out
+//     }
+// }
 
 // // TODO:
 // // SNIP (2023) paper used tokenization and attention pooling.

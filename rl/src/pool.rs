@@ -1,40 +1,14 @@
-// let position = self.runtime.run(&self.network, *tree); // FIXME: this can be slow. maybe we have to cahnge Signal::DataFrame(Vec<Vec<f64>>) into Signal::DataFrame(tch::Tensor)
-// let pnl_result = self.pnl_calc.pnl(&position);
-// let stats: Stats = (&pnl_result).into();
-// let fitness = self.score_fn.fitness(&stats);
-// loss::policy_gradient::calc_terminal_reward(fitness)
-
-// loss::policy_gradient::calc_intermediate_reward()
-
 use std::collections::HashMap;
 
 use parser::ast::Network;
-use parser::behavior::BehaviorDecl;
 use stdlib::types::Signal;
 use tch::Tensor;
 
 use crate::state::AbstractMachine;
-use crate::state::SearchState;
 use runtime::backtest::BasicBacktest;
 use runtime::runtime::Runtime;
 
 static SIGNAL_LENGTH: i64 = stdlib::types::SIZE[0] as i64;
-// pub struct Backtester {}
-
-// impl Backtester {
-//     pub fn new() -> Self {
-//         Backtester {}
-//     }
-
-//     pub fn calc_returns(&self, signal: &Signal) -> Tensor {
-//         // Dummy implementation of calc_returns
-//         // In a real scenario, this would compute financial returns from a Signal
-//         tch::Tensor::ones(
-//             [SIGNAL_LENGTH].as_slice(),
-//             (tch::Kind::Float, tch::Device::Cpu),
-//         )
-//     }
-// }
 
 pub struct Pool {
     asts: HashMap<String, Network>,
@@ -67,7 +41,7 @@ impl Pool {
         for (expr, r) in self.returns.iter() {
             let utility: f64 = self.utility(r);
             let marginal_utility =
-                f64::try_from(self.marginal_utility(r).max()).unwrap_or(f64::NAN);
+                f64::try_from(self.marginal_utility(&r.unsqueeze(0)).max()).unwrap_or(f64::NAN);
             let corr = self.corr(&self.portfolio_returns, r);
             let maxcorr = max_corrs.get(expr).copied().unwrap_or(f64::NAN);
             stats.insert(expr.clone(), (utility, marginal_utility, corr, maxcorr));

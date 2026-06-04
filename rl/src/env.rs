@@ -1,35 +1,38 @@
 use crate::action::Action;
 use crate::action::ActionSpace;
-use crate::loss;
-use crate::model::LstmModel;
 use crate::model::Model;
-use crate::pool;
 use crate::pool::Pool;
 use crate::state::AbstractMachine;
 use crate::state::SearchState;
-use crate::train::BatchConfig;
-use crate::trajectory::Step;
-use crate::trajectory::Trajectory;
 use parser::ast::Network;
-use parser::behavior::BehaviorDecl;
 use runtime::runtime::Runtime;
-use stdlib::types::Signal;
-use tch::IndexOp;
-use tch::{
-    Device,
-    Kind::Float,
-    Tensor,
-    nn::{self, LSTMState, OptimizerConfig},
-};
+use tch::{Device, Kind::Float, Tensor};
+
+pub type Trajectory = Vec<Step>;
+pub struct Step {
+    pub state_embedding: Tensor,
+    pub action: Action,
+    pub reward: f64,
+    pub next_state_embedding: Option<Tensor>,
+    // pub sequence: PolishExpr, //For debugging
+}
+impl Step {
+    pub fn is_done(&self) -> bool {
+        self.action == Action::Done
+    }
+}
+
+pub struct BatchConfig {
+    pub batch_size: usize,
+    pub max_length: usize,
+    pub trajectories: Vec<Trajectory>,
+}
 
 pub struct Environment {
     pub state: SearchState,
     pub action_space: ActionSpace,
     pub config: BatchConfig,
     pub pool: Pool,
-    orig_call_graph_size: usize, //network_size
-    orig_behavior_addr: usize,   //node_idx
-    orig_behavior: BehaviorDecl, //behavior_decl
 }
 
 impl Environment {
@@ -40,8 +43,6 @@ impl Environment {
         max_length: usize,
         batch_size: usize,
     ) -> Self {
-        let (behavior_idx, behavior_ref) = call_graph.get_behavior();
-
         let result = Self {
             state: SearchState::new(call_graph),
             action_space: action_space,
@@ -51,9 +52,6 @@ impl Environment {
                 trajectories: vec![],
             },
             pool,
-            orig_call_graph_size: call_graph.nodes.len(),
-            orig_behavior_addr: behavior_idx,
-            orig_behavior: behavior_ref.clone(),
         };
         result
     }
@@ -83,7 +81,7 @@ impl Environment {
     }
 
     fn get_valid_action_mask(&self, device: &Device) -> Tensor {
-        let (stack, callgraph) = self.state.machine.get_stack();
+        let (stack, _callgraph) = self.state.machine.get_stack();
         let mut valid_actions: Vec<Action> = vec![];
         for action_idx in 0..self.action_space.size() {
             let action: Action = self.action_space.get_action(action_idx);
@@ -113,7 +111,7 @@ impl Environment {
     ) -> (Trajectory, String) {
         self.reset();
         let mut trajectory: Trajectory = Vec::new();
-        for i in 0..self.config.max_length {
+        for _i in 0..self.config.max_length {
             let mask: Tensor = self.get_valid_action_mask(device);
             let (state_embedding, action_logits): (Tensor, Tensor) =
                 model.forward(&self.state, &mask, device);
@@ -140,7 +138,11 @@ impl Environment {
                 break;
             }
         }
-        let expr = self.state.machine.callgraph.format_node(self.state.machine.callgraph.root);
+        let expr = self
+            .state
+            .machine
+            .callgraph
+            .format_node(self.state.machine.callgraph.root);
         (trajectory, expr)
     }
 

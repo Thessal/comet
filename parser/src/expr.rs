@@ -83,10 +83,7 @@ impl fmt::Display for Expr {
         match self {
             Expr::Literal(l) => write!(f, "{}", l),
             Expr::Identifier(i) => write!(f, "{}", i),
-            Expr::Call {
-                fn_name: fn_name,
-                args,
-            } => {
+            Expr::Call { fn_name, args } => {
                 let formatted_args: Vec<String> = args.iter().map(|arg| arg.to_string()).collect();
                 write!(f, "{}({})", fn_name, formatted_args.join(", "))
             }

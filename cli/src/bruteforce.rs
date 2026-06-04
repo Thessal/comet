@@ -1,14 +1,10 @@
-use std::collections::HashMap;
 
 use parser::ast::Network;
-use parser::behavior::BehaviorDecl;
 use rl::action::Action;
 use rl::env::Environment;
 use rl::model::RandomModel;
 use rl::pool::Pool;
-use rl::trajectory::Step;
 use runtime::backtest::BasicBacktest;
-use runtime::dmgr;
 use runtime::runtime::Runtime;
 use tch::Device;
 
@@ -54,7 +50,7 @@ pub fn brute_force(network: Network, action_space: rl::action::ActionSpace, use_
 
     // rather than beginning empty alpha pool, insert all for testing
     println!("Adding trajectories to pool...");
-    trajectories.iter().for_each(|(traj, expr, machine)| {
+    trajectories.iter().for_each(|(traj, _expr, machine)| {
         if let Some(last_step) = traj.last() {
             if last_step.action == Action::Done {
                 env.pool.insert(&mut runtime, machine.callgraph.clone());
