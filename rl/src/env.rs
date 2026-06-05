@@ -14,6 +14,7 @@ pub struct Step {
     pub action: Action,
     pub reward: f64,
     pub next_state_embedding: Option<Tensor>,
+    pub value: f64,
     // pub sequence: PolishExpr, //For debugging
 }
 impl Step {
@@ -113,8 +114,9 @@ impl Environment {
         let mut trajectory: Trajectory = Vec::new();
         for _i in 0..self.config.max_length {
             let mask: Tensor = self.get_valid_action_mask(device);
-            let (state_embedding, action_logits): (Tensor, Tensor) =
+            let (state_embedding, action_logits, value_tensor): (Tensor, Tensor, Tensor) =
                 model.forward(&self.state, runtime, &mask, device);
+            let value: f64 = value_tensor.double_value(&[]);
             let sampled_action_idx: Vec<Vec<i64>> = // [batch_size=1, sample_number=1]
                 tch::no_grad(|| action_logits.softmax(1, Float).multinomial(1, true))
                     .try_into()
@@ -131,6 +133,7 @@ impl Environment {
                 action,
                 reward,
                 next_state_embedding: None,
+                value,
             };
 
             trajectory.push(step);

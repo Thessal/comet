@@ -58,7 +58,7 @@ impl AbstractMachine {
                 Some(*addr)
             }
             Action::Reduce(op) => {
-                let idx = self.callgraph.add_node(NodeType::Operator(op.clone()));
+                let idx = self.callgraph.add_node(NodeType::Operator(op));
                 let arity = op.inputs.len();
                 for (_, addr) in self.stack.iter().rev().take(arity) {
                     // or is it self.stack.iter().skip(stack_len - arity) ?

@@ -20,8 +20,8 @@ pub trait Model {
         _runtime: &mut Runtime,
         _masks: &Tensor,
         _device: &Device,
-    ) -> (Tensor, Tensor) {
-        // state_embedding, logits
+    ) -> (Tensor, Tensor, Tensor) {
+        // state_embedding, logits, value
         unimplemented!()
     }
 }
@@ -46,16 +46,17 @@ impl Model for RandomModel {
         _runtime: &mut Runtime,
         masks: &Tensor,
         device: &Device,
-    ) -> (Tensor, Tensor) {
-        // (state_embedding, action_logits)}
+    ) -> (Tensor, Tensor, Tensor) {
+        // (state_embedding, action_logits, value)}
         let logits = tch::Tensor::ones(
             [1, self.action_space.size() as i64],
             (tch::Kind::Float, *device),
         );
         let dummy_emb = tch::Tensor::zeros([1, 1], (tch::Kind::Float, *device));
+        let dummy_val = tch::Tensor::zeros([1, 1], (tch::Kind::Float, *device));
         let masked_logits =
             logits.masked_fill(&masks.logical_not().unsqueeze(0), std::f64::NEG_INFINITY);
-        (dummy_emb, masked_logits)
+        (dummy_emb, masked_logits, dummy_val)
     }
 }
 
@@ -127,21 +128,27 @@ impl AgentModel {
         }
     }
     
-    pub fn calculate_policy_gradient_loss(
+    pub fn calculate_ppo_loss(
         &self,
         log_probs: &Tensor,
+        old_log_probs: &Tensor,
         advantages: &Tensor,
         entropy: Option<&Tensor>,
         entropy_coef: f64,
+        clip_coef: f64,
     ) -> Tensor {
-        // REINFORCE / Policy Gradient loss = -mean(log_prob * advantage)
-        let mut loss = -(log_probs * advantages).mean(tch::Kind::Float);
+        // PPO clipped surrogate objective
+        let ratio = (log_probs - old_log_probs).exp();
+        let loss1 = &ratio * advantages;
+        let loss2 = ratio.clamp(1.0 - clip_coef, 1.0 + clip_coef) * advantages;
+        
+        let mut policy_loss = -loss1.min_other(&loss2).mean(tch::Kind::Float);
         
         // Add entropy regularization if provided to encourage exploration
         if let Some(ent) = entropy {
-            loss = loss - ent.mean(tch::Kind::Float) * entropy_coef;
+            policy_loss = policy_loss - ent.mean(tch::Kind::Float) * entropy_coef;
         }
-        loss
+        policy_loss
     }
     
     pub fn calculate_value_loss(
@@ -165,7 +172,7 @@ impl Model for AgentModel {
         runtime: &mut Runtime,
         masks: &Tensor,
         device: &Device,
-    ) -> (Tensor, Tensor) {
+    ) -> (Tensor, Tensor, Tensor) {
         let (stack, callgraph) = state.machine.get_stack();
         let mut data: Vec<Option<Tensor>> = Vec::new();
         
@@ -203,9 +210,9 @@ impl Model for AgentModel {
         
         let logits = self.actor_proj.forward(&state_embedding);
         let masked_logits = logits.masked_fill(&masks.logical_not().unsqueeze(0), std::f64::NEG_INFINITY);
-        let _value = self.critic_proj.forward(&state_embedding);
+        let value = self.critic_proj.forward(&state_embedding);
         
-        (state_embedding, masked_logits)
+        (state_embedding, masked_logits, value)
     }
 }
 

@@ -1,10 +1,18 @@
 // Minimal version of stdlib
 #![allow(clippy::not_unsafe_ptr_arg_deref, clippy::missing_safety_doc)]
+mod op_add;
+mod op_cs_rank;
+mod op_cs_zscore;
+mod op_data;
+mod op_divide;
+mod op_flip;
+mod op_multiply;
+mod op_subtract;
+
 pub mod types;
 use tch::Kind;
 use types::Signal;
 
-#[derive(Clone)]
 pub struct OperatorSpec {
     pub name: &'static str,
     pub inputs: &'static [Signal],
@@ -24,152 +32,71 @@ impl PartialEq for OperatorSpec {
     }
 }
 
-impl From<&str> for OperatorSpec {
+impl From<&str> for &OperatorSpec {
     fn from(sig_name: &str) -> Self {
         match sig_name {
-            "data" => OperatorSpec {
-                name: "data",
-                inputs: &[Signal::String(None)],
-                output_shape: Signal::DataFrame(None),
-                execute: |_args| panic!("Data operator cannot be executed directly"),
-            },
-            "add" => OperatorSpec {
-                name: "add",
-                inputs: &[Signal::DataFrame(None), Signal::DataFrame(None)],
-                output_shape: Signal::DataFrame(None),
-                execute: |args| match (&args[0], &args[1]) {
-                    (Signal::DataFrame(Some(a)), Signal::DataFrame(Some(b))) => {
-                        Signal::DataFrame(Some(a + b))
-                    }
-                    _ => panic!("add expected two DataFrames"),
-                },
-            },
-            "subtract" => OperatorSpec {
-                name: "subtract",
-                inputs: &[Signal::DataFrame(None), Signal::DataFrame(None)],
-                output_shape: Signal::DataFrame(None),
-                execute: |args| match (&args[0], &args[1]) {
-                    (Signal::DataFrame(Some(a)), Signal::DataFrame(Some(b))) => {
-                        Signal::DataFrame(Some(a - b))
-                    }
-                    _ => panic!("subtract expected two DataFrames"),
-                },
-            },
-            "divide" => OperatorSpec {
-                name: "divide",
-                inputs: &[Signal::DataFrame(None), Signal::DataFrame(None)],
-                output_shape: Signal::DataFrame(None),
-                execute: |args| match (&args[0], &args[1]) {
-                    (Signal::DataFrame(Some(a)), Signal::DataFrame(Some(b))) => {
-                        let result = a / b;
-                        let result = result.nan_to_num(Some(0.0), Some(1e9), Some(-1e9));
-                        Signal::DataFrame(Some(result))
-                    }
-                    _ => panic!("divide expected two DataFrames"),
-                },
-            },
-            "multiply" => OperatorSpec {
-                name: "multiply",
-                inputs: &[Signal::DataFrame(None), Signal::DataFrame(None)],
-                output_shape: Signal::DataFrame(None),
-                execute: |args| match (&args[0], &args[1]) {
-                    (Signal::DataFrame(Some(a)), Signal::DataFrame(Some(b))) => {
-                        Signal::DataFrame(Some(a * b))
-                    }
-                    _ => panic!("multiply expected two DataFrames"),
-                },
-            },
-            "flip" => OperatorSpec {
-                name: "flip",
-                inputs: &[Signal::DataFrame(None)],
-                output_shape: Signal::DataFrame(None),
-                execute: |args| match &args[0] {
-                    Signal::DataFrame(Some(a)) => Signal::DataFrame(Some(a * -1.0)),
-                    _ => panic!("flip expected a DataFrame"),
-                },
-            },
-            "ts_diff" => OperatorSpec {
-                name: "ts_diff",
-                inputs: &[Signal::Int(None), Signal::DataFrame(None)],
-                output_shape: Signal::DataFrame(None),
-                execute: |args| match (&args[0], &args[1]) {
-                    (Signal::Int(Some(period)), Signal::DataFrame(Some(a))) => {
-                        let p = *period as i64;
-                        let shifted = a.roll(&[p], &[0]);
-                        if p > 0 && p <= a.size()[0] {
-                            let mut slice = shifted.narrow(0, 0, p);
-                            let nan = tch::Tensor::full(&[1], f64::NAN, (a.kind(), a.device()));
-                            let _ = slice.copy_(&nan);
-                        }
-                        Signal::DataFrame(Some(a - shifted))
-                    }
-                    _ => panic!("ts_diff expected Int and DataFrame"),
-                },
-            },
-            "ts_mean" => OperatorSpec {
-                name: "ts_mean",
-                inputs: &[Signal::DataFrame(None), Signal::Int(None)],
-                output_shape: Signal::DataFrame(None),
-                execute: |args| {
-                    match (&args[0], &args[1]) {
-                        (Signal::DataFrame(Some(a)), Signal::Int(Some(_period))) => {
-                            // Dummy implementation for now to pass tests (returns same DF)
-                            // TODO: implement rolling window mean with unfold/conv1d
-                            Signal::DataFrame(Some(a.shallow_clone()))
-                        }
-                        _ => panic!("ts_mean expected DataFrame and Int"),
-                    }
-                },
-            },
-            "cs_rank" => OperatorSpec {
-                name: "cs_rank",
-                inputs: &[Signal::DataFrame(None)],
-                output_shape: Signal::DataFrame(None),
-                execute: |args| {
-                    match &args[0] {
-                        Signal::DataFrame(Some(a)) => {
-                            // Cross-sectional rank along dim 1
-                            let rank = a.argsort(1, false).argsort(1, false).to_kind(a.kind());
-                            Signal::DataFrame(Some(rank))
-                        }
-                        _ => panic!("cs_rank expected DataFrame"),
-                    }
-                },
-            },
-            "cs_zscore" => OperatorSpec {
-                name: "cs_zscore",
-                inputs: &[Signal::DataFrame(None)],
-                output_shape: Signal::DataFrame(None),
-                execute: |args| match &args[0] {
-                    Signal::DataFrame(Some(a)) => {
-                        let mean = a.mean_dim(1, true, Kind::Float);
-                        let std = a.std_dim(1, false, true);
-                        Signal::DataFrame(Some((a - mean) / (std + 1e-10)))
-                    }
-                    _ => panic!("cs_zscore expected DataFrame"),
-                },
-            },
-            "consume_float" => OperatorSpec {
-                name: "consume_float",
-                inputs: &[Signal::Float(None)],
-                output_shape: Signal::Void,
-                execute: |_args| Signal::Void,
-            },
-            "ts_rank" => OperatorSpec {
-                name: "ts_rank",
-                inputs: &[Signal::DataFrame(None), Signal::Int(None)],
-                output_shape: Signal::DataFrame(None),
-                execute: |args| {
-                    match (&args[0], &args[1]) {
-                        (Signal::DataFrame(Some(a)), Signal::Int(Some(_period))) => {
-                            // Dummy implementation for now to pass tests (returns same DF)
-                            // TODO: implement rolling window rank
-                            Signal::DataFrame(Some(a.shallow_clone()))
-                        }
-                        _ => panic!("ts_rank expected DataFrame and Int"),
-                    }
-                },
-            },
+            "data" => &op_data::OP_DATA,
+            "add" => &op_add::OP_ADD,
+            "subtract" => &op_subtract::OP_SUBTRACT,
+            "divide" => &op_divide::OP_DIVIDE,
+            "multiply" => &op_multiply::OP_MULTIPLY,
+            "flip" => &op_flip::OP_FLIP,
+            "cs_rank" => &op_cs_rank::OP_CS_RANK,
+            "cs_zscore" => &op_cs_zscore::OP_CS_ZSCORE,
+            // "ts_diff" => OperatorSpec {
+            //     name: "ts_diff",
+            //     inputs: &[Signal::Int(None), Signal::DataFrame(None)],
+            //     output_shape: Signal::DataFrame(None),
+            //     execute: |args| match (&args[0], &args[1]) {
+            //         (Signal::Int(Some(period)), Signal::DataFrame(Some(a))) => {
+            //             let p = *period as i64;
+            //             let shifted = a.roll(&[p], &[0]);
+            //             if p > 0 && p <= a.size()[0] {
+            //                 let mut slice = shifted.narrow(0, 0, p);
+            //                 let nan = tch::Tensor::full(&[1], f64::NAN, (a.kind(), a.device()));
+            //                 let _ = slice.copy_(&nan);
+            //             }
+            //             Signal::DataFrame(Some(a - shifted))
+            //         }
+            //         _ => panic!("ts_diff expected Int and DataFrame"),
+            //     },
+            // },
+            // "ts_mean" => OperatorSpec {
+            //     name: "ts_mean",
+            //     inputs: &[Signal::DataFrame(None), Signal::Int(None)],
+            //     output_shape: Signal::DataFrame(None),
+            //     execute: |args| {
+            //         match (&args[0], &args[1]) {
+            //             (Signal::DataFrame(Some(a)), Signal::Int(Some(_period))) => {
+            //                 // Dummy implementation for now to pass tests (returns same DF)
+            //                 // TODO: implement rolling window mean with unfold/conv1d
+            //                 Signal::DataFrame(Some(a.shallow_clone()))
+            //             }
+            //             _ => panic!("ts_mean expected DataFrame and Int"),
+            //         }
+            //     },
+            // },
+            // "ts_rank" => OperatorSpec {
+            //     name: "ts_rank",
+            //     inputs: &[Signal::DataFrame(None), Signal::Int(None)],
+            //     output_shape: Signal::DataFrame(None),
+            //     execute: |args| {
+            //         match (&args[0], &args[1]) {
+            //             (Signal::DataFrame(Some(a)), Signal::Int(Some(_period))) => {
+            //                 // Dummy implementation for now to pass tests (returns same DF)
+            //                 // TODO: implement rolling window rank
+            //                 Signal::DataFrame(Some(a.shallow_clone()))
+            //             }
+            //             _ => panic!("ts_rank expected DataFrame and Int"),
+            //         }
+            //     },
+            // },
+            // "consume_float" => OperatorSpec {
+            //     name: "consume_float",
+            //     inputs: &[Signal::Float(None)],
+            //     output_shape: Signal::Void,
+            //     execute: |_args| Signal::Void,
+            // },
             _ => panic!("Could not find {} in the stdlib", sig_name),
         }
     }
@@ -196,7 +123,4 @@ impl OperatorSpec {
 }
 
 // TODO:
-// 1. split operators into files
-// 2. define macro to avoid repeated code
-// 3. operator should not modify input data
 // 4. numerical accuracy neeed to be checked.

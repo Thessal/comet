@@ -127,7 +127,7 @@ fn build_ast(
                 behaviors_ptr.push(node_id);
                 Ok(node_id)
             } else {
-                let spec: OperatorSpec = OperatorSpec::from(fn_name.as_str());
+                let spec: &OperatorSpec = fn_name.as_str().into();
                 let node_id = network.add_node(NodeType::Operator(spec));
                 for child_id in arg_indices {
                     network.add_child(node_id, child_id);

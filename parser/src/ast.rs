@@ -17,14 +17,17 @@ pub struct Node {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeType {
-    Operator(OperatorSpec),
+    Operator(&'static OperatorSpec),
     Literal(Literal),
     Behavior(BehaviorDecl),
 }
 
 impl Network {
     pub fn new() -> Self {
-        Self { nodes: Vec::new(), root: 0 }
+        Self {
+            nodes: Vec::new(),
+            root: 0,
+        }
     }
 
     pub fn add_node(&mut self, node_type: NodeType) -> usize {
@@ -140,11 +143,11 @@ mod tests {
         // divide(Mix(data("volume"), data("adv20")), 2) where Mix is a behavior.
 
         let lit1 = network.add_node(NodeType::Literal(Literal::String("volume".to_string())));
-        let op1 = network.add_node(NodeType::Operator(OperatorSpec::from("data")));
+        let op1 = network.add_node(NodeType::Operator("data".into()));
         network.add_child(op1, lit1);
 
         let lit2 = network.add_node(NodeType::Literal(Literal::String("adv20".to_string())));
-        let op2 = network.add_node(NodeType::Operator(OperatorSpec::from("data")));
+        let op2 = network.add_node(NodeType::Operator("data".into()));
         network.add_child(op2, lit2);
 
         let behavior = BehaviorDecl::new(
@@ -157,7 +160,7 @@ mod tests {
         network.add_child(mixed, op2);
 
         let lit3 = network.add_node(NodeType::Literal(Literal::Float(2.0)));
-        let root = network.add_node(NodeType::Operator(OperatorSpec::from("divide")));
+        let root = network.add_node(NodeType::Operator("divide".into()));
         network.root = root;
         network.add_child(root, mixed);
         network.add_child(root, lit3);
@@ -174,7 +177,7 @@ mod tests {
         // 2. Replace Mix with add operator.
         let behavior_idx = mixed;
         let behavior_node = &mut network.nodes[behavior_idx];
-        behavior_node.node_type = NodeType::Operator(OperatorSpec::from("add"));
+        behavior_node.node_type = NodeType::Operator("add".into());
 
         // 3. Display divide(divide(data("volume"), data("adv20")), 2)
         let display_str = network.format_node(root);

@@ -14,9 +14,9 @@ pub enum Action {
     ShiftInt(i64),
     ShiftFloat(f64),
     ShiftString(String),
-    ShiftParam(usize),    // push param into stack
-    Reduce(OperatorSpec), // Apply function/behavior and reduce stack
-    Done,                 // Successfully matched exit condition
+    ShiftParam(usize),             // push param into stack
+    Reduce(&'static OperatorSpec), // Apply function/behavior and reduce stack
+    Done,                          // Successfully matched exit condition
 }
 
 impl Hash for Action {
@@ -52,7 +52,7 @@ impl From<String> for Action {
         } else if s.starts_with("\"") {
             Action::ShiftString(s.trim_matches('"').to_string())
         } else if s.starts_with("!") {
-            Action::Reduce(OperatorSpec::from(&s[1..]))
+            Action::Reduce(s[1..].into())
         } else if let Ok(i) = s.parse::<i64>() {
             Action::ShiftInt(i)
         } else if let Ok(f) = s.parse::<f64>() {
@@ -122,7 +122,7 @@ impl From<&BehaviorDecl> for ActionSpace {
             );
         }
         for idx in operator_offset..params_offset {
-            let op: OperatorSpec = OperatorSpec::from(_operators[idx - operator_offset].as_str());
+            let op: &OperatorSpec = (_operators[idx - operator_offset].as_str()).into();
             map.insert(idx, Action::Reduce(op));
         }
         for idx in params_offset..params_offset + num_params {
@@ -161,7 +161,7 @@ mod tests {
         let action_back: Action = action_str.into();
         assert_eq!(action, action_back);
 
-        let action = Action::Reduce(OperatorSpec::from("ts_mean"));
+        let action = Action::Reduce("ts_mean".into());
         let action_str: String = (&action).into();
         let action_back: Action = action_str.into();
         assert_eq!(action, action_back);
