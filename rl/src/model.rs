@@ -1,10 +1,7 @@
 use runtime::runtime::Runtime;
-use stdlib::types::Signal;
 use tch::{
-    Device,
-    Kind::Float,
-    Tensor,
-    nn::{self, LSTMState, Module, RNN},
+    Device, Tensor,
+    nn::{self, Module},
 };
 
 use crate::{action::ActionSpace, state::SearchState};

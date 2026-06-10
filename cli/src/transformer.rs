@@ -1,5 +1,4 @@
 use parser::ast::Network;
-use tch::nn::OptimizerConfig;
 use rl::action::Action;
 use rl::env::Environment;
 use rl::model::AgentModel;
@@ -7,6 +6,7 @@ use rl::pool::Pool;
 use runtime::backtest::BasicBacktest;
 use runtime::runtime::Runtime;
 use tch::Device;
+use tch::nn::OptimizerConfig;
 
 pub struct TransformerSearch {
     env: Environment,
@@ -38,8 +38,8 @@ pub fn transformer_search(network: Network, action_space: rl::action::ActionSpac
         &network,
         action_space,
         pool,
-        50,   // max_length
-        1000, // batch_size
+        50, // max_length
+        10, // batch_size
     );
 
     println!("Sampling trajectories...");
@@ -80,41 +80,43 @@ pub fn transformer_search(network: Network, action_space: rl::action::ActionSpac
     println!("Training model using PPO...");
     let mut opt = tch::nn::Adam::default().build(&vs, 1e-4).unwrap();
     let mut total_loss_val = 0.0;
-    
+
     // Example PPO loop (1 epoch over the collected trajectories)
     // Note: A full implementation requires batching and recalculating log_probs via model.forward()
     for (traj, _expr, machine) in trajectories.iter() {
         if let Some(last_step) = traj.last() {
             if last_step.action == Action::Done {
                 let episode_return = env.pool.calc_reward(&mut runtime, &machine, true);
-                
+                // TODO : reward or return? review PPO definition. also, final reward defintion check
+
                 // For each step in this trajectory
                 for step in traj.iter() {
                     let advantage = episode_return - step.value;
                     let advantage_t = tch::Tensor::from_slice(&[advantage as f32]).to(device);
                     let return_t = tch::Tensor::from_slice(&[episode_return as f32]).to(device);
                     let old_value_t = tch::Tensor::from_slice(&[step.value as f32]).to(device);
-                    
-                    // In actual PPO, re-run forward pass here for the step state to get new log_probs and value
-                    // let (new_state_emb, new_logits, new_value) = model.forward(&step.state, ...);
-                    // let new_log_probs = calculate_log_prob(new_logits, step.action);
-                    
-                    // Dummy log_probs for compilation structure (replace with actual network outputs)
-                    let dummy_log_prob = tch::Tensor::zeros([1], (tch::Kind::Float, device)).requires_grad_(true);
-                    let dummy_old_log_prob = tch::Tensor::zeros([1], (tch::Kind::Float, device));
-                    
+
+                    let action_idx = env.action_space.get_idx(&step.action) as i64;
+                    let old_log_probs = step.logits.log_softmax(1, tch::Kind::Float).detach();
+                    let old_log_prob = old_log_probs.gather(
+                        1,
+                        &tch::Tensor::from_slice(&[action_idx]).to(device),
+                        false,
+                    );
+                    let log_prob = step.logits.log_softmax(1, tch::Kind::Float);
+
                     let ppo_loss = model.calculate_ppo_loss(
-                        &dummy_log_prob,
-                        &dummy_old_log_prob,
+                        &log_prob,
+                        &old_log_prob,
                         &advantage_t,
                         None,
                         0.01,
-                        0.2
+                        0.2,
                     );
-                    
+
                     let value_loss = model.calculate_value_loss(&old_value_t, &return_t);
                     let total_loss = ppo_loss + value_loss * 0.5;
-                    
+
                     opt.backward_step(&total_loss);
                     total_loss_val += total_loss.double_value(&[]);
                 }

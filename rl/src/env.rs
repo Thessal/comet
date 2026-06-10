@@ -15,6 +15,7 @@ pub struct Step {
     pub reward: f64,
     pub next_state_embedding: Option<Tensor>,
     pub value: f64,
+    pub logits: Tensor,
     // pub sequence: PolishExpr, //For debugging
 }
 impl Step {
@@ -134,6 +135,7 @@ impl Environment {
                 reward,
                 next_state_embedding: None,
                 value,
+                logits: action_logits, //.detach(),
             };
 
             trajectory.push(step);
