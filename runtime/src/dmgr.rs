@@ -87,6 +87,7 @@ impl DataManager {
             if rows == 0 {
                 Tensor::zeros(&[0, 0], (Kind::Float, self.device))
             } else {
+                println!("Creating tensor from slice, flat_data.len() = {}, rows = {}, cols = {}", flat_data.len(), rows, cols);
                 Tensor::from_slice(&flat_data).view((rows as i64, cols as i64)).to(self.device)
             }
         } else {

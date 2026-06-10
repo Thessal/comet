@@ -1,0 +1,20 @@
+[package]
+name = "py"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "comet_env"
+crate-type = ["cdylib"]
+path = "lib.rs"
+
+[dependencies]
+pyo3 = { version = "0.22.0", features = ["extension-module"] }
+tch = "0.22.0"
+numpy = "0.22.0"
+ndarray = "0.16.1"
+rl = { path = "../rl" }
+parser = { path = "../parser" }
+runtime = { path = "../runtime" }
+stdlib = { path = "../stdlib" }
+

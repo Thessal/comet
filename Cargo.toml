@@ -1,4 +1,4 @@
 [workspace]
-members = ["parser", "runtime", "rl", "stdlib", "cli"]
+members = ["parser", "runtime", "rl", "stdlib", "cli", "py"]
 resolver = "2"
 exclude = ["data"]
