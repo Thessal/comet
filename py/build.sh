@@ -9,5 +9,5 @@ cargo clean -p torch-sys
 cargo clean -p tch
 cargo build --release
 cp ../target/release/libcomet_env.so ./comet_env.so
-ldd comet_env.so > ldd_output.txt
-python test.py > py_output.txt 2>&1
+# ldd comet_env.so > ldd_output.txt
+# python test.py > py_output.txt 2>&1

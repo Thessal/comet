@@ -1,4 +1,4 @@
-use numpy::{IntoPyArray, PyArray1, PyArray2};
+use numpy::{IntoPyArray, PyArray1, PyArray3};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fs;
@@ -105,15 +105,16 @@ impl PyEnvironment {
     fn get_observation(
         &mut self,
         py: Python<'_>,
-    ) -> PyResult<(Py<PyArray2<f32>>, Vec<String>, String)> {
+    ) -> PyResult<(Py<PyArray3<f32>>, Vec<String>, String)> {
         let (stack, callgraph) = self.env.state.machine.get_stack();
         let mut data_tensors = Vec::new();
 
         for (_signal_decl, addr) in stack.iter() {
             let signal = self.runtime.lookup_or_run(callgraph, *addr);
             if let stdlib::types::Signal::DataFrame(Some(df)) = signal {
-                let df_mean = df.mean_dim(Some([0].as_slice()), false, tch::Kind::Float);
-                data_tensors.push(df_mean);
+                // TODO: do embedding or mean_dim in the later
+                // let df_mean = df.mean_dim(Some([0].as_slice()), false, tch::Kind::Float);
+                data_tensors.push(df.to_device(Device::Cpu));
             }
         }
 
@@ -131,7 +132,7 @@ impl PyEnvironment {
         let expr_str = callgraph.format_node(callgraph.root);
 
         if data_tensors.is_empty() {
-            let empty_data = ndarray::Array2::<f32>::zeros((0, 0));
+            let empty_data = ndarray::Array3::<f32>::zeros((0, 0, 0));
             return Ok((
                 empty_data.into_pyarray_bound(py).into(),
                 node_strs,
@@ -140,14 +141,19 @@ impl PyEnvironment {
         }
 
         let stacked = Tensor::stack(&data_tensors, 0).to_device(Device::Cpu);
-        let size = stacked.size(); // [num_tensors, feature_dim]
+        let size = stacked.size(); // [num_tensors, rows, cols]
 
-        let flattened: Vec<f32> = stacked.try_into().unwrap_or_default();
-        let array2 =
-            ndarray::Array2::from_shape_vec((size[0] as usize, size[1] as usize), flattened)
-                .map_err(|e: ndarray::ShapeError| PyValueError::new_err(e.to_string()))?;
+        let flattened: Vec<f32> = stacked
+            .flatten(0, -1)
+            .try_into()
+            .expect("Failed to convert stacked tensor to Vec<f32>");
+        let array3 = ndarray::Array3::from_shape_vec(
+            (size[0] as usize, size[1] as usize, size[2] as usize),
+            flattened,
+        )
+        .map_err(|e: ndarray::ShapeError| PyValueError::new_err(e.to_string()))?;
 
-        Ok((array2.into_pyarray_bound(py).into(), node_strs, expr_str))
+        Ok((array3.into_pyarray_bound(py).into(), node_strs, expr_str))
     }
 }
 
