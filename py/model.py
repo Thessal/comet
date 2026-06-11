@@ -22,7 +22,8 @@ class AlphaConvEncoder(nn.Module):
             alpha_matrix: Shape (batch_size, num_instruments, time_steps)
                           Both num_instruments and time_steps can vary dynamically.
         """
-        print(f"alpha_matrix shape: {alpha_matrix.shape}")
+        # print(f"alpha_matrix shape: {alpha_matrix.shape}")
+        
         # batch_size, num_instruments, time_steps = alpha_matrix.shape
         time_steps, num_instruments = alpha_matrix.shape
         batch_size = 1
@@ -67,6 +68,7 @@ class SRDecoderModel(nn.Module):
         self.transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers=nlayers)
         
         self.output_linear = nn.Linear(d_model, vocab_size)
+        self.value_linear = nn.Linear(d_model, 1) # Critic value head
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, shifted_target_tokens, alpha_matrix):
@@ -100,5 +102,6 @@ class SRDecoderModel(nn.Module):
             tgt_mask=causal_mask
         )
         
-        output = self.output_linear(output)
-        return F.log_softmax(output, dim=-1)
+        logits = self.output_linear(output)
+        values = self.value_linear(output).squeeze(-1) # Shape: (batch_size, seq_len)
+        return F.log_softmax(logits, dim=-1), values
