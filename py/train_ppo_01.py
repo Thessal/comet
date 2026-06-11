@@ -140,10 +140,10 @@ def train_ppo():
     
     # Hyperparameters
     epochs = 4
-    episodes_per_batch = 50
+    episodes_per_batch = 10
     clip_param = 0.2
     c1 = 0.5 # Value loss coefficient
-    c2 = 0.05 # Entropy coefficient
+    c2 = 0.01 # Entropy coefficient
     seq_len = 50
     
     for iteration in range(1, 101): # PPO Iterations
@@ -167,14 +167,8 @@ def train_ppo():
                 for a, c in action_counts.items():
                     total_action_counts[a] = total_action_counts.get(a, 0) + c
                     
-        from collections import Counter
-        print(f"Avg Reward: {np.mean(ep_rewards):.4f} | Avg Length: {np.mean(ep_lengths):.1f} | Pool Size: {env.pool_size()}")
-        
-        expr_counter = Counter(ep_exprs)
-        most_common_exprs = expr_counter.most_common(3)
-        print(f"Top 3 Expressions: {most_common_exprs}")
-        print(f"Total unique expressions in batch: {len(expr_counter)}")
-        
+        print(f"Avg Reward: {np.mean(ep_rewards):.4f} | Avg Length: {np.mean(ep_lengths):.1f}")
+        print(f"Sample Expressions: {ep_exprs[:3]}")
         top_actions = sorted(total_action_counts.items(), key=lambda x: x[1], reverse=True)[:5]
         print(f"Top Actions (ID: count): {top_actions}", flush=True)
         

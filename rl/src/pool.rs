@@ -34,6 +34,10 @@ impl Pool {
         self.returns.keys().cloned().collect()
     }
 
+    pub fn len(&self) -> usize {
+        self.returns.len()
+    }
+
     pub fn stats(&self) -> HashMap<String, (f64, f64, f64, f64)> {
         // This function is slow. Debug / Analysis use only.
         let mut stats: HashMap<String, (f64, f64, f64, f64)> = HashMap::new();

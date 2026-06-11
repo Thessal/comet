@@ -68,6 +68,10 @@ impl PyEnvironment {
         self.env.action_space.size()
     }
 
+    fn pool_size(&self) -> usize {
+        self.env.pool.len()
+    }
+
     fn step(&mut self, action_idx: usize) -> PyResult<(f64, bool)> {
         if action_idx >= self.env.action_space.size() {
             return Err(PyValueError::new_err("Invalid action index"));
@@ -79,6 +83,12 @@ impl PyEnvironment {
             .env
             .pool
             .calc_reward(&mut self.runtime, &self.env.state.machine, is_done);
+
+        if is_done {
+            let callgraph = self.env.state.machine.callgraph.clone();
+            self.env.pool.insert(&mut self.runtime, callgraph);
+        }
+
         Ok((reward, is_done))
     }
 
