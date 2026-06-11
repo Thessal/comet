@@ -61,6 +61,11 @@ def generate_episode(env, model, buffer: RolloutBuffer, seq_len: int = 50):
     target_tokens = []
     shifted_target_tokens = torch.tensor([[0]*seq_len])
     
+    ep_reward = 0.0
+    ep_length = 0
+    final_expr = ""
+    action_counts = {}
+    
     for step in range(seq_len):
         valid_actions_mask = env.get_valid_actions()
         data_tensors, node_strs, expr_str = env.get_observation()
@@ -90,11 +95,14 @@ def generate_episode(env, model, buffer: RolloutBuffer, seq_len: int = 50):
             
         dist = torch.distributions.Categorical(probs)
         action_idx = dist.sample().item()
+        action_counts[action_idx] = action_counts.get(action_idx, 0) + 1
         
         log_prob = dist.log_prob(torch.tensor(action_idx))
         value = values[0, step_idx]
         
         reward, is_done = env.step(action_idx)
+        ep_reward += reward
+        ep_length += 1
         
         # Save to buffer
         buffer.states.append((shifted_target_tokens.clone(), data_tensor_pt.clone(), step_idx, mask.clone()))
@@ -108,7 +116,10 @@ def generate_episode(env, model, buffer: RolloutBuffer, seq_len: int = 50):
         shifted_target_tokens = build_shifted_target_tokens(target_tokens, seq_len)
         
         if is_done:
+            _, _, final_expr = env.get_observation()
             break
+        else:
+            final_expr = expr_str
             
     # Calculate last value for GAE
     last_value = 0.0
@@ -117,7 +128,7 @@ def generate_episode(env, model, buffer: RolloutBuffer, seq_len: int = 50):
         val_idx = min(len(target_tokens), seq_len - 1)
         last_value = last_values[0, val_idx].item()
         
-    return last_value
+    return last_value, ep_reward, ep_length, final_expr, action_counts
 
 def train_ppo():
     env = comet_env.PyEnvironment("../examples/behavior_1.cm", max_length=50, batch_size=1, use_cuda=True)
@@ -141,11 +152,26 @@ def train_ppo():
         
         # 1. Collect Rollouts
         model.eval()
+        ep_rewards = []
+        ep_lengths = []
+        ep_exprs = []
+        total_action_counts = {}
+        
         with torch.no_grad():
             last_value = 0.0
             for ep in range(episodes_per_batch):
-                last_value = generate_episode(env, model, buffer, seq_len=seq_len)
-                
+                last_value, ep_reward, ep_length, final_expr, action_counts = generate_episode(env, model, buffer, seq_len=seq_len)
+                ep_rewards.append(ep_reward)
+                ep_lengths.append(ep_length)
+                ep_exprs.append(final_expr)
+                for a, c in action_counts.items():
+                    total_action_counts[a] = total_action_counts.get(a, 0) + c
+                    
+        print(f"Avg Reward: {np.mean(ep_rewards):.4f} | Avg Length: {np.mean(ep_lengths):.1f}")
+        print(f"Sample Expressions: {ep_exprs[:3]}")
+        top_actions = sorted(total_action_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        print(f"Top Actions (ID: count): {top_actions}", flush=True)
+        
         # 2. Compute Advantages & Returns
         returns, advantages = buffer.calc_gae(last_value)
         # Normalize advantages
@@ -206,7 +232,7 @@ def train_ppo():
                 total_value_loss += value_loss.item()
                 total_entropy += entropy.item()
                 
-            print(f"Epoch {epoch+1}/{epochs} | Policy Loss: {total_policy_loss/len(buffer.states):.4f} | Value Loss: {total_value_loss/len(buffer.states):.4f} | Entropy: {total_entropy/len(buffer.states):.4f}")
+            print(f"Epoch {epoch+1}/{epochs} | Policy Loss: {total_policy_loss/len(buffer.states):.4f} | Value Loss: {total_value_loss/len(buffer.states):.4f} | Entropy: {total_entropy/len(buffer.states):.4f}", flush=True)
 
 if __name__ == "__main__":
     train_ppo()
