@@ -17,6 +17,7 @@ pub trait Model {
         _runtime: &mut Runtime,
         _masks: &Tensor,
         _device: &Device,
+        _actions: &[i64],
     ) -> (Tensor, Tensor, Tensor) {
         // state_embedding, logits, value
         unimplemented!()
@@ -43,6 +44,7 @@ impl Model for RandomModel {
         _runtime: &mut Runtime,
         masks: &Tensor,
         device: &Device,
+        _actions: &[i64],
     ) -> (Tensor, Tensor, Tensor) {
         // (state_embedding, action_logits, value)}
         let logits = tch::Tensor::ones(
@@ -133,42 +135,18 @@ impl TransformerLayer {
 
 pub struct AgentModel {
     pub action_space: ActionSpace,
-    transformer_layers: Vec<TransformerLayer>,
-    actor_proj: nn::Linear,
-    critic_proj: nn::Linear,
-    node_embedding: nn::Embedding,
-    data_proj: nn::Linear,
-    embed_dim: i64,
+    pub decoder: crate::model_transformer::SRDecoderModel,
+    seq_len: i64,
 }
 
 impl AgentModel {
-    pub fn new(vs: &nn::Path, action_space: ActionSpace, embed_dim: i64) -> Self {
-        let mut transformer_layers = Vec::new();
-        let depth = 4;
-        for i in 0..depth {
-            transformer_layers.push(TransformerLayer::new(
-                &vs.sub(format!("layer_{}", i)),
-                embed_dim,
-            ));
-        }
-        let actor_proj = nn::linear(
-            vs,
-            embed_dim,
-            action_space.size() as i64,
-            Default::default(),
-        );
-        let critic_proj = nn::linear(vs, embed_dim, 1, Default::default());
-        let node_embedding = nn::embedding(vs, 1000, embed_dim, Default::default());
-        let data_proj = nn::linear(vs, stdlib::types::SIZE[1], embed_dim, Default::default());
-
+    pub fn new(vs: &nn::Path, action_space: ActionSpace, d_model: i64) -> Self {
+        let vocab_size = action_space.size() as i64;
+        let decoder = crate::model_transformer::SRDecoderModel::new(vs, vocab_size, d_model, 8, 512, 4);
         Self {
             action_space,
-            transformer_layers,
-            actor_proj,
-            critic_proj,
-            node_embedding,
-            data_proj,
-            embed_dim,
+            decoder,
+            seq_len: 50,
         }
     }
 
@@ -181,14 +159,12 @@ impl AgentModel {
         entropy_coef: f64,
         clip_coef: f64,
     ) -> Tensor {
-        // PPO clipped surrogate objective
         let ratio = (log_probs - old_log_probs).exp();
         let loss1 = &ratio * advantages;
         let loss2 = ratio.clamp(1.0 - clip_coef, 1.0 + clip_coef) * advantages;
 
         let mut policy_loss = -loss1.min_other(&loss2).mean(tch::Kind::Float);
 
-        // Add entropy regularization if provided to encourage exploration
         if let Some(ent) = entropy {
             policy_loss = policy_loss - ent.mean(tch::Kind::Float) * entropy_coef;
         }
@@ -196,7 +172,6 @@ impl AgentModel {
     }
 
     pub fn calculate_value_loss(&self, values: &Tensor, returns: &Tensor) -> Tensor {
-        // Critic loss = MSE(values, returns)
         values.mse_loss(returns, tch::Reduction::Mean)
     }
 }
@@ -210,6 +185,7 @@ impl Model for AgentModel {
         runtime: &mut Runtime,
         masks: &Tensor,
         device: &Device,
+        actions: &[i64],
     ) -> (Tensor, Tensor, Tensor) {
         let (stack, callgraph) = state.machine.get_stack();
         let mut data_tensors = Vec::new();
@@ -217,58 +193,41 @@ impl Model for AgentModel {
         for (_signal_decl, addr) in stack.iter() {
             let signal = runtime.lookup_or_run(callgraph, *addr);
             if let stdlib::types::Signal::DataFrame(Some(df)) = signal {
-                let df_mean = df.mean_dim(Some([0].as_slice()), false, tch::Kind::Float);
-                data_tensors.push(df_mean);
+                data_tensors.push(df.to_device(tch::Device::Cpu));
             }
         }
 
-        let stack_data_emb = if data_tensors.is_empty() {
-            Tensor::zeros([1, self.embed_dim], (tch::Kind::Float, *device))
+        let mut alpha_matrix = if data_tensors.is_empty() {
+            Tensor::zeros([1755, 5], (tch::Kind::Float, *device))
         } else {
-            let stacked = Tensor::stack(&data_tensors, 0).to(*device);
-            let proj = self.data_proj.forward(&stacked);
-            proj.mean_dim(Some([0].as_slice()), false, tch::Kind::Float)
-                .unsqueeze(0)
-        };
-        let stack_data_emb_seq = stack_data_emb.unsqueeze(1);
-
-        let mut node_indices = Vec::new();
-        for node in &callgraph.nodes {
-            let id = match &node.node_type {
-                parser::ast::NodeType::Operator(_) => 1,
-                parser::ast::NodeType::Literal(_) => 2,
-                parser::ast::NodeType::Behavior(_) => 3,
-            };
-            node_indices.push(id);
-        }
-
-        let input_seq = if node_indices.is_empty() {
-            stack_data_emb_seq
-        } else {
-            let node_indices_t = Tensor::from_slice(&node_indices)
-                .to_kind(tch::Kind::Int64)
+            let stacked = Tensor::stack(&data_tensors, 0);
+            let size = stacked.size();
+            let flattened: Vec<f32> = stacked.flatten(0, -1).try_into().unwrap_or_default();
+            let stacked = Tensor::from_slice(&flattened)
+                .view([size[0], size[1], size[2]])
                 .to(*device);
-            let seq_emb = self.node_embedding.forward(&node_indices_t).unsqueeze(0);
-            Tensor::concat(&[stack_data_emb_seq, seq_emb], 1)
+            stacked.mean_dim(Some([0].as_slice()), false, tch::Kind::Float)
         };
+        alpha_matrix = alpha_matrix.nan_to_num(0.0, 0.0, 0.0);
+        let alpha_matrix = alpha_matrix.unsqueeze(0); // batch_size=1
 
-        let seq_len = input_seq.size()[1];
-        let ones = Tensor::ones([seq_len, seq_len], (tch::Kind::Bool, *device));
-        let mask = ones.triu(1);
-
-        let mut x = input_seq;
-        for layer in &self.transformer_layers {
-            x = layer.forward(&x, &mask);
+        // Build shifted target tokens
+        let mut target_tokens = actions.to_vec();
+        target_tokens.insert(0, 0); // SOS
+        target_tokens.truncate(self.seq_len as usize);
+        while target_tokens.len() < self.seq_len as usize {
+            target_tokens.push(0); // pad
         }
+        let shifted_target_tokens = Tensor::from_slice(&target_tokens).to(*device).unsqueeze(0);
 
-        let state_embedding = x.select(1, -1);
+        let (logits, values) = self.decoder.forward(&shifted_target_tokens, &alpha_matrix);
+        
+        let step_idx = std::cmp::min(actions.len(), self.seq_len as usize - 1) as i64;
+        let step_logits = logits.select(1, step_idx); // (1, vocab_size)
+        let value = values.select(1, step_idx); // (1,)
 
-        let logits = self.actor_proj.forward(&state_embedding);
-        let value = self.critic_proj.forward(&state_embedding);
+        let masked_logits = step_logits.masked_fill(&masks.logical_not().unsqueeze(0), std::f64::NEG_INFINITY);
 
-        let masked_logits =
-            logits.masked_fill(&masks.logical_not().unsqueeze(0), std::f64::NEG_INFINITY);
-
-        (state_embedding, masked_logits, value)
+        (alpha_matrix, masked_logits, value)
     }
 }

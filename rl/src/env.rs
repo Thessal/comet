@@ -82,7 +82,7 @@ impl Environment {
         trajectories
     }
 
-    fn get_valid_action_mask(&self, device: &Device) -> Tensor {
+    pub fn get_valid_action_mask(&self, device: &Device) -> Tensor {
         let (stack, _callgraph) = self.state.machine.get_stack();
         let mut valid_actions: Vec<Action> = vec![];
         for action_idx in 0..self.action_space.size() {
@@ -113,10 +113,11 @@ impl Environment {
     ) -> (Trajectory, String) {
         self.reset();
         let mut trajectory: Trajectory = Vec::new();
+        let mut actions: Vec<i64> = Vec::new();
         for _i in 0..self.config.max_length {
             let mask: Tensor = self.get_valid_action_mask(device);
             let (state_embedding, action_logits, value_tensor): (Tensor, Tensor, Tensor) =
-                model.forward(&self.state, runtime, &mask, device);
+                model.forward(&self.state, runtime, &mask, device, &actions);
             let value: f64 = value_tensor.double_value(&[]);
             let sampled_action_idx: Vec<Vec<i64>> = // [batch_size=1, sample_number=1]
                 tch::no_grad(|| action_logits.softmax(1, Float).multinomial(1, true))
@@ -125,6 +126,8 @@ impl Environment {
             let action_idx: i64 = sampled_action_idx[0][0];
             let action: Action = self.action_space.get_action(action_idx as usize);
             self.step(&action);
+
+            actions.push(action_idx);
 
             let is_done = action == Action::Done;
             let reward: f64 = self.pool.calc_reward(runtime, &self.state.machine, is_done);
