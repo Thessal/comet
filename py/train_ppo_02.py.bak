@@ -1,0 +1,244 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+import numpy as np
+import comet_env
+from model import SRDecoderModel
+
+def build_shifted_target_tokens(target_tokens: list[int], seq_len: int = 50) -> torch.Tensor:
+    # Start with SOS token (0)
+    result = [0] + target_tokens
+    
+    # Pad to seq_len length with 0s
+    if len(result) < seq_len:
+        result.extend([0] * (seq_len - len(result)))
+    else:
+        # Truncate if needed to strictly maintain seq_len
+        result = result[:seq_len]
+        
+    return torch.tensor([result], dtype=torch.long)
+
+class RolloutBuffer:
+    def __init__(self):
+        self.states = [] # list of (shifted_target_tokens, data_tensor_pt)
+        self.actions = []
+        self.log_probs = []
+        self.values = []
+        self.rewards = []
+        self.dones = []
+        
+    def clear(self):
+        self.states.clear()
+        self.actions.clear()
+        self.log_probs.clear()
+        self.values.clear()
+        self.rewards.clear()
+        self.dones.clear()
+
+    def calc_gae(self, last_value, gamma=0.99, gae_lambda=0.95):
+        advantages = []
+        returns = []
+        gae = 0
+        
+        for i in reversed(range(len(self.rewards))):
+            if i == len(self.rewards) - 1:
+                next_non_terminal = 1.0 - self.dones[i]
+                next_value = last_value
+            else:
+                next_non_terminal = 1.0 - self.dones[i]
+                next_value = self.values[i + 1]
+                
+            delta = self.rewards[i] + gamma * next_value * next_non_terminal - self.values[i]
+            gae = delta + gamma * gae_lambda * next_non_terminal * gae
+            advantages.insert(0, gae)
+            returns.insert(0, gae + self.values[i])
+            
+        return torch.tensor(returns, dtype=torch.float32), torch.tensor(advantages, dtype=torch.float32)
+
+def generate_episode(env, model, buffer: RolloutBuffer, seq_len: int = 50):
+    env.reset()
+    target_tokens = []
+    shifted_target_tokens = torch.tensor([[0]*seq_len])
+    
+    ep_reward = 0.0
+    ep_length = 0
+    final_expr = ""
+    action_counts = {}
+    
+    for step in range(seq_len):
+        valid_actions_mask = env.get_valid_actions()
+        data_tensors, node_strs, expr_str = env.get_observation()
+        
+        if data_tensors.size == 0:
+            data_tensor_pt = torch.zeros(1755, 5) # Dummy
+        else:
+            data_tensors = torch.from_numpy(data_tensors)
+            data_tensor_pt = torch.mean(data_tensors, dim=0, keepdim=False)
+            
+        # Get predictions from model
+        log_probs, values = model(shifted_target_tokens, data_tensor_pt)
+        
+        step_idx = len(target_tokens)
+        
+        mask = torch.from_numpy(valid_actions_mask)
+        # Apply mask
+        log_probs[0, step_idx, ~mask] = -float('inf')
+        
+        probs = torch.exp(log_probs[0, step_idx])
+        
+        # Prevent sum to zero if all masked (shouldn't happen with valid masking)
+        if probs.sum() > 0:
+            probs = probs / probs.sum() 
+        else:
+            probs = torch.ones_like(probs) / probs.numel()
+            
+        dist = torch.distributions.Categorical(probs)
+        action_idx = dist.sample().item()
+        action_counts[action_idx] = action_counts.get(action_idx, 0) + 1
+        
+        log_prob = dist.log_prob(torch.tensor(action_idx))
+        value = values[0, step_idx]
+        
+        reward, is_done = env.step(action_idx)
+        ep_reward += reward
+        ep_length += 1
+        
+        # Save to buffer
+        buffer.states.append((shifted_target_tokens.clone(), data_tensor_pt.clone(), step_idx, mask.clone()))
+        buffer.actions.append(action_idx)
+        buffer.log_probs.append(log_prob)
+        buffer.values.append(value)
+        buffer.rewards.append(reward)
+        buffer.dones.append(is_done)
+        
+        target_tokens.append(action_idx)
+        shifted_target_tokens = build_shifted_target_tokens(target_tokens, seq_len)
+        
+        if is_done:
+            _, _, final_expr = env.get_observation()
+            break
+        else:
+            final_expr = expr_str
+            
+    # Calculate last value for GAE
+    last_value = 0.0
+    if not is_done:
+        _, last_values = model(shifted_target_tokens, data_tensor_pt)
+        val_idx = min(len(target_tokens), seq_len - 1)
+        last_value = last_values[0, val_idx].item()
+        
+    return last_value, ep_reward, ep_length, final_expr, action_counts
+
+def train_ppo():
+    env = comet_env.PyEnvironment("../examples/behavior_1.cm", max_length=50, batch_size=1, use_cuda=True)
+    vocab_size = env.action_space_size()
+    model = SRDecoderModel(vocab_size=vocab_size)
+    optimizer = optim.Adam(model.parameters(), lr=1e-4)
+    
+    buffer = RolloutBuffer()
+    
+    # Hyperparameters
+    epochs = 4
+    episodes_per_batch = 50
+    clip_param = 0.2
+    c1 = 0.5 # Value loss coefficient
+    c2 = 0.05 # Entropy coefficient
+    seq_len = 50
+    
+    for iteration in range(1, 101): # PPO Iterations
+        print(f"--- Iteration {iteration} ---")
+        buffer.clear()
+        
+        # 1. Collect Rollouts
+        model.eval()
+        ep_rewards = []
+        ep_lengths = []
+        ep_exprs = []
+        total_action_counts = {}
+        
+        with torch.no_grad():
+            last_value = 0.0
+            for ep in range(episodes_per_batch):
+                last_value, ep_reward, ep_length, final_expr, action_counts = generate_episode(env, model, buffer, seq_len=seq_len)
+                ep_rewards.append(ep_reward)
+                ep_lengths.append(ep_length)
+                ep_exprs.append(final_expr)
+                for a, c in action_counts.items():
+                    total_action_counts[a] = total_action_counts.get(a, 0) + c
+                    
+        from collections import Counter
+        print(f"Avg Reward: {np.mean(ep_rewards):.4f} | Avg Length: {np.mean(ep_lengths):.1f} | Pool Size: {env.pool_size()}")
+        
+        expr_counter = Counter(ep_exprs)
+        most_common_exprs = expr_counter.most_common(3)
+        print(f"Top 3 Expressions: {most_common_exprs}")
+        print(f"Total unique expressions in batch: {len(expr_counter)}")
+        
+        top_actions = sorted(total_action_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        print(f"Top Actions (ID: count): {top_actions}", flush=True)
+        
+        # 2. Compute Advantages & Returns
+        returns, advantages = buffer.calc_gae(last_value)
+        # Normalize advantages
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        
+        # Convert buffer history to tensors
+        old_log_probs = torch.stack(buffer.log_probs).detach()
+        old_actions = torch.tensor(buffer.actions, dtype=torch.long)
+        
+        # 3. Optimize Model
+        model.train()
+        for epoch in range(epochs):
+            # In a full implementation, you would batch this. 
+            # For autoregressive sequences, evaluating the entire sequence batch at once can be memory intensive or tricky due to dynamic data_tensor_pt.
+            # Here we loop over the buffer for simplicity. This can be batched later for performance.
+            total_policy_loss = 0
+            total_value_loss = 0
+            total_entropy = 0
+            
+            for i in range(len(buffer.states)):
+                shifted_tgt, data_pt, step_idx, mask = buffer.states[i]
+                
+                new_log_probs, new_values = model(shifted_tgt, data_pt)
+                
+                # Apply mask to new logits exactly as during collection
+                masked_log_probs = new_log_probs[0, step_idx].clone()
+                masked_log_probs[~mask] = -float('inf')
+                new_probs = torch.exp(masked_log_probs)
+                if new_probs.sum() > 0:
+                    new_probs = new_probs / new_probs.sum()
+                else:
+                    new_probs = torch.ones_like(new_probs) / new_probs.numel()
+                    
+                dist = torch.distributions.Categorical(new_probs)
+                
+                # Calculate new log prob and entropy
+                new_log_prob = dist.log_prob(old_actions[i])
+                entropy = dist.entropy()
+                
+                # Calculate PPO ratios
+                ratio = torch.exp(new_log_prob - old_log_probs[i])
+                
+                # Calculate Surrogate Loss
+                surr1 = ratio * advantages[i]
+                surr2 = torch.clamp(ratio, 1.0 - clip_param, 1.0 + clip_param) * advantages[i]
+                policy_loss = -torch.min(surr1, surr2)
+                
+                # Value Loss
+                value_loss = F.mse_loss(new_values[0, step_idx], returns[i])
+                
+                loss = policy_loss + c1 * value_loss - c2 * entropy
+                
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                
+                total_policy_loss += policy_loss.item()
+                total_value_loss += value_loss.item()
+                total_entropy += entropy.item()
+                
+            print(f"Epoch {epoch+1}/{epochs} | Policy Loss: {total_policy_loss/len(buffer.states):.4f} | Value Loss: {total_value_loss/len(buffer.states):.4f} | Entropy: {total_entropy/len(buffer.states):.4f}", flush=True)
+
+if __name__ == "__main__":
+    train_ppo()
