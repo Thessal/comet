@@ -6,6 +6,7 @@ import torch.nn.functional as F
 class AlphaConvEncoder(nn.Module):
     def __init__(self, hidden_dim=64, d_model=256, kernel_size=5):
         super().__init__()
+        # Note that currently time index length is 1755 , and only 5 instruments are used for testing. 
         # 1. Temporal Convolution (Shared weights across all instruments)
         # in_channels=1 because we process a single 1D alpha signal per instrument
         self.conv1d = nn.Conv1d(in_channels=1, out_channels=hidden_dim, kernel_size=kernel_size)
@@ -19,32 +20,45 @@ class AlphaConvEncoder(nn.Module):
     def forward(self, alpha_matrix):
         """
         Args:
-            alpha_matrix: Shape (batch_size, num_instruments, time_steps)
-                          Both num_instruments and time_steps can vary dynamically.
+            alpha_matrix: Shape (batch_size, time_steps, num_instruments) or (time_steps, num_instruments)
         """
-        # print(f"alpha_matrix shape: {alpha_matrix.shape}")
+        if alpha_matrix.dim() == 2:
+            alpha_matrix = alpha_matrix.unsqueeze(0)
+            
+        batch_size, time_steps, num_instruments = alpha_matrix.shape
         
-        # batch_size, num_instruments, time_steps = alpha_matrix.shape
-        time_steps, num_instruments = alpha_matrix.shape
-        batch_size = 1
+        # Goal: Apply a 1D Temporal Convolution over the TIME dimension for each instrument independently.
+        # PyTorch's Conv1d expects input shape: (N, C, L) where:
+        # N = Batch Size, C = Channels, L = Sequence Length (Time)
+        #
+        # Here, we treat each instrument as its own independent sequence in the batch.
+        # So N = batch_size * num_instruments, C = 1 (just the price value), L = time_steps
         
-        # Reshape to treat instruments as independent channels in the batch dimension
-        # Shape becomes: (batch_size * num_instruments, 1, time_steps)
-        x = alpha_matrix.view(batch_size * num_instruments, 1, time_steps)
+        # 1. Swap time and instrument dimensions to get (batch, instrument, time)
+        x = alpha_matrix.transpose(1, 2).contiguous() 
         
-        # Apply Conv1D
-        x = F.relu(self.conv1d(x)) # Shape: (batch_size * num_instruments, hidden_dim, time_steps - kernel_size + 1)
+        # 2. Merge batch and instrument dimensions to form the 'N' dimension for Conv1d
+        x = x.view(batch_size * num_instruments, 1, time_steps)
         
-        # Pool across time
-        x = self.time_pool(x)      # Shape: (batch_size * num_instruments, hidden_dim, 1)
-        x = x.squeeze(-1)          # Shape: (batch_size * num_instruments, hidden_dim)
+        # 3. Apply Temporal Conv1D
+        # Output shape: (batch_size * num_instruments, hidden_dim, time_steps - kernel_size + 1)
+        x = F.relu(self.conv1d(x)) 
         
-        # Reshape back to separate batch and instruments
+        # 4. Pool across time to get a single vector per instrument
+        # Output shape: (batch_size * num_instruments, hidden_dim, 1)
+        x = self.time_pool(x)      
+        
+        # 5. Remove the size-1 time dimension
+        # Output shape: (batch_size * num_instruments, hidden_dim)
+        x = x.squeeze(-1)          
+        
+        # 6. Separate batch and instrument dimensions again
+        # Output shape: (batch_size, num_instruments, hidden_dim)
         x = x.view(batch_size, num_instruments, -1)
         
-        # Pool across instruments (Permutation invariant, handles dynamic universe size)
-        # Using mean pooling here, but max pooling is also valid
-        x = x.mean(dim=1)          # Shape: (batch_size, hidden_dim)
+        # 7. Pool across instruments (Permutation invariant, handles dynamic universe size)
+        # Shape: (batch_size, hidden_dim)
+        x = x.mean(dim=1)          
         
         # Project to decoder's expected dimension
         context_vector = self.proj(x) # Shape: (batch_size, d_model)

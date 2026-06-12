@@ -1,0 +1,906 @@
+Creating tensor from slice, flat_data.len() = 8775, rows = 1755, cols = 5
+Creating tensor from slice, flat_data.len() = 8775, rows = 1755, cols = 5
+Creating tensor from slice, flat_data.len() = 8775, rows = 1755, cols = 5
+Creating tensor from slice, flat_data.len() = 8775, rows = 1755, cols = 5
+Creating tensor from slice, flat_data.len() = 8775, rows = 1755, cols = 5
+Creating tensor from slice, flat_data.len() = 8775, rows = 1755, cols = 5
+--- Iteration 1 ---
+Avg Reward: 0.3156 | Avg Length: 24.6 | Pool Size: 36
+Top 3 Expressions: [('TechnicalIndicator(divide(data("volume"), data("adv20")), data("returns"), divide(data("close"), data("open")))', 11), ('data("returns")', 3), ('cs_zscore(divide(data("volume"), data("adv20")))', 2)]
+Total unique expressions in batch: 37
+Top Actions (ID: count): [(9, 173), (10, 161), (7, 155), (8, 130), (4, 127)]
+Epoch 1/4 | Policy Loss: 0.0772 | Value Loss: 77991.7863 | Entropy: 2.0450
+Epoch 2/4 | Policy Loss: 0.1115 | Value Loss: 77216.5631 | Entropy: 2.0490
+Epoch 3/4 | Policy Loss: 0.0864 | Value Loss: 76833.1653 | Entropy: 2.0558
+Epoch 4/4 | Policy Loss: 0.0927 | Value Loss: 76621.7735 | Entropy: 2.0632
+--- Iteration 2 ---
+Avg Reward: 0.0304 | Avg Length: 12.3 | Pool Size: 72
+Top 3 Expressions: [('data("returns")', 7), ('divide(data("close"), data("open"))', 3), ('TechnicalIndicator(divide(data("volume"), data("adv20")), data("returns"), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 40
+Top Actions (ID: count): [(7, 100), (9, 95), (5, 82), (1, 57), (10, 55)]
+Epoch 1/4 | Policy Loss: 0.0206 | Value Loss: 41827.9100 | Entropy: 1.9656
+Epoch 2/4 | Policy Loss: 0.0399 | Value Loss: 41805.7714 | Entropy: 1.9623
+Epoch 3/4 | Policy Loss: 0.0469 | Value Loss: 41777.9535 | Entropy: 1.9610
+Epoch 4/4 | Policy Loss: 0.0165 | Value Loss: 41756.5700 | Entropy: 1.9501
+--- Iteration 3 ---
+Avg Reward: 0.0189 | Avg Length: 8.3 | Pool Size: 94
+Top 3 Expressions: [('data("returns")', 10), ('divide(data("volume"), data("adv20"))', 7), ('divide(data("close"), data("open"))', 4)]
+Total unique expressions in batch: 28
+Top Actions (ID: count): [(7, 66), (9, 62), (0, 48), (10, 46), (8, 38)]
+Epoch 1/4 | Policy Loss: 0.0422 | Value Loss: 41300.0270 | Entropy: 1.9221
+Epoch 2/4 | Policy Loss: 0.0248 | Value Loss: 41272.5507 | Entropy: 1.9203
+Epoch 3/4 | Policy Loss: 0.0138 | Value Loss: 41243.3755 | Entropy: 1.9057
+Epoch 4/4 | Policy Loss: 0.0001 | Value Loss: 41222.5714 | Entropy: 1.8998
+--- Iteration 4 ---
+Avg Reward: 0.0015 | Avg Length: 6.7 | Pool Size: 119
+Top 3 Expressions: [('data("returns")', 10), ('divide(data("close"), data("open"))', 5), ('divide(data("volume"), data("adv20"))', 3)]
+Total unique expressions in batch: 33
+Top Actions (ID: count): [(9, 66), (7, 54), (0, 49), (10, 27), (8, 27)]
+Epoch 1/4 | Policy Loss: 0.0468 | Value Loss: 25518.5472 | Entropy: 1.8255
+Epoch 2/4 | Policy Loss: 0.0538 | Value Loss: 25506.6180 | Entropy: 1.8172
+Epoch 3/4 | Policy Loss: -0.0002 | Value Loss: 25499.4683 | Entropy: 1.8056
+Epoch 4/4 | Policy Loss: 0.0129 | Value Loss: 25495.0356 | Entropy: 1.7873
+--- Iteration 5 ---
+Avg Reward: -0.0382 | Avg Length: 3.9 | Pool Size: 132
+Top 3 Expressions: [('data("returns")', 14), ('cs_zscore(data("returns"))', 6), ('divide(data("volume"), data("adv20"))', 5)]
+Total unique expressions in batch: 24
+Top Actions (ID: count): [(0, 50), (9, 42), (7, 25), (10, 24), (5, 13)]
+Epoch 1/4 | Policy Loss: 0.0682 | Value Loss: 62.9905 | Entropy: 1.6099
+Epoch 2/4 | Policy Loss: 0.0867 | Value Loss: 62.8258 | Entropy: 1.5982
+Epoch 3/4 | Policy Loss: 0.0533 | Value Loss: 62.0560 | Entropy: 1.5863
+Epoch 4/4 | Policy Loss: 0.0035 | Value Loss: 59.9915 | Entropy: 1.5674
+--- Iteration 6 ---
+Avg Reward: -0.0247 | Avg Length: 3.1 | Pool Size: 142
+Top 3 Expressions: [('data("returns")', 15), ('divide(data("close"), data("open"))', 8), ('flip(divide(data("close"), data("open")))', 4)]
+Total unique expressions in batch: 20
+Top Actions (ID: count): [(0, 50), (9, 27), (10, 24), (7, 13), (5, 11)]
+Epoch 1/4 | Policy Loss: 0.0926 | Value Loss: 63.9954 | Entropy: 1.4700
+Epoch 2/4 | Policy Loss: 0.0676 | Value Loss: 56.8068 | Entropy: 1.4515
+Epoch 3/4 | Policy Loss: 0.0815 | Value Loss: 46.1298 | Entropy: 1.4287
+Epoch 4/4 | Policy Loss: 0.1018 | Value Loss: 33.3311 | Entropy: 1.4584
+--- Iteration 7 ---
+Avg Reward: -0.0091 | Avg Length: 4.1 | Pool Size: 158
+Top 3 Expressions: [('divide(data("volume"), data("adv20"))', 9), ('data("returns")', 6), ('divide(data("close"), data("open"))', 4)]
+Total unique expressions in batch: 27
+Top Actions (ID: count): [(0, 50), (10, 33), (9, 27), (7, 23), (8, 18)]
+Epoch 1/4 | Policy Loss: 0.0836 | Value Loss: 27.4719 | Entropy: 1.5960
+Epoch 2/4 | Policy Loss: 0.0774 | Value Loss: 18.1773 | Entropy: 1.6265
+Epoch 3/4 | Policy Loss: 0.0846 | Value Loss: 12.6792 | Entropy: 1.6527
+Epoch 4/4 | Policy Loss: 0.1290 | Value Loss: 9.8044 | Entropy: 1.6791
+--- Iteration 8 ---
+Avg Reward: 0.2367 | Avg Length: 10.3 | Pool Size: 195
+Top 3 Expressions: [('cs_zscore(data("returns"))', 3), ('divide(data("volume"), data("adv20"))', 2), ('divide(data("close"), data("open"))', 2)]
+Total unique expressions in batch: 46
+Top Actions (ID: count): [(9, 83), (10, 62), (7, 60), (5, 60), (0, 50)]
+Epoch 1/4 | Policy Loss: 0.0714 | Value Loss: 5.2228 | Entropy: 1.9296
+Epoch 2/4 | Policy Loss: 0.0921 | Value Loss: 2.0885 | Entropy: 1.9498
+Epoch 3/4 | Policy Loss: 0.0963 | Value Loss: 0.8620 | Entropy: 1.9610
+Epoch 4/4 | Policy Loss: 0.1308 | Value Loss: 0.7508 | Entropy: 1.9591
+--- Iteration 9 ---
+Avg Reward: 0.2943 | Avg Length: 10.1 | Pool Size: 223
+Top 3 Expressions: [('divide(data("close"), data("open"))', 7), ('cs_rank(data("returns"))', 2), ('cs_zscore(cs_zscore(divide(data("close"), data("open"))))', 2)]
+Total unique expressions in batch: 40
+Top Actions (ID: count): [(10, 86), (7, 74), (9, 55), (0, 49), (5, 47)]
+Epoch 1/4 | Policy Loss: 0.0301 | Value Loss: 16978.0232 | Entropy: 1.9390
+Epoch 2/4 | Policy Loss: 0.0394 | Value Loss: 16931.5634 | Entropy: 1.9099
+Epoch 3/4 | Policy Loss: 0.0319 | Value Loss: 16872.1715 | Entropy: 1.8570
+Epoch 4/4 | Policy Loss: 0.0560 | Value Loss: 16807.7024 | Entropy: 1.8111
+--- Iteration 10 ---
+Avg Reward: 0.0701 | Avg Length: 3.1 | Pool Size: 230
+Top 3 Expressions: [('divide(data("close"), data("open"))', 15), ('data("returns")', 10), ('divide(data("volume"), data("adv20"))', 8)]
+Total unique expressions in batch: 19
+Top Actions (ID: count): [(0, 50), (10, 26), (9, 20), (8, 19), (7, 12)]
+Epoch 1/4 | Policy Loss: 0.0971 | Value Loss: 7.6026 | Entropy: 1.4638
+Epoch 2/4 | Policy Loss: 0.0781 | Value Loss: 8.9594 | Entropy: 1.4958
+Epoch 3/4 | Policy Loss: 0.1017 | Value Loss: 8.7738 | Entropy: 1.4604
+Epoch 4/4 | Policy Loss: 0.0724 | Value Loss: 8.7429 | Entropy: 1.4403
+--- Iteration 11 ---
+Avg Reward: 0.0750 | Avg Length: 3.4 | Pool Size: 239
+Top 3 Expressions: [('divide(data("volume"), data("adv20"))', 10), ('divide(data("close"), data("open"))', 9), ('data("returns")', 7)]
+Total unique expressions in batch: 22
+Top Actions (ID: count): [(0, 50), (8, 26), (10, 23), (9, 20), (5, 12)]
+Epoch 1/4 | Policy Loss: 0.0733 | Value Loss: 7.3156 | Entropy: 1.4498
+Epoch 2/4 | Policy Loss: 0.0794 | Value Loss: 5.8810 | Entropy: 1.4844
+Epoch 3/4 | Policy Loss: 0.0942 | Value Loss: 5.0537 | Entropy: 1.4896
+Epoch 4/4 | Policy Loss: 0.0944 | Value Loss: 3.2410 | Entropy: 1.5009
+--- Iteration 12 ---
+Avg Reward: 0.0513 | Avg Length: 3.3 | Pool Size: 247
+Top 3 Expressions: [('divide(data("volume"), data("adv20"))', 11), ('divide(data("close"), data("open"))', 8), ('cs_rank(data("returns"))', 3)]
+Total unique expressions in batch: 23
+Top Actions (ID: count): [(0, 50), (9, 27), (8, 19), (10, 18), (7, 15)]
+Epoch 1/4 | Policy Loss: 0.1049 | Value Loss: 1.8429 | Entropy: 1.4938
+Epoch 2/4 | Policy Loss: 0.0751 | Value Loss: 1.0278 | Entropy: 1.5095
+Epoch 3/4 | Policy Loss: 0.0721 | Value Loss: 0.5847 | Entropy: 1.5157
+Epoch 4/4 | Policy Loss: 0.0674 | Value Loss: 0.6840 | Entropy: 1.5029
+--- Iteration 13 ---
+Avg Reward: 0.1535 | Avg Length: 4.7 | Pool Size: 263
+Top 3 Expressions: [('divide(data("volume"), data("adv20"))', 13), ('divide(data("close"), data("open"))', 7), ('data("returns")', 3)]
+Total unique expressions in batch: 27
+Top Actions (ID: count): [(0, 50), (10, 44), (8, 27), (9, 23), (1, 18)]
+Epoch 1/4 | Policy Loss: 0.0726 | Value Loss: 0.5436 | Entropy: 1.6767
+Epoch 2/4 | Policy Loss: 0.0598 | Value Loss: 0.6030 | Entropy: 1.6440
+Epoch 3/4 | Policy Loss: 0.0711 | Value Loss: 0.4483 | Entropy: 1.6097
+Epoch 4/4 | Policy Loss: 0.0720 | Value Loss: 0.4273 | Entropy: 1.5699
+--- Iteration 14 ---
+Avg Reward: 0.1307 | Avg Length: 4.3 | Pool Size: 279
+Top 3 Expressions: [('divide(data("close"), data("open"))', 14), ('divide(data("volume"), data("adv20"))', 9), ('subtract(data("returns"), divide(data("close"), data("open")))', 2)]
+Total unique expressions in batch: 26
+Top Actions (ID: count): [(0, 50), (10, 45), (8, 27), (9, 23), (1, 14)]
+Epoch 1/4 | Policy Loss: 0.0393 | Value Loss: 0.4688 | Entropy: 1.5582
+Epoch 2/4 | Policy Loss: 0.0902 | Value Loss: 0.3766 | Entropy: 1.5380
+Epoch 3/4 | Policy Loss: 0.0591 | Value Loss: 0.2943 | Entropy: 1.5241
+Epoch 4/4 | Policy Loss: 0.0309 | Value Loss: 0.2046 | Entropy: 1.5301
+--- Iteration 15 ---
+Avg Reward: 0.0841 | Avg Length: 2.8 | Pool Size: 286
+Top 3 Expressions: [('divide(data("close"), data("open"))', 22), ('data("returns")', 9), ('divide(data("volume"), data("adv20"))', 6)]
+Total unique expressions in batch: 14
+Top Actions (ID: count): [(0, 50), (10, 40), (9, 18), (1, 12), (8, 8)]
+Epoch 1/4 | Policy Loss: 0.0352 | Value Loss: 0.1325 | Entropy: 1.3258
+Epoch 2/4 | Policy Loss: -0.0253 | Value Loss: 0.1544 | Entropy: 1.3216
+Epoch 3/4 | Policy Loss: -0.0058 | Value Loss: 0.1653 | Entropy: 1.3526
+Epoch 4/4 | Policy Loss: -0.0505 | Value Loss: 0.1494 | Entropy: 1.3326
+--- Iteration 16 ---
+Avg Reward: 0.3955 | Avg Length: 8.9 | Pool Size: 305
+Top 3 Expressions: [('divide(data("close"), data("open"))', 15), ('TechnicalIndicator(divide(data("volume"), data("adv20")), data("returns"), divide(data("close"), data("open")))', 3), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 2)]
+Total unique expressions in batch: 30
+Top Actions (ID: count): [(10, 166), (1, 77), (0, 47), (3, 40), (9, 25)]
+Epoch 1/4 | Policy Loss: 0.0529 | Value Loss: 57999.0893 | Entropy: 1.7026
+Epoch 2/4 | Policy Loss: 0.0332 | Value Loss: 57913.1204 | Entropy: 1.6286
+Epoch 3/4 | Policy Loss: 0.0436 | Value Loss: 57796.8964 | Entropy: 1.5660
+Epoch 4/4 | Policy Loss: 0.0246 | Value Loss: 57617.8826 | Entropy: 1.5404
+--- Iteration 17 ---
+Avg Reward: 0.4529 | Avg Length: 9.3 | Pool Size: 320
+Top 3 Expressions: [('divide(data("close"), data("open"))', 20), ('divide(data("volume"), data("adv20"))', 4), ('TechnicalIndicator(divide(data("volume"), data("adv20")), data("returns"), divide(data("close"), data("open")))', 4)]
+Total unique expressions in batch: 22
+Top Actions (ID: count): [(10, 212), (1, 111), (0, 46), (3, 36), (4, 17)]
+Epoch 1/4 | Policy Loss: 0.0358 | Value Loss: 75721.2475 | Entropy: 1.5199
+Epoch 2/4 | Policy Loss: 0.0337 | Value Loss: 75470.1299 | Entropy: 1.4901
+Epoch 3/4 | Policy Loss: 0.0467 | Value Loss: 75194.4253 | Entropy: 1.4686
+Epoch 4/4 | Policy Loss: 0.0727 | Value Loss: 74907.6631 | Entropy: 1.4817
+--- Iteration 18 ---
+Avg Reward: 0.1309 | Avg Length: 3.1 | Pool Size: 328
+Top 3 Expressions: [('divide(data("close"), data("open"))', 27), ('divide(data("volume"), data("adv20"))', 5), ('data("returns")', 4)]
+Total unique expressions in batch: 14
+Top Actions (ID: count): [(10, 57), (0, 50), (1, 14), (8, 11), (3, 9)]
+Epoch 1/4 | Policy Loss: 0.0755 | Value Loss: 28.4173 | Entropy: 1.1295
+Epoch 2/4 | Policy Loss: 0.0346 | Value Loss: 31.3227 | Entropy: 1.1044
+Epoch 3/4 | Policy Loss: 0.0331 | Value Loss: 32.9931 | Entropy: 1.1026
+Epoch 4/4 | Policy Loss: 0.0420 | Value Loss: 32.3538 | Entropy: 1.1017
+--- Iteration 19 ---
+Avg Reward: 0.1374 | Avg Length: 3.1 | Pool Size: 333
+Top 3 Expressions: [('divide(data("close"), data("open"))', 27), ('divide(data("volume"), data("adv20"))', 4), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 17
+Top Actions (ID: count): [(10, 64), (0, 50), (1, 15), (8, 7), (3, 7)]
+Epoch 1/4 | Policy Loss: 0.0209 | Value Loss: 31.5687 | Entropy: 1.1237
+Epoch 2/4 | Policy Loss: 0.0415 | Value Loss: 30.1011 | Entropy: 1.1062
+Epoch 3/4 | Policy Loss: 0.0714 | Value Loss: 27.7722 | Entropy: 1.1130
+Epoch 4/4 | Policy Loss: 0.0594 | Value Loss: 25.8838 | Entropy: 1.0962
+--- Iteration 20 ---
+Avg Reward: 0.1496 | Avg Length: 3.4 | Pool Size: 345
+Top 3 Expressions: [('divide(data("close"), data("open"))', 28), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 3), ('divide(data("volume"), data("adv20"))', 3)]
+Total unique expressions in batch: 18
+Top Actions (ID: count): [(10, 71), (0, 50), (1, 19), (3, 11), (8, 7)]
+Epoch 1/4 | Policy Loss: 0.0301 | Value Loss: 23.4212 | Entropy: 1.1511
+Epoch 2/4 | Policy Loss: 0.0587 | Value Loss: 21.0613 | Entropy: 1.1394
+Epoch 3/4 | Policy Loss: 0.1204 | Value Loss: 18.8992 | Entropy: 1.1511
+Epoch 4/4 | Policy Loss: 0.0852 | Value Loss: 16.2991 | Entropy: 1.1491
+--- Iteration 21 ---
+Avg Reward: 0.1500 | Avg Length: 3.3 | Pool Size: 352
+Top 3 Expressions: [('divide(data("close"), data("open"))', 32), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 3), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 2)]
+Total unique expressions in batch: 15
+Top Actions (ID: count): [(10, 70), (0, 50), (1, 21), (3, 6), (9, 5)]
+Epoch 1/4 | Policy Loss: 0.0956 | Value Loss: 15.3071 | Entropy: 1.1187
+Epoch 2/4 | Policy Loss: 0.0620 | Value Loss: 12.7073 | Entropy: 1.1320
+Epoch 3/4 | Policy Loss: 0.1168 | Value Loss: 11.1597 | Entropy: 1.1356
+Epoch 4/4 | Policy Loss: 0.1236 | Value Loss: 9.2209 | Entropy: 1.1477
+--- Iteration 22 ---
+Avg Reward: 0.2892 | Avg Length: 6.0 | Pool Size: 367
+Top 3 Expressions: [('divide(data("close"), data("open"))', 23), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 4), ('divide(data("volume"), data("adv20"))', 3)]
+Total unique expressions in batch: 22
+Top Actions (ID: count): [(10, 133), (1, 68), (0, 50), (3, 13), (4, 9)]
+Epoch 1/4 | Policy Loss: 0.0606 | Value Loss: 5.9019 | Entropy: 1.3665
+Epoch 2/4 | Policy Loss: 0.0589 | Value Loss: 4.1657 | Entropy: 1.3589
+Epoch 3/4 | Policy Loss: 0.0954 | Value Loss: 2.3812 | Entropy: 1.3692
+Epoch 4/4 | Policy Loss: 0.0574 | Value Loss: 1.2886 | Entropy: 1.3871
+--- Iteration 23 ---
+Avg Reward: 0.3552 | Avg Length: 7.8 | Pool Size: 387
+Top 3 Expressions: [('divide(data("close"), data("open"))', 17), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 6), ('flip(divide(data("close"), data("open")))', 2)]
+Total unique expressions in batch: 28
+Top Actions (ID: count): [(10, 164), (1, 100), (0, 50), (3, 24), (9, 12)]
+Epoch 1/4 | Policy Loss: 0.0427 | Value Loss: 1.0201 | Entropy: 1.4539
+Epoch 2/4 | Policy Loss: 0.0619 | Value Loss: 0.1810 | Entropy: 1.4536
+Epoch 3/4 | Policy Loss: 0.0356 | Value Loss: 0.2484 | Entropy: 1.4213
+Epoch 4/4 | Policy Loss: 0.0105 | Value Loss: 0.2040 | Entropy: 1.3916
+--- Iteration 24 ---
+Avg Reward: 0.1516 | Avg Length: 3.1 | Pool Size: 392
+Top 3 Expressions: [('divide(data("close"), data("open"))', 31), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 7), ('divide(data("volume"), data("adv20"))', 4)]
+Total unique expressions in batch: 10
+Top Actions (ID: count): [(10, 68), (0, 50), (1, 22), (8, 8), (4, 3)]
+Epoch 1/4 | Policy Loss: 0.0356 | Value Loss: 0.1156 | Entropy: 1.0264
+Epoch 2/4 | Policy Loss: 0.0248 | Value Loss: 0.1523 | Entropy: 0.9855
+Epoch 3/4 | Policy Loss: -0.0060 | Value Loss: 0.1630 | Entropy: 0.9593
+Epoch 4/4 | Policy Loss: -0.0167 | Value Loss: 0.1130 | Entropy: 0.9871
+--- Iteration 25 ---
+Avg Reward: 0.3790 | Avg Length: 7.3 | Pool Size: 401
+Top 3 Expressions: [('divide(data("close"), data("open"))', 29), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 4), ('TechnicalIndicator(divide(data("volume"), data("adv20")), data("returns"), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 16
+Top Actions (ID: count): [(10, 171), (1, 104), (0, 47), (8, 17), (3, 11)]
+Epoch 1/4 | Policy Loss: 0.0366 | Value Loss: 70427.6683 | Entropy: 1.2745
+Epoch 2/4 | Policy Loss: 0.0543 | Value Loss: 70397.0566 | Entropy: 1.2379
+Epoch 3/4 | Policy Loss: 0.0442 | Value Loss: 70370.6297 | Entropy: 1.2119
+Epoch 4/4 | Policy Loss: 0.0373 | Value Loss: 70305.5139 | Entropy: 1.1959
+--- Iteration 26 ---
+Avg Reward: 0.7033 | Avg Length: 13.6 | Pool Size: 409
+Top 3 Expressions: [('divide(data("close"), data("open"))', 23), ('TechnicalIndicator(divide(data("volume"), data("adv20")), data("returns"), divide(data("close"), data("open")))', 10), ('divide(data("volume"), data("adv20"))', 2)]
+Total unique expressions in batch: 18
+Top Actions (ID: count): [(10, 357), (1, 206), (0, 40), (3, 29), (8, 22)]
+Epoch 1/4 | Policy Loss: 0.0677 | Value Loss: 129122.9875 | Entropy: 1.2755
+Epoch 2/4 | Policy Loss: 0.0618 | Value Loss: 128765.9562 | Entropy: 1.2614
+Epoch 3/4 | Policy Loss: 0.0687 | Value Loss: 128399.6681 | Entropy: 1.2432
+Epoch 4/4 | Policy Loss: 0.1066 | Value Loss: 128032.2852 | Entropy: 1.1934
+--- Iteration 27 ---
+Avg Reward: 0.1243 | Avg Length: 2.5 | Pool Size: 412
+Top 3 Expressions: [('divide(data("close"), data("open"))', 44), ('add(add(add(add(divide(data("volume"), data("adv20")), divide(data("close"), data("open"))), add(divide(data("close"), data("open")), divide(data("close"), data("open")))), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 1), ('add(add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 1)]
+Total unique expressions in batch: 7
+Top Actions (ID: count): [(10, 60), (0, 50), (1, 12), (8, 2), (6, 1)]
+Epoch 1/4 | Policy Loss: 0.0222 | Value Loss: 10.7063 | Entropy: 0.6993
+Epoch 2/4 | Policy Loss: 0.0088 | Value Loss: 11.1350 | Entropy: 0.6769
+Epoch 3/4 | Policy Loss: 0.0300 | Value Loss: 11.6487 | Entropy: 0.6868
+Epoch 4/4 | Policy Loss: 0.0391 | Value Loss: 12.1176 | Entropy: 0.6844
+--- Iteration 28 ---
+Avg Reward: 0.1212 | Avg Length: 2.5 | Pool Size: 414
+Top 3 Expressions: [('divide(data("close"), data("open"))', 42), ('data("returns")', 2), ('add(divide(data("close"), data("open")), add(add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open"))), divide(data("close"), data("open"))))', 1)]
+Total unique expressions in batch: 8
+Top Actions (ID: count): [(10, 59), (0, 50), (1, 10), (3, 3), (9, 2)]
+Epoch 1/4 | Policy Loss: 0.0066 | Value Loss: 12.2590 | Entropy: 0.6545
+Epoch 2/4 | Policy Loss: 0.0330 | Value Loss: 12.2051 | Entropy: 0.6629
+Epoch 3/4 | Policy Loss: 0.0269 | Value Loss: 12.1471 | Entropy: 0.6642
+Epoch 4/4 | Policy Loss: 0.0569 | Value Loss: 12.2886 | Entropy: 0.6565
+--- Iteration 29 ---
+Avg Reward: 0.1232 | Avg Length: 2.4 | Pool Size: 416
+Top 3 Expressions: [('divide(data("close"), data("open"))', 41), ('divide(data("volume"), data("adv20"))', 3), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 2)]
+Total unique expressions in batch: 7
+Top Actions (ID: count): [(10, 54), (0, 50), (1, 8), (8, 4), (6, 2)]
+Epoch 1/4 | Policy Loss: 0.0382 | Value Loss: 12.6331 | Entropy: 0.6366
+Epoch 2/4 | Policy Loss: 0.0477 | Value Loss: 11.9442 | Entropy: 0.6373
+Epoch 3/4 | Policy Loss: 0.0799 | Value Loss: 11.9350 | Entropy: 0.6539
+Epoch 4/4 | Policy Loss: 0.1210 | Value Loss: 11.3357 | Entropy: 0.6468
+--- Iteration 30 ---
+Avg Reward: 0.1203 | Avg Length: 2.4 | Pool Size: 417
+Top 3 Expressions: [('divide(data("close"), data("open"))', 43), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3), ('data("returns")', 1)]
+Total unique expressions in batch: 6
+Top Actions (ID: count): [(10, 58), (0, 50), (1, 9), (8, 2), (9, 1)]
+Epoch 1/4 | Policy Loss: 0.0380 | Value Loss: 11.1899 | Entropy: 0.6781
+Epoch 2/4 | Policy Loss: 0.0204 | Value Loss: 10.9457 | Entropy: 0.6571
+Epoch 3/4 | Policy Loss: 0.0297 | Value Loss: 9.9630 | Entropy: 0.6903
+Epoch 4/4 | Policy Loss: 0.0422 | Value Loss: 9.7581 | Entropy: 0.6827
+--- Iteration 31 ---
+Avg Reward: 0.1491 | Avg Length: 3.0 | Pool Size: 421
+Top 3 Expressions: [('divide(data("close"), data("open"))', 33), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 5), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 11
+Top Actions (ID: count): [(10, 69), (0, 50), (1, 25), (8, 4), (9, 2)]
+Epoch 1/4 | Policy Loss: 0.0694 | Value Loss: 9.3431 | Entropy: 0.7551
+Epoch 2/4 | Policy Loss: 0.0558 | Value Loss: 8.3780 | Entropy: 0.7764
+Epoch 3/4 | Policy Loss: 0.1152 | Value Loss: 7.5926 | Entropy: 0.7715
+Epoch 4/4 | Policy Loss: 0.1080 | Value Loss: 6.2565 | Entropy: 0.7869
+--- Iteration 32 ---
+Avg Reward: 0.1253 | Avg Length: 2.6 | Pool Size: 423
+Top 3 Expressions: [('divide(data("close"), data("open"))', 37), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 7), ('divide(data("volume"), data("adv20"))', 2)]
+Total unique expressions in batch: 7
+Top Actions (ID: count): [(10, 61), (0, 50), (1, 12), (8, 3), (7, 2)]
+Epoch 1/4 | Policy Loss: 0.0426 | Value Loss: 5.6645 | Entropy: 0.7118
+Epoch 2/4 | Policy Loss: 0.0345 | Value Loss: 4.6639 | Entropy: 0.7466
+Epoch 3/4 | Policy Loss: 0.0398 | Value Loss: 3.9953 | Entropy: 0.7509
+Epoch 4/4 | Policy Loss: 0.0384 | Value Loss: 3.2052 | Entropy: 0.7862
+--- Iteration 33 ---
+Avg Reward: 0.1602 | Avg Length: 3.2 | Pool Size: 425
+Top 3 Expressions: [('divide(data("close"), data("open"))', 34), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 6), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 10
+Top Actions (ID: count): [(10, 76), (0, 50), (1, 28), (8, 2), (9, 1)]
+Epoch 1/4 | Policy Loss: 0.0274 | Value Loss: 2.6611 | Entropy: 0.8933
+Epoch 2/4 | Policy Loss: 0.0033 | Value Loss: 1.9774 | Entropy: 0.9015
+Epoch 3/4 | Policy Loss: 0.0439 | Value Loss: 1.4456 | Entropy: 0.9292
+Epoch 4/4 | Policy Loss: 0.0436 | Value Loss: 0.9685 | Entropy: 0.9426
+--- Iteration 34 ---
+Avg Reward: 0.3619 | Avg Length: 7.2 | Pool Size: 438
+Top 3 Expressions: [('divide(data("close"), data("open"))', 20), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 7), ('divide(data("volume"), data("adv20"))', 3)]
+Total unique expressions in batch: 21
+Top Actions (ID: count): [(10, 167), (1, 108), (0, 49), (8, 9), (3, 8)]
+Epoch 1/4 | Policy Loss: 0.0102 | Value Loss: 23975.6614 | Entropy: 1.1845
+Epoch 2/4 | Policy Loss: 0.0107 | Value Loss: 23985.4020 | Entropy: 1.1897
+Epoch 3/4 | Policy Loss: 0.0205 | Value Loss: 23963.4734 | Entropy: 1.1517
+Epoch 4/4 | Policy Loss: 0.0303 | Value Loss: 23914.6702 | Entropy: 1.1258
+--- Iteration 35 ---
+Avg Reward: 0.2913 | Avg Length: 6.1 | Pool Size: 454
+Top 3 Expressions: [('divide(data("close"), data("open"))', 13), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 8), ('add(add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 26
+Top Actions (ID: count): [(10, 130), (1, 86), (0, 50), (8, 10), (9, 9)]
+Epoch 1/4 | Policy Loss: 0.0641 | Value Loss: 1.6116 | Entropy: 1.0597
+Epoch 2/4 | Policy Loss: 0.0777 | Value Loss: 1.9171 | Entropy: 1.0540
+Epoch 3/4 | Policy Loss: 0.0490 | Value Loss: 1.0425 | Entropy: 1.0842
+Epoch 4/4 | Policy Loss: 0.0788 | Value Loss: 0.5273 | Entropy: 1.1263
+--- Iteration 36 ---
+Avg Reward: 0.3474 | Avg Length: 7.0 | Pool Size: 464
+Top 3 Expressions: [('divide(data("close"), data("open"))', 21), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 8), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 20
+Top Actions (ID: count): [(10, 163), (1, 107), (0, 49), (8, 7), (3, 7)]
+Epoch 1/4 | Policy Loss: -0.0010 | Value Loss: 24707.8014 | Entropy: 1.1664
+Epoch 2/4 | Policy Loss: 0.0016 | Value Loss: 24728.2944 | Entropy: 1.1741
+Epoch 3/4 | Policy Loss: -0.0026 | Value Loss: 24717.6475 | Entropy: 1.1533
+Epoch 4/4 | Policy Loss: 0.0119 | Value Loss: 24688.3352 | Entropy: 1.1366
+--- Iteration 37 ---
+Avg Reward: 0.3742 | Avg Length: 7.5 | Pool Size: 480
+Top 3 Expressions: [('divide(data("close"), data("open"))', 15), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 6), ('divide(data("volume"), data("adv20"))', 3)]
+Total unique expressions in batch: 27
+Top Actions (ID: count): [(10, 166), (1, 122), (0, 50), (8, 13), (3, 8)]
+Epoch 1/4 | Policy Loss: 0.0759 | Value Loss: 1.0910 | Entropy: 1.0929
+Epoch 2/4 | Policy Loss: 0.0873 | Value Loss: 1.2863 | Entropy: 1.0985
+Epoch 3/4 | Policy Loss: 0.0611 | Value Loss: 1.0892 | Entropy: 1.1017
+Epoch 4/4 | Policy Loss: 0.0587 | Value Loss: 0.6273 | Entropy: 1.1337
+--- Iteration 38 ---
+Avg Reward: 0.8581 | Avg Length: 16.8 | Pool Size: 500
+Top 3 Expressions: [('divide(data("close"), data("open"))', 14), ('TechnicalIndicator(divide(data("volume"), data("adv20")), data("returns"), divide(data("close"), data("open")))', 8), ('divide(data("volume"), data("adv20"))', 3)]
+Total unique expressions in batch: 27
+Top Actions (ID: count): [(10, 435), (1, 285), (0, 42), (8, 23), (3, 19)]
+Epoch 1/4 | Policy Loss: 0.0583 | Value Loss: 81703.7311 | Entropy: 1.2340
+Epoch 2/4 | Policy Loss: 0.0759 | Value Loss: 81488.7138 | Entropy: 1.1367
+Epoch 3/4 | Policy Loss: 0.1712 | Value Loss: 80902.6288 | Entropy: 0.9312
+Epoch 4/4 | Policy Loss: 0.3071 | Value Loss: 80017.8107 | Entropy: 1.3071
+--- Iteration 39 ---
+Avg Reward: 0.1071 | Avg Length: 2.2 | Pool Size: 501
+Top 3 Expressions: [('divide(data("close"), data("open"))', 45), ('add(divide(data("close"), data("open")), divide(data("volume"), data("adv20")))', 2), ('cs_rank(flip(flip(divide(data("close"), data("open")))))', 1)]
+Total unique expressions in batch: 5
+Top Actions (ID: count): [(0, 50), (10, 49), (8, 3), (5, 2), (6, 2)]
+Epoch 1/4 | Policy Loss: 0.1224 | Value Loss: 6.6597 | Entropy: 0.6544
+Epoch 2/4 | Policy Loss: 0.1021 | Value Loss: 8.4955 | Entropy: 0.6597
+Epoch 3/4 | Policy Loss: 0.1983 | Value Loss: 4.4718 | Entropy: 0.7162
+Epoch 4/4 | Policy Loss: 0.1925 | Value Loss: 3.9808 | Entropy: 0.7292
+--- Iteration 40 ---
+Avg Reward: 0.2253 | Avg Length: 4.6 | Pool Size: 510
+Top 3 Expressions: [('divide(data("close"), data("open"))', 16), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 13), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 19
+Top Actions (ID: count): [(10, 107), (0, 50), (1, 41), (3, 14), (8, 4)]
+Epoch 1/4 | Policy Loss: 0.0697 | Value Loss: 12.2991 | Entropy: 1.1255
+Epoch 2/4 | Policy Loss: 0.1177 | Value Loss: 5.5862 | Entropy: 1.0917
+Epoch 3/4 | Policy Loss: 0.1659 | Value Loss: 1.2331 | Entropy: 1.1047
+Epoch 4/4 | Policy Loss: 0.1716 | Value Loss: 0.5974 | Entropy: 1.1056
+--- Iteration 41 ---
+Avg Reward: 0.5695 | Avg Length: 11.2 | Pool Size: 517
+Top 3 Expressions: [('divide(data("close"), data("open"))', 24), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 7), ('TechnicalIndicator(divide(data("volume"), data("adv20")), data("returns"), divide(data("close"), data("open")))', 6)]
+Total unique expressions in batch: 15
+Top Actions (ID: count): [(10, 311), (1, 158), (0, 44), (3, 17), (8, 10)]
+Epoch 1/4 | Policy Loss: 0.0564 | Value Loss: 93873.6841 | Entropy: 1.3749
+Epoch 2/4 | Policy Loss: 0.0807 | Value Loss: 93743.2128 | Entropy: 1.3277
+Epoch 3/4 | Policy Loss: 0.1528 | Value Loss: 93279.7934 | Entropy: 1.1877
+Epoch 4/4 | Policy Loss: 0.2090 | Value Loss: 92529.9780 | Entropy: 1.0484
+--- Iteration 42 ---
+Avg Reward: 0.1022 | Avg Length: 2.1 | Pool Size: 517
+Top 3 Expressions: [('divide(data("close"), data("open"))', 41), ('divide(data("volume"), data("adv20"))', 5), ('cs_zscore(divide(data("close"), data("open")))', 1)]
+Total unique expressions in batch: 6
+Top Actions (ID: count): [(0, 50), (10, 47), (8, 5), (1, 3), (7, 1)]
+Epoch 1/4 | Policy Loss: 0.0206 | Value Loss: 6.2392 | Entropy: 0.5774
+Epoch 2/4 | Policy Loss: 0.0071 | Value Loss: 6.9228 | Entropy: 0.5345
+Epoch 3/4 | Policy Loss: 0.0694 | Value Loss: 7.3082 | Entropy: 0.5610
+Epoch 4/4 | Policy Loss: 0.0308 | Value Loss: 7.3334 | Entropy: 0.5375
+--- Iteration 43 ---
+Avg Reward: 0.1040 | Avg Length: 2.2 | Pool Size: 517
+Top 3 Expressions: [('divide(data("close"), data("open"))', 42), ('divide(data("volume"), data("adv20"))', 2), ('data("returns")', 1)]
+Total unique expressions in batch: 8
+Top Actions (ID: count): [(10, 50), (0, 50), (1, 4), (8, 3), (9, 1)]
+Epoch 1/4 | Policy Loss: 0.0256 | Value Loss: 7.2919 | Entropy: 0.5936
+Epoch 2/4 | Policy Loss: 0.0262 | Value Loss: 7.4656 | Entropy: 0.5635
+Epoch 3/4 | Policy Loss: 0.0120 | Value Loss: 7.4727 | Entropy: 0.5472
+Epoch 4/4 | Policy Loss: 0.0159 | Value Loss: 7.3697 | Entropy: 0.5476
+--- Iteration 44 ---
+Avg Reward: 0.0989 | Avg Length: 2.1 | Pool Size: 517
+Top 3 Expressions: [('divide(data("close"), data("open"))', 43), ('divide(data("volume"), data("adv20"))', 3), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 2)]
+Total unique expressions in batch: 4
+Top Actions (ID: count): [(0, 50), (10, 47), (8, 3), (1, 2), (9, 2)]
+Epoch 1/4 | Policy Loss: 0.0438 | Value Loss: 6.7095 | Entropy: 0.5342
+Epoch 2/4 | Policy Loss: 0.0130 | Value Loss: 6.2113 | Entropy: 0.5356
+Epoch 3/4 | Policy Loss: 0.0103 | Value Loss: 5.8689 | Entropy: 0.5804
+Epoch 4/4 | Policy Loss: 0.0197 | Value Loss: 5.3825 | Entropy: 0.6087
+--- Iteration 45 ---
+Avg Reward: 0.1092 | Avg Length: 2.2 | Pool Size: 517
+Top 3 Expressions: [('divide(data("close"), data("open"))', 41), ('divide(data("volume"), data("adv20"))', 3), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 2)]
+Total unique expressions in batch: 7
+Top Actions (ID: count): [(10, 50), (0, 50), (8, 4), (1, 4), (3, 1)]
+Epoch 1/4 | Policy Loss: 0.0031 | Value Loss: 5.5816 | Entropy: 0.5850
+Epoch 2/4 | Policy Loss: 0.0282 | Value Loss: 4.8466 | Entropy: 0.5958
+Epoch 3/4 | Policy Loss: 0.0225 | Value Loss: 4.3648 | Entropy: 0.6115
+Epoch 4/4 | Policy Loss: 0.0203 | Value Loss: 3.6925 | Entropy: 0.6548
+--- Iteration 46 ---
+Avg Reward: 0.1154 | Avg Length: 2.3 | Pool Size: 517
+Top 3 Expressions: [('divide(data("close"), data("open"))', 38), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 5), ('divide(data("volume"), data("adv20"))', 3)]
+Total unique expressions in batch: 7
+Top Actions (ID: count): [(10, 53), (0, 50), (1, 8), (8, 4), (9, 1)]
+Epoch 1/4 | Policy Loss: 0.0001 | Value Loss: 4.3752 | Entropy: 0.6512
+Epoch 2/4 | Policy Loss: 0.0185 | Value Loss: 4.1486 | Entropy: 0.6512
+Epoch 3/4 | Policy Loss: 0.0051 | Value Loss: 3.6155 | Entropy: 0.6631
+Epoch 4/4 | Policy Loss: 0.0085 | Value Loss: 2.3617 | Entropy: 0.6859
+--- Iteration 47 ---
+Avg Reward: 0.1398 | Avg Length: 2.8 | Pool Size: 518
+Top 3 Expressions: [('divide(data("close"), data("open"))', 31), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 10), ('divide(data("volume"), data("adv20"))', 4)]
+Total unique expressions in batch: 8
+Top Actions (ID: count): [(10, 63), (0, 50), (1, 21), (8, 5), (9, 3)]
+Epoch 1/4 | Policy Loss: 0.0383 | Value Loss: 3.0883 | Entropy: 0.7911
+Epoch 2/4 | Policy Loss: 0.0286 | Value Loss: 1.9822 | Entropy: 0.8030
+Epoch 3/4 | Policy Loss: 0.0484 | Value Loss: 1.0090 | Entropy: 0.8523
+Epoch 4/4 | Policy Loss: 0.0369 | Value Loss: 0.5499 | Entropy: 0.9224
+--- Iteration 48 ---
+Avg Reward: 0.2017 | Avg Length: 4.2 | Pool Size: 527
+Top 3 Expressions: [('divide(data("close"), data("open"))', 28), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 6), ('divide(data("volume"), data("adv20"))', 4)]
+Total unique expressions in batch: 14
+Top Actions (ID: count): [(10, 92), (0, 50), (1, 47), (8, 7), (9, 4)]
+Epoch 1/4 | Policy Loss: 0.0478 | Value Loss: 0.8161 | Entropy: 1.0417
+Epoch 2/4 | Policy Loss: 0.0536 | Value Loss: 0.3442 | Entropy: 1.0779
+Epoch 3/4 | Policy Loss: 0.0551 | Value Loss: 0.2439 | Entropy: 1.1104
+Epoch 4/4 | Policy Loss: 0.0690 | Value Loss: 0.1621 | Entropy: 1.1148
+--- Iteration 49 ---
+Avg Reward: 0.1815 | Avg Length: 3.6 | Pool Size: 533
+Top 3 Expressions: [('divide(data("close"), data("open"))', 29), ('divide(data("volume"), data("adv20"))', 4), ('cs_rank(divide(data("close"), data("open")))', 2)]
+Total unique expressions in batch: 16
+Top Actions (ID: count): [(10, 79), (0, 50), (1, 32), (8, 8), (2, 4)]
+Epoch 1/4 | Policy Loss: 0.0481 | Value Loss: 0.1576 | Entropy: 1.0263
+Epoch 2/4 | Policy Loss: 0.0342 | Value Loss: 0.1571 | Entropy: 1.0201
+Epoch 3/4 | Policy Loss: 0.0234 | Value Loss: 0.1552 | Entropy: 1.0164
+Epoch 4/4 | Policy Loss: -0.0098 | Value Loss: 0.1363 | Entropy: 0.9636
+--- Iteration 50 ---
+Avg Reward: 0.6970 | Avg Length: 14.1 | Pool Size: 554
+Top 3 Expressions: [('divide(data("close"), data("open"))', 17), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 4), ('divide(data("volume"), data("adv20"))', 2)]
+Total unique expressions in batch: 29
+Top Actions (ID: count): [(10, 337), (1, 250), (0, 48), (3, 27), (2, 12)]
+Epoch 1/4 | Policy Loss: 0.0347 | Value Loss: 24520.8067 | Entropy: 1.1861
+Epoch 2/4 | Policy Loss: 0.0187 | Value Loss: 24491.3621 | Entropy: 1.1184
+Epoch 3/4 | Policy Loss: 0.0386 | Value Loss: 24444.0671 | Entropy: 1.0929
+Epoch 4/4 | Policy Loss: 0.0278 | Value Loss: 24376.4947 | Entropy: 1.0953
+--- Iteration 51 ---
+Avg Reward: 0.4139 | Avg Length: 8.4 | Pool Size: 568
+Top 3 Expressions: [('divide(data("close"), data("open"))', 23), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 7), ('add(add(add(divide(data("close"), data("open")), add(divide(data("volume"), data("adv20")), divide(data("close"), data("open")))), add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), add(add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open"))), divide(data("close"), data("open"))))))), add(add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open"))))), divide(data("close"), data("open"))))', 1)]
+Total unique expressions in batch: 22
+Top Actions (ID: count): [(10, 211), (1, 145), (0, 49), (2, 5), (3, 4)]
+Epoch 1/4 | Policy Loss: 0.0145 | Value Loss: 20554.7208 | Entropy: 1.0284
+Epoch 2/4 | Policy Loss: 0.0168 | Value Loss: 20519.6301 | Entropy: 1.0323
+Epoch 3/4 | Policy Loss: 0.0346 | Value Loss: 20478.5625 | Entropy: 1.0179
+Epoch 4/4 | Policy Loss: 0.0327 | Value Loss: 20439.9141 | Entropy: 1.0193
+--- Iteration 52 ---
+Avg Reward: 0.1656 | Avg Length: 3.4 | Pool Size: 574
+Top 3 Expressions: [('divide(data("close"), data("open"))', 32), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 6), ('add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open"))))', 2)]
+Total unique expressions in batch: 12
+Top Actions (ID: count): [(10, 84), (0, 50), (1, 30), (3, 3), (2, 2)]
+Epoch 1/4 | Policy Loss: 0.0183 | Value Loss: 12.3005 | Entropy: 0.8411
+Epoch 2/4 | Policy Loss: 0.0412 | Value Loss: 13.6022 | Entropy: 0.8445
+Epoch 3/4 | Policy Loss: 0.0319 | Value Loss: 13.9888 | Entropy: 0.8361
+Epoch 4/4 | Policy Loss: 0.0190 | Value Loss: 13.9206 | Entropy: 0.8310
+--- Iteration 53 ---
+Avg Reward: 0.1318 | Avg Length: 2.7 | Pool Size: 574
+Top 3 Expressions: [('divide(data("close"), data("open"))', 33), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 11), ('data("returns")', 1)]
+Total unique expressions in batch: 8
+Top Actions (ID: count): [(10, 66), (0, 50), (1, 18), (9, 1), (8, 1)]
+Epoch 1/4 | Policy Loss: 0.0943 | Value Loss: 14.1810 | Entropy: 0.7518
+Epoch 2/4 | Policy Loss: 0.0427 | Value Loss: 13.2890 | Entropy: 0.7294
+Epoch 3/4 | Policy Loss: 0.0774 | Value Loss: 12.7468 | Entropy: 0.7552
+Epoch 4/4 | Policy Loss: 0.0224 | Value Loss: 11.9339 | Entropy: 0.7272
+--- Iteration 54 ---
+Avg Reward: 0.1509 | Avg Length: 3.1 | Pool Size: 575
+Top 3 Expressions: [('divide(data("close"), data("open"))', 31), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 9), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 9
+Top Actions (ID: count): [(10, 77), (0, 50), (1, 23), (3, 3), (2, 1)]
+Epoch 1/4 | Policy Loss: 0.0424 | Value Loss: 10.4356 | Entropy: 0.7974
+Epoch 2/4 | Policy Loss: 0.0336 | Value Loss: 9.2129 | Entropy: 0.7895
+Epoch 3/4 | Policy Loss: 0.0753 | Value Loss: 8.2683 | Entropy: 0.7964
+Epoch 4/4 | Policy Loss: 0.0971 | Value Loss: 7.0901 | Entropy: 0.7961
+--- Iteration 55 ---
+Avg Reward: 0.1559 | Avg Length: 3.1 | Pool Size: 575
+Top 3 Expressions: [('divide(data("close"), data("open"))', 32), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 8), ('multiply(divide(data("close"), data("open")), divide(data("close"), data("open")))', 2)]
+Total unique expressions in batch: 11
+Top Actions (ID: count): [(10, 77), (0, 50), (1, 25), (3, 2), (5, 1)]
+Epoch 1/4 | Policy Loss: -0.0033 | Value Loss: 6.5681 | Entropy: 0.8028
+Epoch 2/4 | Policy Loss: -0.0035 | Value Loss: 5.8303 | Entropy: 0.7910
+Epoch 3/4 | Policy Loss: 0.0515 | Value Loss: 4.7688 | Entropy: 0.8078
+Epoch 4/4 | Policy Loss: 0.0445 | Value Loss: 4.0350 | Entropy: 0.7876
+--- Iteration 56 ---
+Avg Reward: 0.1855 | Avg Length: 3.7 | Pool Size: 578
+Top 3 Expressions: [('divide(data("close"), data("open"))', 33), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 8), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), add(divide(data("close"), data("open")), divide(data("close"), data("open"))))', 1)]
+Total unique expressions in batch: 11
+Top Actions (ID: count): [(10, 91), (0, 50), (1, 39), (3, 2), (8, 1)]
+Epoch 1/4 | Policy Loss: 0.0148 | Value Loss: 3.4582 | Entropy: 0.8635
+Epoch 2/4 | Policy Loss: 0.0439 | Value Loss: 2.8152 | Entropy: 0.8550
+Epoch 3/4 | Policy Loss: 0.0430 | Value Loss: 2.1964 | Entropy: 0.8721
+Epoch 4/4 | Policy Loss: 0.0274 | Value Loss: 1.7583 | Entropy: 0.8783
+--- Iteration 57 ---
+Avg Reward: 0.2393 | Avg Length: 4.9 | Pool Size: 588
+Top 3 Expressions: [('divide(data("close"), data("open"))', 30), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 4), ('add(add(multiply(divide(data("close"), data("open")), divide(data("close"), data("open"))), subtract(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))), divide(data("close"), data("open")))', 1)]
+Total unique expressions in batch: 18
+Top Actions (ID: count): [(10, 118), (1, 58), (0, 50), (3, 6), (2, 5)]
+Epoch 1/4 | Policy Loss: 0.0918 | Value Loss: 1.4528 | Entropy: 0.9501
+Epoch 2/4 | Policy Loss: 0.0322 | Value Loss: 1.0498 | Entropy: 0.9547
+Epoch 3/4 | Policy Loss: 0.0783 | Value Loss: 0.6912 | Entropy: 0.9648
+Epoch 4/4 | Policy Loss: 0.0192 | Value Loss: 0.4480 | Entropy: 0.9679
+--- Iteration 58 ---
+Avg Reward: 0.3705 | Avg Length: 7.3 | Pool Size: 600
+Top 3 Expressions: [('divide(data("close"), data("open"))', 22), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 5), ('add(add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open")))), divide(data("close"), data("open")))', 2)]
+Total unique expressions in batch: 23
+Top Actions (ID: count): [(10, 180), (1, 123), (0, 49), (3, 5), (8, 2)]
+Epoch 1/4 | Policy Loss: 0.0317 | Value Loss: 23523.8918 | Entropy: 1.0310
+Epoch 2/4 | Policy Loss: 0.0413 | Value Loss: 23519.8987 | Entropy: 1.0221
+Epoch 3/4 | Policy Loss: 0.0097 | Value Loss: 23489.0871 | Entropy: 0.9934
+Epoch 4/4 | Policy Loss: 0.0570 | Value Loss: 23313.0389 | Entropy: 0.9095
+--- Iteration 59 ---
+Avg Reward: 0.1958 | Avg Length: 3.9 | Pool Size: 604
+Top 3 Expressions: [('divide(data("close"), data("open"))', 29), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 7), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 12
+Top Actions (ID: count): [(10, 95), (0, 50), (1, 41), (3, 4), (2, 1)]
+Epoch 1/4 | Policy Loss: 0.0272 | Value Loss: 0.3814 | Entropy: 0.8652
+Epoch 2/4 | Policy Loss: 0.0080 | Value Loss: 0.8286 | Entropy: 0.8388
+Epoch 3/4 | Policy Loss: 0.0225 | Value Loss: 0.7339 | Entropy: 0.8437
+Epoch 4/4 | Policy Loss: 0.0049 | Value Loss: 0.4800 | Entropy: 0.8515
+--- Iteration 60 ---
+Avg Reward: 0.2131 | Avg Length: 4.5 | Pool Size: 612
+Top 3 Expressions: [('divide(data("close"), data("open"))', 27), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 7), ('add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), add(subtract(divide(data("close"), data("open")), divide(data("close"), data("open"))), add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), data("returns"))))))', 1)]
+Total unique expressions in batch: 18
+Top Actions (ID: count): [(10, 106), (1, 56), (0, 50), (9, 3), (3, 2)]
+Epoch 1/4 | Policy Loss: 0.0401 | Value Loss: 0.9966 | Entropy: 0.8676
+Epoch 2/4 | Policy Loss: 0.0369 | Value Loss: 0.2534 | Entropy: 0.9095
+Epoch 3/4 | Policy Loss: 0.0488 | Value Loss: 0.1748 | Entropy: 0.9096
+Epoch 4/4 | Policy Loss: 0.0830 | Value Loss: 0.1349 | Entropy: 0.9200
+--- Iteration 61 ---
+Avg Reward: 0.2932 | Avg Length: 5.8 | Pool Size: 620
+Top 3 Expressions: [('divide(data("close"), data("open"))', 26), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 6), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 17
+Top Actions (ID: count): [(10, 137), (1, 86), (0, 50), (8, 5), (3, 4)]
+Epoch 1/4 | Policy Loss: 0.0407 | Value Loss: 0.3218 | Entropy: 0.9635
+Epoch 2/4 | Policy Loss: 0.0305 | Value Loss: 0.1953 | Entropy: 0.9892
+Epoch 3/4 | Policy Loss: -0.0069 | Value Loss: 0.1615 | Entropy: 0.9811
+Epoch 4/4 | Policy Loss: -0.0041 | Value Loss: 0.1852 | Entropy: 0.9512
+--- Iteration 62 ---
+Avg Reward: 1.2736 | Avg Length: 25.0 | Pool Size: 629
+Top 3 Expressions: [('TechnicalIndicator(divide(data("volume"), data("adv20")), data("returns"), divide(data("close"), data("open")))', 18), ('divide(data("close"), data("open"))', 14), ('add(subtract(add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open"))), add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open"))))), add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open"))))', 1)]
+Total unique expressions in batch: 20
+Top Actions (ID: count): [(10, 709), (1, 462), (0, 32), (3, 15), (2, 12)]
+Epoch 1/4 | Policy Loss: 0.0361 | Value Loss: 127833.2755 | Entropy: 1.0930
+Epoch 2/4 | Policy Loss: 0.0521 | Value Loss: 127448.8898 | Entropy: 1.0678
+Epoch 3/4 | Policy Loss: 0.0956 | Value Loss: 127046.8942 | Entropy: 1.0391
+Epoch 4/4 | Policy Loss: 0.1409 | Value Loss: 126682.9126 | Entropy: 1.0003
+--- Iteration 63 ---
+Avg Reward: 0.1529 | Avg Length: 3.0 | Pool Size: 629
+Top 3 Expressions: [('divide(data("close"), data("open"))', 36), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 5), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 4)]
+Total unique expressions in batch: 8
+Top Actions (ID: count): [(10, 73), (0, 50), (1, 25), (9, 1), (8, 1)]
+Epoch 1/4 | Policy Loss: 0.0473 | Value Loss: 6.7711 | Entropy: 0.7402
+Epoch 2/4 | Policy Loss: 0.0386 | Value Loss: 7.3919 | Entropy: 0.7280
+Epoch 3/4 | Policy Loss: 0.0349 | Value Loss: 7.5766 | Entropy: 0.7273
+Epoch 4/4 | Policy Loss: 0.0258 | Value Loss: 7.8477 | Entropy: 0.7115
+--- Iteration 64 ---
+Avg Reward: 0.1281 | Avg Length: 2.6 | Pool Size: 630
+Top 3 Expressions: [('divide(data("close"), data("open"))', 39), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 6), ('divide(data("volume"), data("adv20"))', 1)]
+Total unique expressions in batch: 7
+Top Actions (ID: count): [(10, 62), (0, 50), (1, 14), (8, 2), (7, 1)]
+Epoch 1/4 | Policy Loss: 0.0745 | Value Loss: 7.8429 | Entropy: 0.6504
+Epoch 2/4 | Policy Loss: 0.1220 | Value Loss: 7.6403 | Entropy: 0.6670
+Epoch 3/4 | Policy Loss: 0.1064 | Value Loss: 7.4539 | Entropy: 0.6710
+Epoch 4/4 | Policy Loss: 0.1184 | Value Loss: 6.8492 | Entropy: 0.6638
+--- Iteration 65 ---
+Avg Reward: 0.1388 | Avg Length: 2.7 | Pool Size: 633
+Top 3 Expressions: [('divide(data("close"), data("open"))', 39), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 4), ('divide(data("volume"), data("adv20"))', 3)]
+Total unique expressions in batch: 7
+Top Actions (ID: count): [(10, 64), (0, 50), (1, 17), (8, 3), (9, 1)]
+Epoch 1/4 | Policy Loss: 0.0747 | Value Loss: 6.4874 | Entropy: 0.6762
+Epoch 2/4 | Policy Loss: 0.0384 | Value Loss: 5.9776 | Entropy: 0.6713
+Epoch 3/4 | Policy Loss: 0.0767 | Value Loss: 5.5581 | Entropy: 0.6905
+Epoch 4/4 | Policy Loss: 0.0627 | Value Loss: 5.0236 | Entropy: 0.6845
+--- Iteration 66 ---
+Avg Reward: 0.1210 | Avg Length: 2.5 | Pool Size: 633
+Top 3 Expressions: [('divide(data("close"), data("open"))', 42), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 3), ('add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open")))))', 1)]
+Total unique expressions in batch: 7
+Top Actions (ID: count): [(10, 59), (0, 50), (1, 11), (8, 1), (6, 1)]
+Epoch 1/4 | Policy Loss: 0.0853 | Value Loss: 4.7912 | Entropy: 0.6640
+Epoch 2/4 | Policy Loss: 0.0970 | Value Loss: 4.6040 | Entropy: 0.6598
+Epoch 3/4 | Policy Loss: 0.0624 | Value Loss: 4.4463 | Entropy: 0.6317
+Epoch 4/4 | Policy Loss: 0.0404 | Value Loss: 3.9608 | Entropy: 0.6792
+--- Iteration 67 ---
+Avg Reward: 0.1568 | Avg Length: 3.1 | Pool Size: 633
+Top 3 Expressions: [('divide(data("close"), data("open"))', 35), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 6), ('add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open"))))', 2)]
+Total unique expressions in batch: 8
+Top Actions (ID: count): [(10, 77), (0, 50), (1, 25), (3, 1), (4, 1)]
+Epoch 1/4 | Policy Loss: 0.0415 | Value Loss: 3.6401 | Entropy: 0.7333
+Epoch 2/4 | Policy Loss: 0.0394 | Value Loss: 3.3823 | Entropy: 0.7207
+Epoch 3/4 | Policy Loss: 0.0712 | Value Loss: 2.8205 | Entropy: 0.7277
+Epoch 4/4 | Policy Loss: 0.0278 | Value Loss: 2.5436 | Entropy: 0.7142
+--- Iteration 68 ---
+Avg Reward: 0.1269 | Avg Length: 2.6 | Pool Size: 633
+Top 3 Expressions: [('divide(data("close"), data("open"))', 35), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 10), ('divide(data("volume"), data("adv20"))', 2)]
+Total unique expressions in batch: 6
+Top Actions (ID: count): [(10, 61), (0, 50), (1, 14), (8, 2), (9, 1)]
+Epoch 1/4 | Policy Loss: 0.0796 | Value Loss: 2.1178 | Entropy: 0.6777
+Epoch 2/4 | Policy Loss: 0.0650 | Value Loss: 2.0698 | Entropy: 0.6644
+Epoch 3/4 | Policy Loss: 0.0545 | Value Loss: 1.8914 | Entropy: 0.6890
+Epoch 4/4 | Policy Loss: 0.0683 | Value Loss: 1.6770 | Entropy: 0.6813
+--- Iteration 69 ---
+Avg Reward: 0.1384 | Avg Length: 2.7 | Pool Size: 633
+Top 3 Expressions: [('divide(data("close"), data("open"))', 36), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 12), ('multiply(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open"))))', 1)]
+Total unique expressions in batch: 4
+Top Actions (ID: count): [(10, 68), (0, 50), (1, 17), (3, 1)]
+Epoch 1/4 | Policy Loss: 0.0109 | Value Loss: 1.5414 | Entropy: 0.6937
+Epoch 2/4 | Policy Loss: 0.0161 | Value Loss: 1.1961 | Entropy: 0.7147
+Epoch 3/4 | Policy Loss: 0.0130 | Value Loss: 1.0940 | Entropy: 0.7002
+Epoch 4/4 | Policy Loss: 0.0239 | Value Loss: 0.7318 | Entropy: 0.7053
+--- Iteration 70 ---
+Avg Reward: 0.1391 | Avg Length: 2.8 | Pool Size: 634
+Top 3 Expressions: [('divide(data("close"), data("open"))', 33), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 9), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 2)]
+Total unique expressions in batch: 7
+Top Actions (ID: count): [(10, 67), (0, 50), (1, 19), (8, 2), (9, 1)]
+Epoch 1/4 | Policy Loss: 0.0886 | Value Loss: 0.5258 | Entropy: 0.7152
+Epoch 2/4 | Policy Loss: 0.0576 | Value Loss: 0.4222 | Entropy: 0.7249
+Epoch 3/4 | Policy Loss: 0.1544 | Value Loss: 0.2410 | Entropy: 0.7182
+Epoch 4/4 | Policy Loss: 0.0583 | Value Loss: 0.1379 | Entropy: 0.7244
+--- Iteration 71 ---
+Avg Reward: 0.1548 | Avg Length: 3.1 | Pool Size: 635
+Top 3 Expressions: [('divide(data("close"), data("open"))', 34), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 7), ('divide(data("volume"), data("adv20"))', 1)]
+Total unique expressions in batch: 11
+Top Actions (ID: count): [(10, 75), (0, 50), (1, 26), (8, 2), (3, 1)]
+Epoch 1/4 | Policy Loss: 0.0565 | Value Loss: 0.1065 | Entropy: 0.7638
+Epoch 2/4 | Policy Loss: 0.0848 | Value Loss: 0.0582 | Entropy: 0.7509
+Epoch 3/4 | Policy Loss: 0.0134 | Value Loss: 0.0491 | Entropy: 0.7612
+Epoch 4/4 | Policy Loss: -0.0099 | Value Loss: 0.0809 | Entropy: 0.7668
+--- Iteration 72 ---
+Avg Reward: 0.2213 | Avg Length: 4.6 | Pool Size: 641
+Top 3 Expressions: [('divide(data("close"), data("open"))', 28), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 4), ('add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open"))))', 3)]
+Total unique expressions in batch: 15
+Top Actions (ID: count): [(10, 108), (1, 62), (0, 50), (9, 5), (7, 2)]
+Epoch 1/4 | Policy Loss: 0.0412 | Value Loss: 0.1079 | Entropy: 0.8924
+Epoch 2/4 | Policy Loss: 0.0358 | Value Loss: 0.1335 | Entropy: 0.8868
+Epoch 3/4 | Policy Loss: 0.0071 | Value Loss: 0.1173 | Entropy: 0.8659
+Epoch 4/4 | Policy Loss: -0.0260 | Value Loss: 0.1178 | Entropy: 0.8623
+--- Iteration 73 ---
+Avg Reward: 0.6016 | Avg Length: 11.8 | Pool Size: 653
+Top 3 Expressions: [('divide(data("close"), data("open"))', 18), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 7), ('add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open"))))', 5)]
+Total unique expressions in batch: 21
+Top Actions (ID: count): [(10, 303), (1, 219), (0, 47), (3, 6), (8, 6)]
+Epoch 1/4 | Policy Loss: 0.0140 | Value Loss: 43991.6181 | Entropy: 0.9959
+Epoch 2/4 | Policy Loss: 0.0105 | Value Loss: 43961.4231 | Entropy: 0.9757
+Epoch 3/4 | Policy Loss: 0.0099 | Value Loss: 43911.8633 | Entropy: 0.9482
+Epoch 4/4 | Policy Loss: 0.0022 | Value Loss: 43860.7527 | Entropy: 0.9521
+--- Iteration 74 ---
+Avg Reward: 0.7949 | Avg Length: 15.6 | Pool Size: 665
+Top 3 Expressions: [('divide(data("close"), data("open"))', 17), ('TechnicalIndicator(divide(data("volume"), data("adv20")), data("returns"), divide(data("close"), data("open")))', 7), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 6)]
+Total unique expressions in batch: 21
+Top Actions (ID: count): [(10, 428), (1, 287), (0, 43), (5, 6), (9, 4)]
+Epoch 1/4 | Policy Loss: 0.0230 | Value Loss: 78416.3498 | Entropy: 0.9850
+Epoch 2/4 | Policy Loss: 0.0399 | Value Loss: 78271.0308 | Entropy: 0.9751
+Epoch 3/4 | Policy Loss: 0.0588 | Value Loss: 78132.7948 | Entropy: 0.9531
+Epoch 4/4 | Policy Loss: 0.0712 | Value Loss: 77993.7873 | Entropy: 0.9127
+--- Iteration 75 ---
+Avg Reward: 0.1458 | Avg Length: 3.0 | Pool Size: 666
+Top 3 Expressions: [('divide(data("close"), data("open"))', 33), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 7), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 9
+Top Actions (ID: count): [(10, 71), (0, 50), (1, 25), (9, 2), (8, 2)]
+Epoch 1/4 | Policy Loss: 0.0646 | Value Loss: 5.8587 | Entropy: 0.6142
+Epoch 2/4 | Policy Loss: 0.0667 | Value Loss: 6.1762 | Entropy: 0.5937
+Epoch 3/4 | Policy Loss: 0.0782 | Value Loss: 6.6444 | Entropy: 0.5958
+Epoch 4/4 | Policy Loss: 0.0961 | Value Loss: 6.6446 | Entropy: 0.6007
+--- Iteration 76 ---
+Avg Reward: 0.1576 | Avg Length: 3.2 | Pool Size: 668
+Top 3 Expressions: [('divide(data("close"), data("open"))', 36), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 7), ('add(add(add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), add(divide(data("close"), data("open")), divide(data("close"), data("open")))), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 1)]
+Total unique expressions in batch: 9
+Top Actions (ID: count): [(10, 76), (0, 50), (1, 29), (8, 2), (9, 1)]
+Epoch 1/4 | Policy Loss: 0.0478 | Value Loss: 6.3791 | Entropy: 0.6115
+Epoch 2/4 | Policy Loss: 0.0543 | Value Loss: 6.1068 | Entropy: 0.6095
+Epoch 3/4 | Policy Loss: 0.0364 | Value Loss: 5.8070 | Entropy: 0.6086
+Epoch 4/4 | Policy Loss: 0.0645 | Value Loss: 5.5501 | Entropy: 0.6219
+--- Iteration 77 ---
+Avg Reward: 0.1670 | Avg Length: 3.4 | Pool Size: 670
+Top 3 Expressions: [('divide(data("close"), data("open"))', 34), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 8), ('add(cs_rank(divide(data("close"), data("open"))), divide(data("close"), data("open")))', 1)]
+Total unique expressions in batch: 10
+Top Actions (ID: count): [(10, 81), (0, 50), (1, 34), (9, 3), (6, 1)]
+Epoch 1/4 | Policy Loss: 0.0928 | Value Loss: 5.1287 | Entropy: 0.6524
+Epoch 2/4 | Policy Loss: 0.0827 | Value Loss: 4.6758 | Entropy: 0.6411
+Epoch 3/4 | Policy Loss: 0.0742 | Value Loss: 4.3250 | Entropy: 0.6627
+Epoch 4/4 | Policy Loss: 0.0996 | Value Loss: 3.8920 | Entropy: 0.6643
+--- Iteration 78 ---
+Avg Reward: 0.1752 | Avg Length: 3.5 | Pool Size: 671
+Top 3 Expressions: [('divide(data("close"), data("open"))', 33), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 5), ('add(add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 10
+Top Actions (ID: count): [(10, 86), (0, 50), (1, 34), (3, 2), (8, 1)]
+Epoch 1/4 | Policy Loss: 0.0091 | Value Loss: 3.8748 | Entropy: 0.6652
+Epoch 2/4 | Policy Loss: 0.0249 | Value Loss: 3.3276 | Entropy: 0.6677
+Epoch 3/4 | Policy Loss: 0.0150 | Value Loss: 3.1085 | Entropy: 0.6630
+Epoch 4/4 | Policy Loss: 0.0397 | Value Loss: 2.5672 | Entropy: 0.6864
+--- Iteration 79 ---
+Avg Reward: 0.1754 | Avg Length: 3.5 | Pool Size: 673
+Top 3 Expressions: [('divide(data("close"), data("open"))', 33), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 10), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 7
+Top Actions (ID: count): [(10, 86), (0, 50), (1, 36), (6, 1)]
+Epoch 1/4 | Policy Loss: 0.0021 | Value Loss: 2.4204 | Entropy: 0.6789
+Epoch 2/4 | Policy Loss: 0.0139 | Value Loss: 1.9790 | Entropy: 0.6813
+Epoch 3/4 | Policy Loss: 0.0378 | Value Loss: 1.6794 | Entropy: 0.6951
+Epoch 4/4 | Policy Loss: 0.0181 | Value Loss: 1.3484 | Entropy: 0.6929
+--- Iteration 80 ---
+Avg Reward: 0.2060 | Avg Length: 4.0 | Pool Size: 675
+Top 3 Expressions: [('divide(data("close"), data("open"))', 32), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 7), ('add(add(add(add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open"))), divide(data("close"), data("open"))), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 2)]
+Total unique expressions in batch: 11
+Top Actions (ID: count): [(10, 100), (1, 50), (0, 50), (8, 1), (3, 1)]
+Epoch 1/4 | Policy Loss: 0.0189 | Value Loss: 1.3081 | Entropy: 0.7321
+Epoch 2/4 | Policy Loss: 0.0146 | Value Loss: 1.0882 | Entropy: 0.7401
+Epoch 3/4 | Policy Loss: 0.0312 | Value Loss: 0.8584 | Entropy: 0.7492
+Epoch 4/4 | Policy Loss: 0.0112 | Value Loss: 0.6232 | Entropy: 0.7424
+--- Iteration 81 ---
+Avg Reward: 0.1789 | Avg Length: 3.6 | Pool Size: 678
+Top 3 Expressions: [('divide(data("close"), data("open"))', 26), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 11), ('add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open"))))', 4)]
+Total unique expressions in batch: 12
+Top Actions (ID: count): [(10, 86), (0, 50), (1, 36), (8, 2), (4, 1)]
+Epoch 1/4 | Policy Loss: 0.0373 | Value Loss: 0.5596 | Entropy: 0.6962
+Epoch 2/4 | Policy Loss: 0.0365 | Value Loss: 0.3513 | Entropy: 0.7175
+Epoch 3/4 | Policy Loss: 0.0109 | Value Loss: 0.2368 | Entropy: 0.7064
+Epoch 4/4 | Policy Loss: 0.0361 | Value Loss: 0.1575 | Entropy: 0.7233
+--- Iteration 82 ---
+Avg Reward: 0.2248 | Avg Length: 4.6 | Pool Size: 683
+Top 3 Expressions: [('divide(data("close"), data("open"))', 26), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 9), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 5)]
+Total unique expressions in batch: 12
+Top Actions (ID: count): [(10, 112), (1, 63), (0, 50), (9, 2), (7, 2)]
+Epoch 1/4 | Policy Loss: 0.0394 | Value Loss: 0.1822 | Entropy: 0.7860
+Epoch 2/4 | Policy Loss: 0.0219 | Value Loss: 0.1003 | Entropy: 0.7973
+Epoch 3/4 | Policy Loss: 0.0164 | Value Loss: 0.0728 | Entropy: 0.8107
+Epoch 4/4 | Policy Loss: 0.0122 | Value Loss: 0.0852 | Entropy: 0.8148
+--- Iteration 83 ---
+Avg Reward: 0.5064 | Avg Length: 10.0 | Pool Size: 692
+Top 3 Expressions: [('divide(data("close"), data("open"))', 21), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 8), ('TechnicalIndicator(divide(data("volume"), data("adv20")), data("returns"), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 21
+Top Actions (ID: count): [(10, 258), (1, 180), (0, 47), (2, 5), (3, 4)]
+Epoch 1/4 | Policy Loss: 0.0401 | Value Loss: 51966.7692 | Entropy: 0.9497
+Epoch 2/4 | Policy Loss: 0.0539 | Value Loss: 51967.6018 | Entropy: 0.9503
+Epoch 3/4 | Policy Loss: 0.0321 | Value Loss: 51951.2814 | Entropy: 0.9434
+Epoch 4/4 | Policy Loss: 0.0382 | Value Loss: 51925.1985 | Entropy: 0.9481
+--- Iteration 84 ---
+Avg Reward: 0.5665 | Avg Length: 11.1 | Pool Size: 705
+Top 3 Expressions: [('divide(data("close"), data("open"))', 18), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 7), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 4)]
+Total unique expressions in batch: 23
+Top Actions (ID: count): [(10, 291), (1, 205), (0, 48), (4, 4), (2, 2)]
+Epoch 1/4 | Policy Loss: 0.0119 | Value Loss: 30943.5943 | Entropy: 0.9517
+Epoch 2/4 | Policy Loss: 0.0247 | Value Loss: 30921.3284 | Entropy: 0.9378
+Epoch 3/4 | Policy Loss: 0.0149 | Value Loss: 30881.7806 | Entropy: 0.9267
+Epoch 4/4 | Policy Loss: 0.0171 | Value Loss: 30848.5587 | Entropy: 0.9160
+--- Iteration 85 ---
+Avg Reward: 0.2311 | Avg Length: 4.5 | Pool Size: 711
+Top 3 Expressions: [('divide(data("close"), data("open"))', 37), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 4), ('add(add(divide(data("close"), data("open")), add(add(add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(divide(data("close"), data("open")), divide(data("close"), data("open"))))), divide(data("close"), data("open"))), divide(data("close"), data("open")))), divide(data("volume"), data("adv20")))', 1)]
+Total unique expressions in batch: 11
+Top Actions (ID: count): [(10, 112), (1, 60), (0, 50), (3, 2), (8, 1)]
+Epoch 1/4 | Policy Loss: 0.0155 | Value Loss: 1.4025 | Entropy: 0.7400
+Epoch 2/4 | Policy Loss: 0.0258 | Value Loss: 1.5383 | Entropy: 0.7405
+Epoch 3/4 | Policy Loss: 0.0042 | Value Loss: 1.6174 | Entropy: 0.7475
+Epoch 4/4 | Policy Loss: 0.0229 | Value Loss: 1.6537 | Entropy: 0.7261
+--- Iteration 86 ---
+Avg Reward: 0.1580 | Avg Length: 3.1 | Pool Size: 713
+Top 3 Expressions: [('divide(data("close"), data("open"))', 38), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 8), ('add(divide(data("volume"), data("adv20")), divide(data("close"), data("open")))', 1)]
+Total unique expressions in batch: 6
+Top Actions (ID: count): [(10, 76), (0, 50), (1, 27), (8, 1), (5, 1)]
+Epoch 1/4 | Policy Loss: 0.0311 | Value Loss: 1.5710 | Entropy: 0.6420
+Epoch 2/4 | Policy Loss: 0.0347 | Value Loss: 1.4417 | Entropy: 0.6483
+Epoch 3/4 | Policy Loss: 0.0665 | Value Loss: 1.3299 | Entropy: 0.6332
+Epoch 4/4 | Policy Loss: 0.0367 | Value Loss: 1.2291 | Entropy: 0.6417
+--- Iteration 87 ---
+Avg Reward: 0.1227 | Avg Length: 2.4 | Pool Size: 713
+Top 3 Expressions: [('divide(data("close"), data("open"))', 38), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 5), ('divide(data("volume"), data("adv20"))', 3)]
+Total unique expressions in batch: 7
+Top Actions (ID: count): [(10, 56), (0, 50), (1, 9), (8, 3), (9, 2)]
+Epoch 1/4 | Policy Loss: 0.1231 | Value Loss: 1.0886 | Entropy: 0.5520
+Epoch 2/4 | Policy Loss: 0.0927 | Value Loss: 1.0625 | Entropy: 0.5526
+Epoch 3/4 | Policy Loss: 0.1320 | Value Loss: 0.9578 | Entropy: 0.5593
+Epoch 4/4 | Policy Loss: 0.1361 | Value Loss: 0.9214 | Entropy: 0.5639
+--- Iteration 88 ---
+Avg Reward: 0.1712 | Avg Length: 3.4 | Pool Size: 716
+Top 3 Expressions: [('divide(data("close"), data("open"))', 36), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 6), ('add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open"))))', 2)]
+Total unique expressions in batch: 9
+Top Actions (ID: count): [(10, 83), (0, 50), (1, 33), (8, 1), (3, 1)]
+Epoch 1/4 | Policy Loss: -0.0017 | Value Loss: 0.8826 | Entropy: 0.6631
+Epoch 2/4 | Policy Loss: 0.0044 | Value Loss: 0.7169 | Entropy: 0.6719
+Epoch 3/4 | Policy Loss: 0.0109 | Value Loss: 0.5458 | Entropy: 0.6786
+Epoch 4/4 | Policy Loss: 0.0132 | Value Loss: 0.4255 | Entropy: 0.6735
+--- Iteration 89 ---
+Avg Reward: 0.1549 | Avg Length: 3.0 | Pool Size: 717
+Top 3 Expressions: [('divide(data("close"), data("open"))', 38), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 6), ('add(add(add(add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open"))), divide(data("close"), data("open"))), add(divide(data("close"), data("open")), divide(data("close"), data("open")))), divide(data("close"), data("open")))', 1)]
+Total unique expressions in batch: 8
+Top Actions (ID: count): [(10, 75), (0, 50), (1, 24), (2, 1), (8, 1)]
+Epoch 1/4 | Policy Loss: 0.0313 | Value Loss: 0.3425 | Entropy: 0.6543
+Epoch 2/4 | Policy Loss: 0.0117 | Value Loss: 0.2364 | Entropy: 0.6596
+Epoch 3/4 | Policy Loss: 0.0100 | Value Loss: 0.1422 | Entropy: 0.6666
+Epoch 4/4 | Policy Loss: 0.0124 | Value Loss: 0.0957 | Entropy: 0.6629
+--- Iteration 90 ---
+Avg Reward: 0.2283 | Avg Length: 4.5 | Pool Size: 721
+Top 3 Expressions: [('divide(data("close"), data("open"))', 32), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 5), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 2)]
+Total unique expressions in batch: 13
+Top Actions (ID: count): [(10, 111), (1, 62), (0, 50), (8, 1)]
+Epoch 1/4 | Policy Loss: 0.0152 | Value Loss: 0.1466 | Entropy: 0.7562
+Epoch 2/4 | Policy Loss: 0.0025 | Value Loss: 0.0927 | Entropy: 0.7739
+Epoch 3/4 | Policy Loss: -0.0095 | Value Loss: 0.0665 | Entropy: 0.7773
+Epoch 4/4 | Policy Loss: -0.0152 | Value Loss: 0.0718 | Entropy: 0.7877
+--- Iteration 91 ---
+Avg Reward: 0.5499 | Avg Length: 10.8 | Pool Size: 729
+Top 3 Expressions: [('divide(data("close"), data("open"))', 21), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 12), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 14
+Top Actions (ID: count): [(10, 283), (1, 200), (0, 47), (2, 3), (8, 2)]
+Epoch 1/4 | Policy Loss: 0.0221 | Value Loss: 48108.3845 | Entropy: 0.9366
+Epoch 2/4 | Policy Loss: 0.0132 | Value Loss: 48097.8938 | Entropy: 0.9342
+Epoch 3/4 | Policy Loss: 0.0164 | Value Loss: 48077.3111 | Entropy: 0.9372
+Epoch 4/4 | Policy Loss: 0.0298 | Value Loss: 48035.5598 | Entropy: 0.9373
+--- Iteration 92 ---
+Avg Reward: 0.4751 | Avg Length: 9.3 | Pool Size: 738
+Top 3 Expressions: [('divide(data("close"), data("open"))', 22), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 8), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 19
+Top Actions (ID: count): [(10, 233), (1, 173), (0, 49), (4, 3), (8, 3)]
+Epoch 1/4 | Policy Loss: -0.0024 | Value Loss: 18567.9474 | Entropy: 0.9056
+Epoch 2/4 | Policy Loss: -0.0009 | Value Loss: 18552.5869 | Entropy: 0.8885
+Epoch 3/4 | Policy Loss: 0.0095 | Value Loss: 18533.1551 | Entropy: 0.8676
+Epoch 4/4 | Policy Loss: 0.0331 | Value Loss: 18493.3064 | Entropy: 0.8160
+--- Iteration 93 ---
+Avg Reward: 0.2262 | Avg Length: 4.4 | Pool Size: 741
+Top 3 Expressions: [('divide(data("close"), data("open"))', 33), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 6), ('add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open"))))', 3)]
+Total unique expressions in batch: 10
+Top Actions (ID: count): [(10, 111), (1, 58), (0, 50), (4, 2), (2, 1)]
+Epoch 1/4 | Policy Loss: 0.0060 | Value Loss: 1.2348 | Entropy: 0.7086
+Epoch 2/4 | Policy Loss: 0.0194 | Value Loss: 1.5120 | Entropy: 0.6900
+Epoch 3/4 | Policy Loss: 0.0068 | Value Loss: 1.7554 | Entropy: 0.6810
+Epoch 4/4 | Policy Loss: 0.0106 | Value Loss: 1.7342 | Entropy: 0.6783
+--- Iteration 94 ---
+Avg Reward: 0.1831 | Avg Length: 3.7 | Pool Size: 743
+Top 3 Expressions: [('divide(data("close"), data("open"))', 31), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 4), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 14
+Top Actions (ID: count): [(10, 89), (0, 50), (1, 43), (8, 3), (9, 1)]
+Epoch 1/4 | Policy Loss: 0.0329 | Value Loss: 1.2443 | Entropy: 0.6956
+Epoch 2/4 | Policy Loss: 0.0756 | Value Loss: 1.2213 | Entropy: 0.6872
+Epoch 3/4 | Policy Loss: 0.0371 | Value Loss: 1.0690 | Entropy: 0.6942
+Epoch 4/4 | Policy Loss: 0.0354 | Value Loss: 0.9452 | Entropy: 0.6954
+--- Iteration 95 ---
+Avg Reward: 0.1855 | Avg Length: 3.7 | Pool Size: 745
+Top 3 Expressions: [('divide(data("close"), data("open"))', 32), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 5), ('add(add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open")))), divide(data("close"), data("open")))', 2)]
+Total unique expressions in batch: 12
+Top Actions (ID: count): [(10, 87), (0, 50), (1, 41), (8, 3), (9, 1)]
+Epoch 1/4 | Policy Loss: 0.0453 | Value Loss: 0.9258 | Entropy: 0.6968
+Epoch 2/4 | Policy Loss: 0.0256 | Value Loss: 0.7586 | Entropy: 0.7008
+Epoch 3/4 | Policy Loss: 0.0351 | Value Loss: 0.5979 | Entropy: 0.7051
+Epoch 4/4 | Policy Loss: 0.0525 | Value Loss: 0.4510 | Entropy: 0.7123
+--- Iteration 96 ---
+Avg Reward: 0.2229 | Avg Length: 4.4 | Pool Size: 750
+Top 3 Expressions: [('divide(data("close"), data("open"))', 27), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 9), ('add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open"))))', 3)]
+Total unique expressions in batch: 14
+Top Actions (ID: count): [(10, 109), (1, 56), (0, 50), (3, 3), (5, 1)]
+Epoch 1/4 | Policy Loss: 0.0135 | Value Loss: 0.4105 | Entropy: 0.7438
+Epoch 2/4 | Policy Loss: 0.0139 | Value Loss: 0.2985 | Entropy: 0.7492
+Epoch 3/4 | Policy Loss: 0.0082 | Value Loss: 0.2127 | Entropy: 0.7564
+Epoch 4/4 | Policy Loss: 0.0162 | Value Loss: 0.1329 | Entropy: 0.7643
+--- Iteration 97 ---
+Avg Reward: 0.2502 | Avg Length: 5.0 | Pool Size: 756
+Top 3 Expressions: [('divide(data("close"), data("open"))', 26), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 7), ('add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 3)]
+Total unique expressions in batch: 15
+Top Actions (ID: count): [(10, 121), (1, 73), (0, 50), (8, 2), (9, 1)]
+Epoch 1/4 | Policy Loss: 0.0466 | Value Loss: 0.1591 | Entropy: 0.7869
+Epoch 2/4 | Policy Loss: 0.0314 | Value Loss: 0.1101 | Entropy: 0.7971
+Epoch 3/4 | Policy Loss: 0.0280 | Value Loss: 0.0812 | Entropy: 0.7942
+Epoch 4/4 | Policy Loss: 0.0429 | Value Loss: 0.0888 | Entropy: 0.7992
+--- Iteration 98 ---
+Avg Reward: 0.6221 | Avg Length: 12.2 | Pool Size: 774
+Top 3 Expressions: [('divide(data("close"), data("open"))', 11), ('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 6), ('add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open"))))', 4)]
+Total unique expressions in batch: 29
+Top Actions (ID: count): [(10, 307), (1, 243), (0, 48), (8, 4), (2, 3)]
+Epoch 1/4 | Policy Loss: 0.0259 | Value Loss: 28214.8259 | Entropy: 0.8803
+Epoch 2/4 | Policy Loss: 0.0217 | Value Loss: 28159.6461 | Entropy: 0.7986
+Epoch 3/4 | Policy Loss: 0.0535 | Value Loss: 27862.2602 | Entropy: 0.6031
+Epoch 4/4 | Policy Loss: 0.0360 | Value Loss: 27618.1081 | Entropy: 0.7841
+--- Iteration 99 ---
+Avg Reward: 0.3087 | Avg Length: 6.2 | Pool Size: 789
+Top 3 Expressions: [('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 13), ('divide(data("close"), data("open"))', 13), ('add(add(add(divide(data("close"), data("open")), divide(data("close"), data("open"))), divide(data("close"), data("open"))), divide(data("close"), data("open")))', 4)]
+Total unique expressions in batch: 22
+Top Actions (ID: count): [(10, 147), (1, 80), (0, 50), (3, 17), (2, 5)]
+Epoch 1/4 | Policy Loss: 0.0532 | Value Loss: 11.8316 | Entropy: 0.7737
+Epoch 2/4 | Policy Loss: 0.0577 | Value Loss: 11.3822 | Entropy: 0.7845
+Epoch 3/4 | Policy Loss: 0.0722 | Value Loss: 8.2145 | Entropy: 0.7318
+Epoch 4/4 | Policy Loss: 0.1363 | Value Loss: 2.4766 | Entropy: 0.7619
+--- Iteration 100 ---
+Avg Reward: 0.4704 | Avg Length: 9.3 | Pool Size: 803
+Top 3 Expressions: [('add(divide(data("close"), data("open")), divide(data("close"), data("open")))', 10), ('add(divide(data("close"), data("open")), add(divide(data("close"), data("open")), divide(data("close"), data("open"))))', 7), ('divide(data("close"), data("open"))', 5)]
+Total unique expressions in batch: 28
+Top Actions (ID: count): [(10, 226), (1, 181), (0, 50), (8, 6), (7, 1)]
+Epoch 1/4 | Policy Loss: 0.0497 | Value Loss: 0.7368 | Entropy: 0.8128
+Epoch 2/4 | Policy Loss: 0.0881 | Value Loss: 0.1383 | Entropy: 0.8868
+Epoch 3/4 | Policy Loss: 0.1015 | Value Loss: 0.0992 | Entropy: 0.8933
+Epoch 4/4 | Policy Loss: 0.0916 | Value Loss: 0.0878 | Entropy: 0.8659
