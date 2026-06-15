@@ -1,4 +1,3 @@
-
 use parser::ast::Network;
 use rl::action::Action;
 use rl::env::Environment;
@@ -23,7 +22,11 @@ impl BruteforceSearch {
     }
 }
 
-pub fn brute_force(network: Network, action_space: rl::action::ActionSpace, use_cuda: bool) {
+pub fn brute_force(
+    network: Network,
+    action_space: rl::action::ActionSpace,
+    use_cuda: bool,
+) -> Pool {
     let device = if use_cuda {
         Device::cuda_if_available()
     } else {
@@ -37,43 +40,35 @@ pub fn brute_force(network: Network, action_space: rl::action::ActionSpace, use_
         &network,
         action_space,
         pool,
-        50,   // max_length
-        1000, // batch_size
+        50, // max_length
+        50, // batch_size (episodes_per_batch)
     );
 
-    println!("Sampling trajectories...");
-    let trajectories = env.sample(
-        &mut runtime,
-        &mut RandomModel::new(env.action_space.clone()),
-        &device,
-    );
+    let mut model = RandomModel::new(env.action_space.clone());
+    let num_iterations = 2000;
 
-    // rather than beginning empty alpha pool, insert all for testing
-    println!("Adding trajectories to pool...");
-    trajectories.iter().for_each(|(traj, _expr, machine)| {
-        if let Some(last_step) = traj.last() {
-            if last_step.action == Action::Done {
-                env.pool.insert(&mut runtime, machine.callgraph.clone());
-            }
-        }
-    });
-    let pool_stats = env.pool.stats();
+    for iteration in 0..num_iterations {
+        println!("--- Iteration {} ---", iteration);
+        let trajectories = env.sample(&mut runtime, &mut model, &device);
 
-    // Calc utility for each trajectory
-    println!("Calculating utility for each trajectory...");
-    trajectories.iter().for_each(|(traj, expr, machine)| {
-        if let Some(last_step) = traj.last() {
-            if last_step.action == Action::Done {
-                let marginal_utility = env.pool.calc_reward(&mut runtime, &machine, true);
-                let utility_traj: Vec<f64> = traj.iter().map(|step| step.reward).collect();
-                let (_utility, _marginal_utility, corr, maxcorr) = pool_stats.get(expr).unwrap();
-                println!(
-                    "marginal_utility: {}\t utility_traj: {:?}\t Expr: {}\t _utility: {}\t _marginal_utility: {}\t corr:{}\t maxcorr:{}",
-                    marginal_utility, utility_traj, expr, _utility, _marginal_utility, corr, maxcorr
-                );
-            } else {
-                println!("Expression failed to terminate: {}", expr);
+        let mut ep_lengths = Vec::new();
+
+        trajectories.iter().for_each(|(traj, _expr, machine)| {
+            ep_lengths.push(traj.len());
+            if let Some(last_step) = traj.last() {
+                if last_step.action == Action::Done {
+                    env.pool.insert(&mut runtime, machine.callgraph.clone());
+                }
             }
-        }
-    });
+        });
+
+        let avg_length: f64 = ep_lengths.iter().sum::<usize>() as f64 / ep_lengths.len() as f64;
+        println!(
+            "Avg Length: {:.1} | Pool Size: {}",
+            avg_length,
+            env.pool.len()
+        );
+    }
+
+    env.pool
 }

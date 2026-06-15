@@ -29,7 +29,15 @@ impl AbstractMachine {
 
     pub fn check_reduce(&self, operator_spec: &OperatorSpec) -> bool {
         // type checking
-        assert!(operator_spec.inputs.len() <= self.stack.len());
+        // assert!(operator_spec.inputs.len() <= self.stack.len());
+        assert!(
+            operator_spec.inputs.len() <= self.stack.len(),
+            "Stack length is not enough. Stack: {:?}\nAST:\n{}, Operator name: {}, Operator inputs: {:?}",
+            self.stack,
+            self.callgraph,
+            operator_spec.name,
+            operator_spec.inputs,
+        );
         for (op_input, stack_item) in operator_spec.inputs.iter().zip(self.stack.iter().rev()) {
             if std::mem::discriminant(op_input) != std::mem::discriminant(&stack_item.0) {
                 return false;
@@ -152,7 +160,12 @@ impl SearchState {
         match action {
             Action::Done => {
                 // Check stack size
-                assert!(self.machine.stack.len() == 1);
+                assert!(
+                    self.machine.stack.len() == 1,
+                    "Stack length is not 1. Stack: {:?}\nAST:\n{}",
+                    self.machine.stack,
+                    self.machine.callgraph
+                );
                 // do the rewiring to replace behavior node with the subgraph
                 // 1. get subgraph address
                 let (subgraph_output_type, subgraph_root_idx) = self.machine.stack.last().unwrap();

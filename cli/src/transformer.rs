@@ -73,7 +73,11 @@ impl TransformerSearch {
     }
 }
 
-pub fn transformer_search(network: Network, action_space: rl::action::ActionSpace, use_cuda: bool) {
+pub fn transformer_search(
+    network: Network,
+    action_space: rl::action::ActionSpace,
+    use_cuda: bool,
+) -> rl::pool::Pool {
     let device = if use_cuda {
         Device::cuda_if_available()
     } else {
@@ -105,6 +109,7 @@ pub fn transformer_search(network: Network, action_space: rl::action::ActionSpac
     let batch_size = 512;
     let episodes_per_batch = 50;
     let num_iterations = 2000;
+    // let num_iterations = 20;
     let unfinished_penaly: f64 = 10.0;
 
     for iteration in 0..num_iterations {
@@ -137,7 +142,9 @@ pub fn transformer_search(network: Network, action_space: rl::action::ActionSpac
                 let mut probs = log_probs.exp().nan_to_num(0.0, 0.0, 0.0).clamp(0.0, 1.0);
                 let sum = probs.sum(tch::Kind::Float);
                 if sum.double_value(&[]) <= 1e-8 {
-                    probs = Tensor::ones_like(&probs) / (probs.size()[1] as f64);
+                    probs = mask.unsqueeze(0).to_kind(tch::Kind::Float);
+                    let mask_sum = probs.sum(tch::Kind::Float);
+                    probs = &probs / mask_sum;
                 } else {
                     probs = &probs / &sum;
                 }
@@ -372,6 +379,12 @@ pub fn transformer_search(network: Network, action_space: rl::action::ActionSpac
                         "WARNING: Loss is {}! (Policy: {}, Value: {}, Entropy: {}) Skipping backward.",
                         loss_val, policy_val, value_val, entropy_val
                     );
+                    println!("Diagnostic - Batch Returns: {:?}", batch_returns);
+                    println!("Diagnostic - Batch Advantages: {:?}", batch_advantages);
+                    println!(
+                        "Diagnostic - Batch Old Actions (Indices): {:?}",
+                        batch_old_actions
+                    );
                     continue;
                 }
 
@@ -388,4 +401,5 @@ pub fn transformer_search(network: Network, action_space: rl::action::ActionSpac
             );
         }
     }
+    env.pool
 }
