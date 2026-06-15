@@ -88,7 +88,9 @@ impl Environment {
         for action_idx in 0..self.action_space.size() {
             let action: Action = self.action_space.get_action(action_idx);
             let valid = match &action {
-                Action::Done => stack.len() == 1,
+                Action::Done => {
+                    stack.len() == 1 && matches!(stack[0].0, stdlib::types::Signal::DataFrame(_))
+                },
                 Action::Reduce(op_spec) => {
                     stack.len() >= op_spec.inputs.len() && // stack size checking
                     self.state.machine.check_reduce(&op_spec) // type checking

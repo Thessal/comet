@@ -7,7 +7,9 @@ mod op_data;
 mod op_divide;
 mod op_flip;
 mod op_multiply;
+mod op_pow;
 mod op_subtract;
+mod op_ts_mean;
 
 pub mod types;
 use tch::Kind;
@@ -41,8 +43,10 @@ impl From<&str> for &OperatorSpec {
             "divide" => &op_divide::OP_DIVIDE,
             "multiply" => &op_multiply::OP_MULTIPLY,
             "flip" => &op_flip::OP_FLIP,
+            "pow" => &op_pow::OP_POW,
             "cs_rank" => &op_cs_rank::OP_CS_RANK,
             "cs_zscore" => &op_cs_zscore::OP_CS_ZSCORE,
+            "ts_mean" => &op_ts_mean::OP_TS_MEAN,
             // "ts_diff" => OperatorSpec {
             //     name: "ts_diff",
             //     inputs: &[Signal::Int(None), Signal::DataFrame(None)],

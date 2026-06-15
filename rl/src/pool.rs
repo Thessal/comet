@@ -19,6 +19,22 @@ pub struct Pool {
 }
 
 impl Pool {
+    pub fn save_returns(&self, path: &str) {
+        use std::fs::File;
+        use std::io::Write;
+
+        let mut file = File::create(path).expect("Unable to create file");
+        for (expr, tensor) in &self.returns {
+            let vals = Vec::<f64>::try_from(tensor.contiguous().to_kind(tch::Kind::Double))
+                .expect("Failed to convert tensor to Vec<f64>");
+            let vals_str: Vec<String> = vals.iter().map(|v| v.to_string()).collect();
+            let expr_escaped = expr.replace("\"", "\"\"");
+            let line = format!("\"{}\",{}\n", expr_escaped, vals_str.join(","));
+            file.write_all(line.as_bytes())
+                .expect("Unable to write data");
+        }
+    }
+
     pub fn new(backtester: BasicBacktest, device: tch::Device) -> Self {
         Pool {
             asts: HashMap::new(),

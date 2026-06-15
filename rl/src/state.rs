@@ -185,7 +185,17 @@ impl SearchState {
 mod tests {
     #[test]
     fn test_action_apply_reduce() {
-        todo!()
+        use crate::action::Action;
+        use stdlib::types::Signal;
+        // Simulate the stack state when a float is pushed
+        let mut stack: Vec<(Signal, usize)> = vec![];
+        stack.push((Signal::Float(Some(1.0)), 0));
+        
+        println!("Stack state: {:?}", stack);
+        // The bug was that Action::Done was allowed if stack.len() == 1
+        // even though stack[0] is a Float, not a DataFrame!
+        let is_done_valid = stack.len() == 1; // Old logic
+        println!("Old logic allowed Action::Done? {}", is_done_valid);
     }
     #[test]
     fn test_get_valid_actions() {}

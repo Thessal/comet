@@ -40,6 +40,8 @@ fn _main(args: Args) {
     for expr in pool.exprs() {
         println!("{}", expr);
     }
+
+    pool.save_returns("returns.csv")
 }
 
 fn _main_bruteforce(args: Args) {
