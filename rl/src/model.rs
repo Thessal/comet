@@ -26,11 +26,40 @@ pub trait Model {
 
 pub struct RandomModel {
     pub action_space: ActionSpace,
+
+    // Note that this is only approximation because some operators are not available depending on data type in stack.
+    // For accurate calculation, transition probability matrix need to be calculated.
+    // Or, hierarchical sampling need to be used, which is too complex to be used as a benchmark.
+    // See result/transition.ipynb
+    log_w_intro: f64, //probability of introducing new parameter / variable
+    log_w_done: f64,  //conditional probability of stop when stop action is possible.
+    intro_idxs: Vec<usize>,
+    done_idxs: Vec<usize>,
 }
 
 impl RandomModel {
-    pub fn new(action_space: ActionSpace) -> Self {
-        Self { action_space }
+    pub fn new(action_space: ActionSpace, introduce_prob: f64, stop_prob: f64) -> Self {
+        let mut intro_idxs: Vec<usize> = vec![];
+        let mut done_idxs: Vec<usize> = vec![];
+        for i in 0..action_space.size() {
+            match action_space.get_action(i) {
+                crate::action::Action::Reduce(_) => {} // operator_actions+=1,
+                crate::action::Action::Done => done_idxs.push(i),
+                _ => intro_idxs.push(i),
+            }
+        }
+        // stop_prob = w / (other actions + 1) ~= w / (introduce_actions + 1)
+        let log_w_done = (stop_prob * (intro_idxs.len() + 1) as f64).ln();
+        // intro_prob = w * (intro_actions) / (all available_actions) ~= w * (intro_actions) / (size)
+        let log_w_intro = (introduce_prob * (action_space.size() as f64)).ln();
+
+        Self {
+            action_space,
+            log_w_intro,
+            log_w_done,
+            intro_idxs,
+            done_idxs,
+        }
     }
 }
 
@@ -47,14 +76,24 @@ impl Model for RandomModel {
         _actions: &[i64],
     ) -> (Tensor, Tensor, Tensor) {
         // (state_embedding, action_logits, value)}
-        let logits = tch::Tensor::ones(
-            [1, self.action_space.size() as i64],
-            (tch::Kind::Float, *device),
-        );
+
+        let mut logits = vec![0f64; self.action_space.size()];
+        for i in &self.intro_idxs {
+            logits[*i] += self.log_w_intro
+        }
+        for i in &self.done_idxs {
+            logits[*i] += self.log_w_done
+        }
+        let logits = tch::Tensor::from_slice(&logits)
+            .to_kind(tch::Kind::Float)
+            .to_device(*device)
+            .unsqueeze(0);
+
         let dummy_emb = tch::Tensor::zeros([1, 1], (tch::Kind::Float, *device));
         let dummy_val = tch::Tensor::zeros([1, 1], (tch::Kind::Float, *device));
         let masked_logits =
             logits.masked_fill(&masks.logical_not().unsqueeze(0), std::f64::NEG_INFINITY);
+
         (dummy_emb, masked_logits, dummy_val)
     }
 }
@@ -142,7 +181,8 @@ pub struct AgentModel {
 impl AgentModel {
     pub fn new(vs: &nn::Path, action_space: ActionSpace, d_model: i64) -> Self {
         let vocab_size = action_space.size() as i64;
-        let decoder = crate::model_transformer::SRDecoderModel::new(vs, vocab_size, d_model, 8, 512, 4);
+        let decoder =
+            crate::model_transformer::SRDecoderModel::new(vs, vocab_size, d_model, 8, 512, 4);
         Self {
             action_space,
             decoder,
@@ -221,12 +261,13 @@ impl Model for AgentModel {
         let shifted_target_tokens = Tensor::from_slice(&target_tokens).to(*device).unsqueeze(0);
 
         let (logits, values) = self.decoder.forward(&shifted_target_tokens, &alpha_matrix);
-        
+
         let step_idx = std::cmp::min(actions.len(), self.seq_len as usize - 1) as i64;
         let step_logits = logits.select(1, step_idx); // (1, vocab_size)
         let value = values.select(1, step_idx); // (1,)
 
-        let masked_logits = step_logits.masked_fill(&masks.logical_not().unsqueeze(0), std::f64::NEG_INFINITY);
+        let masked_logits =
+            step_logits.masked_fill(&masks.logical_not().unsqueeze(0), std::f64::NEG_INFINITY);
 
         (alpha_matrix, masked_logits, value)
     }

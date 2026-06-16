@@ -7,20 +7,20 @@ use runtime::backtest::BasicBacktest;
 use runtime::runtime::Runtime;
 use tch::Device;
 
-pub struct BruteforceSearch {
-    env: Environment,
-}
+// pub struct BruteforceSearch {
+//     env: Environment,
+// }
 
-impl BruteforceSearch {
-    pub fn new(env: Environment) -> Self {
-        Self { env }
-    }
+// impl BruteforceSearch {
+//     pub fn new(env: Environment) -> Self {
+//         Self { env }
+//     }
 
-    pub fn search(&mut self, runtime: &mut Runtime, device: &Device) {
-        let mut model = RandomModel::new(self.env.action_space.clone());
-        self.env.sample(runtime, &mut model, device);
-    }
-}
+//     pub fn search(&mut self, runtime: &mut Runtime, device: &Device) {
+//         let mut model = RandomModel::new(self.env.action_space.clone(), 0.1, 0.5);
+//         self.env.sample(runtime, &mut model, device);
+//     }
+// }
 
 pub fn brute_force(
     network: Network,
@@ -44,7 +44,11 @@ pub fn brute_force(
         50, // batch_size (episodes_per_batch)
     );
 
-    let mut model = RandomModel::new(env.action_space.clone());
+    let mut model = RandomModel::new(
+        env.action_space.clone(),
+        0.02, // introduce_prob
+        1.0,  // stop_prob
+    );
     let num_iterations = 2000;
 
     for iteration in 0..num_iterations {

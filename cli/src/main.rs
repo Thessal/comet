@@ -58,7 +58,14 @@ fn _main_bruteforce(args: Args) {
         _ => unreachable!(),
     };
     let action_space: ActionSpace = behavior_decl.into();
-    bruteforce::brute_force(network, action_space, use_cuda);
+    let pool = bruteforce::brute_force(network, action_space, use_cuda);
+
+    println!("--- Expressions found ---");
+    for expr in pool.exprs() {
+        println!("{}", expr);
+    }
+
+    pool.save_returns("returns_brute.csv")
 }
 
 #[cfg(test)]
@@ -68,7 +75,7 @@ mod tests {
 
     #[test]
     fn test_behavior_1() {
-        let filename = "../examples/behavior_1.cm";
+        let filename = "../examples/behavior_2.cm";
         let _src = fs::read_to_string(filename).expect("Failed to read file");
         _main_bruteforce(Args {
             file: String::from(filename),
