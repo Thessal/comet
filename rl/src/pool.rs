@@ -16,7 +16,7 @@ pub struct Pool {
     portfolio_returns: Tensor,
     backtester: BasicBacktest,
     device: tch::Device,
-}
+} // TODO: evicting pool
 
 impl Pool {
     pub fn save_returns(&self, path: &str) {
@@ -61,7 +61,8 @@ impl Pool {
         for (expr, r) in self.returns.iter() {
             let utility: f64 = self.utility(r);
             let marginal_utility =
-                f64::try_from(self.marginal_utility(&r.unsqueeze(0)).max()).unwrap_or(f64::NAN);
+                f64::try_from(self.marginal_utility(&r.unsqueeze(0), 252, 0).max())
+                    .unwrap_or(f64::NAN); // TODO: pass evaluation start/end days
             let corr = self.corr(&self.portfolio_returns, r);
             let maxcorr = max_corrs.get(expr).copied().unwrap_or(f64::NAN);
             stats.insert(expr.clone(), (utility, marginal_utility, corr, maxcorr));
@@ -161,23 +162,35 @@ impl Pool {
 
     // Bailey, David H., and Marcos Lopez de Prado. "The Sharpe ratio efficient frontier." Journal of Risk 15.2 (2012): 13.
     // Bailey, David H., Marcos López de Prado, and Eva del Pozo. "The strategy approval decision: A sharpe ratio indifference curve approach." Algorithmic Finance 2.1 (2013): 99-109.
-    fn marginal_utility(&self, returns_stacked: &Tensor) -> Tensor {
+    fn marginal_utility(
+        &self,
+        returns_stacked: &Tensor,
+        evaluation_start_days: i64,
+        evaluation_end_days: i64,
+    ) -> Tensor {
         // returns_stacked : [*, T]
+        let t_dim = returns_stacked.size()[1];
+        let eval_len = t_dim - evaluation_start_days - evaluation_end_days;
+
+        let returns_eval = returns_stacked.narrow(1, evaluation_start_days, eval_len);
+        let port_eval = self
+            .portfolio_returns
+            .narrow(0, evaluation_start_days, eval_len);
 
         // Calculate incoming utility for all in stack
-        let mean = returns_stacked.mean_dim(Some([1_i64].as_slice()), false, tch::Kind::Float);
-        let std = returns_stacked.std_dim(Some([1_i64].as_slice()), false, false);
+        let mean = returns_eval.mean_dim(Some([1_i64].as_slice()), false, tch::Kind::Float);
+        let std = returns_eval.std_dim(Some([1_i64].as_slice()), false, false);
         let incoming_utility = &mean / std.clamp_min(1e-9);
 
         // Calculate portfolio properties
-        let port_mean = self.portfolio_returns.mean(None);
-        let port_std = self.portfolio_returns.std(false).clamp_min(1e-9);
+        let port_mean = port_eval.mean(None);
+        let port_std = port_eval.std(false).clamp_min(1e-9);
         let port_utility = &port_mean / &port_std;
-        let port_centered = &self.portfolio_returns - &port_mean;
+        let port_centered = &port_eval - &port_mean;
 
         // Calculate correlation for all in stack
-        let returns_centered = returns_stacked
-            - returns_stacked.mean_dim(Some([1_i64].as_slice()), true, tch::Kind::Float);
+        let returns_centered =
+            &returns_eval - returns_eval.mean_dim(Some([1_i64].as_slice()), true, tch::Kind::Float);
         let cov = (&returns_centered * port_centered).mean_dim(
             Some([1_i64].as_slice()),
             false,
@@ -218,7 +231,7 @@ impl Pool {
             let returns_stacked = Tensor::stack(&returns_list, 0); // [stack_size, T]
 
             // Calculate marginal utility and get the maximum
-            let marginal_utility = self.marginal_utility(&returns_stacked);
+            let marginal_utility = self.marginal_utility(&returns_stacked, 252, 0); // TODO: pass evaluation start/end days properly
 
             // Mask out NaNs to effectively ignore them in max
             let nan_mask = marginal_utility.isnan();

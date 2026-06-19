@@ -1,6 +1,7 @@
 // Minimal version of stdlib
 #![allow(clippy::not_unsafe_ptr_arg_deref, clippy::missing_safety_doc)]
 mod op_add;
+mod op_cross_section;
 mod op_cs_rank;
 mod op_cs_zscore;
 mod op_data;
@@ -9,6 +10,7 @@ mod op_flip;
 mod op_multiply;
 mod op_pow;
 mod op_subtract;
+mod op_time_series;
 mod op_ts_mean;
 
 pub mod types;
@@ -44,9 +46,30 @@ impl From<&str> for &OperatorSpec {
             "multiply" => &op_multiply::OP_MULTIPLY,
             "flip" => &op_flip::OP_FLIP,
             "pow" => &op_pow::OP_POW,
-            "cs_rank" => &op_cs_rank::OP_CS_RANK,
+            // "cs_rank" => &op_cs_rank::OP_CS_RANK, same with rank()
             "cs_zscore" => &op_cs_zscore::OP_CS_ZSCORE,
             "ts_mean" => &op_ts_mean::OP_TS_MEAN,
+            "rank" => &op_cross_section::OP_RANK,
+            "rank_add" => &op_cross_section::OP_RANK_ADD,
+            "rank_sub" => &op_cross_section::OP_RANK_SUB,
+            "rank_mul" => &op_cross_section::OP_RANK_MUL,
+            "rank_div" => &op_cross_section::OP_RANK_DIV,
+            "sign" => &op_cross_section::OP_SIGN,
+            "sigmoid" => &op_cross_section::OP_SIGMOID,
+            "delay" => &op_time_series::OP_DELAY,
+            "delta" => &op_time_series::OP_DELTA,
+            "ts_return" => &op_time_series::OP_TS_RETURN,
+            "ts_max" => &op_time_series::OP_TS_MAX,
+            "ts_min" => &op_time_series::OP_TS_MIN,
+            "ts_argmax" => &op_time_series::OP_TS_ARGMAX,
+            "ts_argmin" => &op_time_series::OP_TS_ARGMIN,
+            "ts_sum" => &op_time_series::OP_TS_SUM,
+            "ts_prod" => &op_time_series::OP_TS_PROD,
+            "ts_nanmean" => &op_time_series::OP_TS_NANMEAN,
+            "ts_stddev" => &op_time_series::OP_TS_STDDEV,
+            "ts_rank" => &op_time_series::OP_TS_RANK,
+            "ts_cov" => &op_time_series::OP_TS_COV,
+            "ts_corr" => &op_time_series::OP_TS_CORR,
             // "ts_diff" => OperatorSpec {
             //     name: "ts_diff",
             //     inputs: &[Signal::Int(None), Signal::DataFrame(None)],
@@ -128,3 +151,190 @@ impl OperatorSpec {
 
 // TODO:
 // 4. numerical accuracy neeed to be checked.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tch::Tensor;
+
+    fn generate_args(spec: &OperatorSpec, device: tch::Device) -> Vec<Signal> {
+        spec.inputs
+            .iter()
+            .map(|s| {
+                match s {
+                    Signal::DataFrame(_) => {
+                        // Random array with values in [0, 1)
+                        Signal::DataFrame(Some(tch::Tensor::rand(
+                            &crate::types::SIZE,
+                            (tch::Kind::Float, device),
+                        )))
+                    }
+                    Signal::Int(_) => {
+                        Signal::Int(Some(5)) // rolling window of 5
+                    }
+                    Signal::Float(_) => Signal::Float(Some(0.5)),
+                    _ => panic!("Unsupported signal type for tests"),
+                }
+            })
+            .collect()
+    }
+
+    fn get_all_ops() -> Vec<&'static str> {
+        vec![
+            "data",
+            "add",
+            "subtract",
+            "divide",
+            "multiply",
+            "flip",
+            "pow",
+            "cs_rank",
+            "cs_zscore",
+            "ts_mean",
+            "rank",
+            "rank_add",
+            "rank_sub",
+            "rank_mul",
+            "rank_div",
+            "sign",
+            "sigmoid",
+            "delay",
+            "delta",
+            "ts_return",
+            "ts_max",
+            "ts_min",
+            "ts_argmax",
+            "ts_argmin",
+            "ts_sum",
+            "ts_prod",
+            "ts_nanmean",
+            "ts_stddev",
+            "ts_rank",
+            "ts_cov",
+            "ts_corr",
+        ]
+    }
+
+    #[test]
+    fn test_data_frame_size() {
+        let device = tch::Device::Cpu;
+        let ops = get_all_ops();
+        for op_name in ops {
+            if op_name == "data" {
+                continue;
+            }
+            let spec: &OperatorSpec = op_name.into();
+            let args = generate_args(spec, device);
+            let out = spec.execute(&args).unwrap();
+            if let Signal::DataFrame(Some(t)) = out {
+                assert_eq!(
+                    t.size(),
+                    crate::types::SIZE,
+                    "Operator {} changed dataframe size",
+                    op_name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_cross_sectional_shuffle() {
+        let device = tch::Device::Cpu;
+        let ops = get_all_ops();
+        for op_name in ops {
+            if op_name == "data" {
+                continue;
+            }
+            let spec: &OperatorSpec = op_name.into();
+            let args = generate_args(spec, device);
+
+            let num_assets = crate::types::SIZE[1];
+            if num_assets < 2 {
+                continue;
+            }
+
+            // Create a permutation of the columns: reverse them for simplicity
+            let perm_vec: Vec<i64> = (0..num_assets).rev().collect();
+            let perm = tch::Tensor::from_slice(&perm_vec).to_device(device);
+
+            let mut shuffled_args = Vec::new();
+            for arg in &args {
+                match arg {
+                    Signal::DataFrame(Some(t)) => {
+                        shuffled_args.push(Signal::DataFrame(Some(t.index_select(1, &perm))));
+                    }
+                    _ => shuffled_args.push(arg.clone()),
+                }
+            }
+
+            let out_orig = spec.execute(&args).unwrap();
+            let out_shuffled = spec.execute(&shuffled_args).unwrap();
+
+            if let (Signal::DataFrame(Some(t_orig)), Signal::DataFrame(Some(t_shuf))) =
+                (out_orig, out_shuffled)
+            {
+                let t_orig_shuffled = t_orig.index_select(1, &perm);
+                let is_close = t_orig_shuffled.isclose(&t_shuf, 1e-4, 1e-6, true);
+                let max_diff = (&t_orig_shuffled - &t_shuf).abs().max().double_value(&[]);
+                let is_all_true = i64::try_from(is_close.all()).unwrap() != 0;
+                assert!(
+                    is_all_true,
+                    "Operator {} failed cross-sectional shuffle test, max diff: {}",
+                    op_name, max_diff
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_forward_looking() {
+        let device = tch::Device::Cpu;
+        let ops = get_all_ops();
+        let t_split = std::cmp::min(100, crate::types::SIZE[0] / 2);
+
+        for op_name in ops {
+            if op_name == "data" {
+                continue;
+            }
+            let spec: &OperatorSpec = op_name.into();
+            let args = generate_args(spec, device);
+
+            let out_orig = spec.execute(&args).unwrap();
+
+            let mut future_args = Vec::new();
+            for arg in &args {
+                match arg {
+                    Signal::DataFrame(Some(t)) => {
+                        let mut modified = t.shallow_clone(); // + 0.0; // force a deep copy by adding 0.0
+                        // Mutate the "future" data (after t_split)
+                        let mut future_slice =
+                            modified.narrow(0, t_split, crate::types::SIZE[0] - t_split);
+                        let _ = future_slice.copy_(&tch::Tensor::rand(
+                            future_slice.size().as_slice(),
+                            (tch::Kind::Float, device),
+                        ));
+                        future_args.push(Signal::DataFrame(Some(modified)));
+                    }
+                    _ => future_args.push(arg.clone()),
+                }
+            }
+
+            let out_future = spec.execute(&future_args).unwrap();
+
+            if let (Signal::DataFrame(Some(t_orig)), Signal::DataFrame(Some(t_fut))) =
+                (out_orig, out_future)
+            {
+                let t_orig_past = t_orig.narrow(0, 0, t_split);
+                let t_fut_past = t_fut.narrow(0, 0, t_split);
+
+                let is_close = t_orig_past.isclose(&t_fut_past, 1e-5, 1e-8, true);
+                let is_all_true = i64::try_from(is_close.all()).unwrap() != 0;
+                assert!(
+                    is_all_true,
+                    "Operator {} failed forward-looking test",
+                    op_name
+                );
+            }
+        }
+    }
+}

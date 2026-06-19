@@ -1,9 +1,14 @@
-Behavior Comparator(param_unused:DataFrame) {
+Behavior TechnicalIndicator(volume_ratio: DataFrame, returns: DataFrame, intraday_ret: DataFrame) {
     weights="behavior_1_compare.pth", train=true, supervised_epochs=100,
-    operators = [add, divide, ts_mean, ts_diff, cs_rank, ts_rank, cs_zscore, ts_zscore, data],
-    integers = [5, 21, 252], floats = [0.1, 0.5, 0.9, 5.0, 21.0, 252.0], strings=["volume", "adv20"]
+    operators = [add, subtract, divide, multiply, flip, cs_zscore, ts_mean, rank, rank_add, rank_sub, rank_mul, rank_div, sign, sigmoid, delay, delta, ts_return, ts_max, ts_min, ts_argmax, ts_argmin, ts_sum, ts_prod, ts_nanmean, ts_stddev, ts_rank, ts_cov, ts_corr],
+    integers = [ 1,2,3,5,21 ], floats = [ 0.5, 1.0, 2.0, 3.0, 4.0, 5.0 ], strings=[]
 } -> DataFrame
 
-Flow volume_spike {
-    Comparator() // param_unused unused. not allowed
+Flow technicalindicator_example {
+    v = divide(data("volume"), data("adv20"))
+    r = data("returns")
+    i = divide(data("close"), data("open"))
+    TechnicalIndicator(v, r, i)
 }
+
+
