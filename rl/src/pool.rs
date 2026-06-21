@@ -16,7 +16,8 @@ pub struct Pool {
     portfolio_returns: Tensor,
     backtester: BasicBacktest,
     device: tch::Device,
-} // TODO: evicting pool
+    adj_coeff: f64,
+} // TODO: evicting pool, do not add invalid equations to the pool
 
 impl Pool {
     pub fn save_returns(&self, path: &str) {
@@ -35,13 +36,14 @@ impl Pool {
         }
     }
 
-    pub fn new(backtester: BasicBacktest, device: tch::Device) -> Self {
+    pub fn new(backtester: BasicBacktest, device: tch::Device, adj_coeff: f64) -> Self {
         Pool {
             asts: HashMap::new(),
             returns: HashMap::new(),
             portfolio_returns: tch::Tensor::zeros(SIGNAL_LENGTH, (tch::Kind::Float, device)),
             backtester,
             device,
+            adj_coeff,
         }
     }
 
@@ -198,7 +200,7 @@ impl Pool {
         );
         let corr = cov / (&std * &port_std).clamp_min(1e-9);
 
-        let marginal_utility = incoming_utility - port_utility * corr;
+        let marginal_utility = incoming_utility - port_utility * corr * self.adj_coeff;
         marginal_utility
     }
 }

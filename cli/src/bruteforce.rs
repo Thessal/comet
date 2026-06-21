@@ -34,7 +34,7 @@ pub fn brute_force(
     };
     let mut runtime = Runtime::new(10000, "data".into(), Some(device));
     let backtester = BasicBacktest::new(&mut runtime.dmgr, "returns_next");
-    let pool = Pool::new(backtester, device);
+    let pool = Pool::new(backtester, device, 1.0);
 
     let mut env = Environment::new(
         &network,

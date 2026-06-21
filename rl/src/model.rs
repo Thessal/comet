@@ -98,79 +98,79 @@ impl Model for RandomModel {
     }
 }
 
-pub struct TransformerLayer {
-    q_proj: nn::Linear,
-    k_proj: nn::Linear,
-    v_proj: nn::Linear,
-    out_proj: nn::Linear,
-    ln1: nn::LayerNorm,
-    mlp1: nn::Linear,
-    mlp2: nn::Linear,
-    ln2: nn::LayerNorm,
-    num_heads: i64,
-    head_dim: i64,
-}
+// pub struct TransformerLayer {
+//     q_proj: nn::Linear,
+//     k_proj: nn::Linear,
+//     v_proj: nn::Linear,
+//     out_proj: nn::Linear,
+//     ln1: nn::LayerNorm,
+//     mlp1: nn::Linear,
+//     mlp2: nn::Linear,
+//     ln2: nn::LayerNorm,
+//     num_heads: i64,
+//     head_dim: i64,
+// }
 
-impl TransformerLayer {
-    pub fn new(vs: &nn::Path, embed_dim: i64) -> Self {
-        let num_heads = 4;
-        let head_dim = embed_dim / num_heads;
-        Self {
-            q_proj: nn::linear(vs, embed_dim, embed_dim, Default::default()),
-            k_proj: nn::linear(vs, embed_dim, embed_dim, Default::default()),
-            v_proj: nn::linear(vs, embed_dim, embed_dim, Default::default()),
-            out_proj: nn::linear(vs, embed_dim, embed_dim, Default::default()),
-            ln1: nn::layer_norm(vs, vec![embed_dim], Default::default()),
-            mlp1: nn::linear(vs, embed_dim, 4 * embed_dim, Default::default()),
-            mlp2: nn::linear(vs, 4 * embed_dim, embed_dim, Default::default()),
-            ln2: nn::layer_norm(vs, vec![embed_dim], Default::default()),
-            num_heads,
-            head_dim,
-        }
-    }
+// impl TransformerLayer {
+//     pub fn new(vs: &nn::Path, embed_dim: i64) -> Self {
+//         let num_heads = 4;
+//         let head_dim = embed_dim / num_heads;
+//         Self {
+//             q_proj: nn::linear(vs, embed_dim, embed_dim, Default::default()),
+//             k_proj: nn::linear(vs, embed_dim, embed_dim, Default::default()),
+//             v_proj: nn::linear(vs, embed_dim, embed_dim, Default::default()),
+//             out_proj: nn::linear(vs, embed_dim, embed_dim, Default::default()),
+//             ln1: nn::layer_norm(vs, vec![embed_dim], Default::default()),
+//             mlp1: nn::linear(vs, embed_dim, 4 * embed_dim, Default::default()),
+//             mlp2: nn::linear(vs, 4 * embed_dim, embed_dim, Default::default()),
+//             ln2: nn::layer_norm(vs, vec![embed_dim], Default::default()),
+//             num_heads,
+//             head_dim,
+//         }
+//     }
 
-    pub fn forward(&self, x: &Tensor, mask: &Tensor) -> Tensor {
-        let size = x.size();
-        let b = size[0];
-        let s = size[1];
-        let e = size[2];
+//     pub fn forward(&self, x: &Tensor, mask: &Tensor) -> Tensor {
+//         let size = x.size();
+//         let b = size[0];
+//         let s = size[1];
+//         let e = size[2];
 
-        let ln_x = x.apply(&self.ln1);
+//         let ln_x = x.apply(&self.ln1);
 
-        let q = self
-            .q_proj
-            .forward(&ln_x)
-            .view([b, s, self.num_heads, self.head_dim])
-            .transpose(1, 2);
-        let k = self
-            .k_proj
-            .forward(&ln_x)
-            .view([b, s, self.num_heads, self.head_dim])
-            .transpose(1, 2);
-        let v = self
-            .v_proj
-            .forward(&ln_x)
-            .view([b, s, self.num_heads, self.head_dim])
-            .transpose(1, 2);
+//         let q = self
+//             .q_proj
+//             .forward(&ln_x)
+//             .view([b, s, self.num_heads, self.head_dim])
+//             .transpose(1, 2);
+//         let k = self
+//             .k_proj
+//             .forward(&ln_x)
+//             .view([b, s, self.num_heads, self.head_dim])
+//             .transpose(1, 2);
+//         let v = self
+//             .v_proj
+//             .forward(&ln_x)
+//             .view([b, s, self.num_heads, self.head_dim])
+//             .transpose(1, 2);
 
-        let scores = q.matmul(&k.transpose(-2, -1)) / (self.head_dim as f64).sqrt();
-        let scores = scores.masked_fill(mask, std::f64::NEG_INFINITY);
-        let attn_weights = scores.softmax(-1, tch::Kind::Float);
+//         let scores = q.matmul(&k.transpose(-2, -1)) / (self.head_dim as f64).sqrt();
+//         let scores = scores.masked_fill(mask, std::f64::NEG_INFINITY);
+//         let attn_weights = scores.softmax(-1, tch::Kind::Float);
 
-        let context = attn_weights
-            .matmul(&v)
-            .transpose(1, 2)
-            .contiguous()
-            .view([b, s, e]);
-        let mha_out = self.out_proj.forward(&context);
+//         let context = attn_weights
+//             .matmul(&v)
+//             .transpose(1, 2)
+//             .contiguous()
+//             .view([b, s, e]);
+//         let mha_out = self.out_proj.forward(&context);
 
-        let x1 = x + &mha_out;
-        let ln_x2 = x1.apply(&self.ln2);
-        let mlp_out = self.mlp2.forward(&self.mlp1.forward(&ln_x2).relu());
+//         let x1 = x + &mha_out;
+//         let ln_x2 = x1.apply(&self.ln2);
+//         let mlp_out = self.mlp2.forward(&self.mlp1.forward(&ln_x2).relu());
 
-        x1 + mlp_out
-    }
-}
+//         x1 + mlp_out
+//     }
+// }
 
 pub struct AgentModel {
     pub action_space: ActionSpace,

@@ -77,6 +77,7 @@ pub fn transformer_search(
     network: Network,
     action_space: rl::action::ActionSpace,
     use_cuda: bool,
+    adj_coeff: Option<f64>, // orthogonal advantage adj. 1.0 is default
 ) -> rl::pool::Pool {
     let device = if use_cuda {
         Device::cuda_if_available()
@@ -85,7 +86,7 @@ pub fn transformer_search(
     };
     let mut runtime = Runtime::new(10000, "data".into(), Some(device));
     let backtester = BasicBacktest::new(&mut runtime.dmgr, "returns_next");
-    let pool = Pool::new(backtester, device);
+    let pool = Pool::new(backtester, device, adj_coeff.unwrap_or(1.0));
 
     let seq_len = 50;
     let mut env = Environment::new(
