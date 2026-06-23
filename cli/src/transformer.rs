@@ -76,15 +76,11 @@ impl TransformerSearch {
 pub fn transformer_search(
     network: Network,
     action_space: rl::action::ActionSpace,
-    use_cuda: bool,
+    device: Device,
     adj_coeff: Option<f64>, // orthogonal advantage adj. 1.0 is default
+    mut runtime: &mut Runtime,
 ) -> rl::pool::Pool {
-    let device = if use_cuda {
-        Device::cuda_if_available()
-    } else {
-        Device::Cpu
-    };
-    let mut runtime = Runtime::new(10000, "data".into(), Some(device));
+    // let mut runtime = Runtime::new(10000, "data".into(), Some(device));
     let backtester = BasicBacktest::new(&mut runtime.dmgr, "returns_next");
     let pool = Pool::new(backtester, device, adj_coeff.unwrap_or(1.0));
 
@@ -185,7 +181,7 @@ pub fn transformer_search(
                     alpha_matrix.squeeze_dim(0),
                     actions.len() as i64,
                     mask,
-                )); // alpha_matrix is (1755, 5)
+                )); // alpha_matrix is (types::SIZE[0], types::SIZE[1])
                 buffer.actions.push(action_idx);
                 buffer.log_probs.push(log_prob);
                 buffer.values.push(value);

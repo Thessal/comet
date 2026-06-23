@@ -32,6 +32,7 @@ impl Runtime {
     pub fn lookup_or_run(&mut self, callgraph: &Network, root: usize) -> &Signal {
         let hash_key: String = callgraph.format_node(root);
 
+        //TODO: mask outside universe to nan. see universe.csv.gz
         if self.expr_cache.get(&hash_key).is_none() {
             let data = self.run(callgraph, root);
             self.expr_cache.put(hash_key.clone(), data);

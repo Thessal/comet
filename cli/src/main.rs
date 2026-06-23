@@ -4,7 +4,9 @@ use clap::Parser;
 use parser::ast::NodeType;
 use parser::behavior::BehaviorDecl;
 use rl::action::ActionSpace;
+use runtime::runtime::Runtime;
 use std::fs;
+use tch::Device;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -21,6 +23,12 @@ fn main() {
 
 fn _main(args: Args) {
     let use_cuda = args.cuda || std::env::var("CUDA_PATH").is_ok();
+    let device = if use_cuda {
+        Device::cuda_if_available()
+    } else {
+        Device::Cpu
+    };
+
     let filename = &args.file;
     let src = fs::read_to_string(filename).expect("Failed to read file");
 
@@ -34,7 +42,9 @@ fn _main(args: Args) {
     };
     let action_space: ActionSpace = behavior_decl.into();
     // bruteforce::brute_force(network, action_space, use_cuda);
-    let pool = transformer::transformer_search(network, action_space, use_cuda, None);
+
+    let mut runtime = Runtime::new(10000, "./wrds/data".into(), Some(device));
+    let pool = transformer::transformer_search(network, action_space, device, None, &mut runtime);
 
     println!("--- Expressions found ---");
     for expr in pool.exprs() {
@@ -70,6 +80,12 @@ fn _main_bruteforce(args: Args) {
 
 fn _main_standard_ppo(args: Args) {
     let use_cuda = args.cuda || std::env::var("CUDA_PATH").is_ok();
+    let device = if use_cuda {
+        Device::cuda_if_available()
+    } else {
+        Device::Cpu
+    };
+
     let filename = &args.file;
     let src = fs::read_to_string(filename).expect("Failed to read file");
 
@@ -83,7 +99,9 @@ fn _main_standard_ppo(args: Args) {
     };
     let action_space: ActionSpace = behavior_decl.into();
     // bruteforce::brute_force(network, action_space, use_cuda);
-    let pool = transformer::transformer_search(network, action_space, use_cuda, Some(0.0));
+    let mut runtime = Runtime::new(300, "./wrds/data".into(), Some(device));
+    let pool =
+        transformer::transformer_search(network, action_space, device, Some(0.0), &mut runtime);
 
     println!("--- Expressions found ---");
     for expr in pool.exprs() {

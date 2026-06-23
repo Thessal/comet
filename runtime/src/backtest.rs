@@ -13,6 +13,7 @@ impl BasicBacktest {
             .get_data(target_field)
             .expect("Failed to load close data")
             .shallow_clone();
+        let returns = returns.nan_to_num(0.0, 0.0, 0.0);
         assert_eq!(returns.size(), DATA_SIZE);
         Self { returns }
     }

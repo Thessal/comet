@@ -1,0 +1,312 @@
+Behavior FinancialRatio(
+    aco : DataFrame, 
+    acox : DataFrame, 
+    act : DataFrame, 
+    am : DataFrame, 
+    ao : DataFrame, 
+    aoloch : DataFrame, 
+    aox : DataFrame, 
+    ap : DataFrame, 
+    apch : DataFrame, 
+    apo : DataFrame, 
+    aqc : DataFrame,
+    at : DataFrame
+) {
+    weights="weights/wrds_1.pth", train=true, supervised_epochs=100,
+    operators = [add, subtract, divide, multiply, flip, pow, cs_zscore, ts_mean, rank, rank_add, rank_sub, rank_mul, rank_div, sign, sigmoid, delay, delta, ts_return, ts_max, ts_min, ts_argmax, ts_argmin, ts_sum, ts_prod, ts_nanmean, ts_stddev, ts_rank, ts_cov, ts_corr],
+    integers = [ 1, 5, 21, 63 ], floats = [ 0.2, 0.8, 1.0, 5.0 ], strings=[]
+} -> DataFrame
+
+#    autxr : DataFrame, 
+#    caps : DataFrame, 
+#    capx : DataFrame, 
+#    ceq : DataFrame, 
+#    ch : DataFrame, 
+#    che : DataFrame, 
+#    cheb : DataFrame, 
+#    chech : DataFrame, 
+#    chee : DataFrame, 
+#    cogs : DataFrame, 
+#    cshfd : DataFrame, 
+#    csho : DataFrame, 
+#    cshpri : DataFrame, 
+#    cshr : DataFrame, 
+#    cstk : DataFrame, 
+#    dc : DataFrame, 
+#    dd1 : DataFrame, 
+#    dfxa : DataFrame, 
+#    dlc : DataFrame, 
+#    dlcch : DataFrame, 
+#    dltt : DataFrame, 
+#    do : DataFrame, 
+#    dp : DataFrame, 
+#    dpact : DataFrame, 
+#    dpc : DataFrame, 
+#    dv : DataFrame, 
+#    dvc : DataFrame, 
+#    dvt : DataFrame, 
+#    ea : DataFrame, 
+#    ebit : DataFrame, 
+#    ebitda : DataFrame, 
+#    emp : DataFrame, 
+#    epsfi : DataFrame, 
+#    epsfx : DataFrame, 
+#    epspi : DataFrame, 
+#    epspx : DataFrame, 
+#    ero : DataFrame, 
+#    exre : DataFrame, 
+#    fca : DataFrame, 
+#    fiao : DataFrame, 
+#    fincf : DataFrame, 
+#    fopo : DataFrame, 
+#    gdwl : DataFrame, 
+#    ib : DataFrame, 
+#    ibc : DataFrame, 
+#    ibmii : DataFrame, 
+#    icapt : DataFrame, 
+#    idit : DataFrame, 
+#    intan : DataFrame, 
+#    intanp : DataFrame, 
+#    intc : DataFrame, 
+#    intoact : DataFrame, 
+#    intpn : DataFrame, 
+#    invch : DataFrame, 
+#    invfg : DataFrame, 
+#    invo : DataFrame, 
+#    invrm : DataFrame, 
+#    invt : DataFrame, 
+#    invwip : DataFrame, 
+#    ivaco : DataFrame, 
+#    ivaeq : DataFrame, 
+#    ivao : DataFrame, 
+#    ivch : DataFrame, 
+#    ivncf : DataFrame, 
+#    ivst : DataFrame, 
+#    ivstch : DataFrame, 
+#    lco : DataFrame, 
+#    lcox : DataFrame, 
+#    lct : DataFrame, 
+#    lo : DataFrame, 
+#    lse : DataFrame, 
+#    lt : DataFrame, 
+#    ltdch : DataFrame, 
+#    mibn : DataFrame, 
+#    mibt : DataFrame, 
+#    mii : DataFrame, 
+#    ni : DataFrame, 
+#    nopi : DataFrame, 
+#    np : DataFrame, 
+#    oancf : DataFrame, 
+#    oiadp : DataFrame, 
+#    oibdp : DataFrame, 
+#    pi : DataFrame, 
+#    ppegt : DataFrame, 
+#    ppent : DataFrame, 
+#    prc : DataFrame, 
+#    prv : DataFrame, 
+#    psfix : DataFrame, 
+#    pstk : DataFrame, 
+#    pstkn : DataFrame, 
+#    pstkr : DataFrame, 
+#    re : DataFrame, 
+#    recch : DataFrame, 
+#    recco : DataFrame, 
+#    rect : DataFrame, 
+#    rectr : DataFrame, 
+#    reuna : DataFrame, 
+#    revt : DataFrame, 
+#    rvlrv : DataFrame, 
+#    rvutx : DataFrame, 
+#    sale : DataFrame, 
+#    saleq : DataFrame, 
+#    sco : DataFrame, 
+#    seq : DataFrame, 
+#    siv : DataFrame, 
+#    spi : DataFrame, 
+#    sppiv : DataFrame, 
+#    sstk : DataFrame, 
+#    teq : DataFrame, 
+#    transa : DataFrame, 
+#    tsca : DataFrame, 
+#    tstk : DataFrame, 
+#    tstlta : DataFrame, 
+#    txc : DataFrame, 
+#    txdb : DataFrame, 
+#    txdc : DataFrame, 
+#    txdi : DataFrame, 
+#    txditc : DataFrame, 
+#    txo : DataFrame, 
+#    txop : DataFrame, 
+#    txp : DataFrame, 
+#    txpd : DataFrame, 
+#    txt : DataFrame, 
+#    txw : DataFrame, 
+#    unl : DataFrame, 
+#    unnp : DataFrame, 
+#    wcap : DataFrame, 
+#    wcapopc : DataFrame, 
+#    xacc : DataFrame, 
+#    xido : DataFrame, 
+#    xint : DataFrame, 
+#    xlr : DataFrame, 
+#    xopr : DataFrame, 
+#    xopro : DataFrame, 
+#    xpp : DataFrame, 
+#    xrd : DataFrame, 
+#    xrent : DataFrame, 
+#    xsga : DataFrame
+
+Flow financialratio_example {
+    aco = data("afnd1_aco")
+    acox = data("afnd1_acox")
+    act = data("afnd1_act")
+    am = data("afnd1_am")
+    ao = data("afnd1_ao")
+    aoloch = data("afnd1_aoloch")
+    aox = data("afnd1_aox")
+    ap = data("afnd1_ap")
+    apch = data("afnd1_apch")
+    apo = data("afnd1_apo")
+    aqc = data("afnd1_aqc")
+    at = data("afnd1_at")
+   # autxr = data("afnd1_autxr")
+   # caps = data("afnd1_caps")
+   # capx = data("afnd1_capx")
+   # ceq = data("afnd1_ceq")
+   # ch = data("afnd1_ch")
+   # che = data("afnd1_che")
+   # cheb = data("afnd1_cheb")
+   # chech = data("afnd1_chech")
+   # chee = data("afnd1_chee")
+   # cogs = data("afnd1_cogs")
+   # cshfd = data("afnd1_cshfd")
+   # csho = data("afnd1_csho")
+   # cshpri = data("afnd1_cshpri")
+   # cshr = data("afnd1_cshr")
+   # cstk = data("afnd1_cstk")
+   # dc = data("afnd1_dc")
+   # dd1 = data("afnd1_dd1")
+   # dfxa = data("afnd1_dfxa")
+   # dlc = data("afnd1_dlc")
+   # dlcch = data("afnd1_dlcch")
+   # dltt = data("afnd1_dltt")
+   # do = data("afnd1_do")
+   # dp = data("afnd1_dp")
+   # dpact = data("afnd1_dpact")
+   # dpc = data("afnd1_dpc")
+   # dv = data("afnd1_dv")
+   # dvc = data("afnd1_dvc")
+   # dvt = data("afnd1_dvt")
+   # ea = data("afnd1_ea")
+   # ebit = data("afnd1_ebit")
+   # ebitda = data("afnd1_ebitda")
+   # emp = data("afnd1_emp")
+   # epsfi = data("afnd1_epsfi")
+   # epsfx = data("afnd1_epsfx")
+   # epspi = data("afnd1_epspi")
+   # epspx = data("afnd1_epspx")
+   # ero = data("afnd1_ero")
+   # exre = data("afnd1_exre")
+   # fca = data("afnd1_fca")
+   # fiao = data("afnd1_fiao")
+   # fincf = data("afnd1_fincf")
+   # fopo = data("afnd1_fopo")
+   # gdwl = data("afnd1_gdwl")
+   # ib = data("afnd1_ib")
+   # ibc = data("afnd1_ibc")
+   # ibmii = data("afnd1_ibmii")
+   # icapt = data("afnd1_icapt")
+   # idit = data("afnd1_idit")
+   # intan = data("afnd1_intan")
+   # intanp = data("afnd1_intanp")
+   # intc = data("afnd1_intc")
+   # intoact = data("afnd1_intoact")
+   # intpn = data("afnd1_intpn")
+   # invch = data("afnd1_invch")
+   # invfg = data("afnd1_invfg")
+   # invo = data("afnd1_invo")
+   # invrm = data("afnd1_invrm")
+   # invt = data("afnd1_invt")
+   # invwip = data("afnd1_invwip")
+   # ivaco = data("afnd1_ivaco")
+   # ivaeq = data("afnd1_ivaeq")
+   # ivao = data("afnd1_ivao")
+   # ivch = data("afnd1_ivch")
+   # ivncf = data("afnd1_ivncf")
+   # ivst = data("afnd1_ivst")
+   # ivstch = data("afnd1_ivstch")
+   # lco = data("afnd1_lco")
+   # lcox = data("afnd1_lcox")
+   # lct = data("afnd1_lct")
+   # lo = data("afnd1_lo")
+   # lse = data("afnd1_lse")
+   # lt = data("afnd1_lt")
+   # ltdch = data("afnd1_ltdch")
+   # mibn = data("afnd1_mibn")
+   # mibt = data("afnd1_mibt")
+   # mii = data("afnd1_mii")
+   # ni = data("afnd1_ni")
+   # nopi = data("afnd1_nopi")
+   # np = data("afnd1_np")
+   # oancf = data("afnd1_oancf")
+   # oiadp = data("afnd1_oiadp")
+   # oibdp = data("afnd1_oibdp")
+   # pi = data("afnd1_pi")
+   # ppegt = data("afnd1_ppegt")
+   # ppent = data("afnd1_ppent")
+   # prc = data("afnd1_prc")
+   # prv = data("afnd1_prv")
+   # psfix = data("afnd1_psfix")
+   # pstk = data("afnd1_pstk")
+   # pstkn = data("afnd1_pstkn")
+   # pstkr = data("afnd1_pstkr")
+   # re = data("afnd1_re")
+   # recch = data("afnd1_recch")
+   # recco = data("afnd1_recco")
+   # rect = data("afnd1_rect")
+   # rectr = data("afnd1_rectr")
+   # reuna = data("afnd1_reuna")
+   # revt = data("afnd1_revt")
+   # rvlrv = data("afnd1_rvlrv")
+   # rvutx = data("afnd1_rvutx")
+   # sale = data("afnd1_sale")
+   # saleq = data("afnd1_saleq")
+   # sco = data("afnd1_sco")
+   # seq = data("afnd1_seq")
+   # siv = data("afnd1_siv")
+   # spi = data("afnd1_spi")
+   # sppiv = data("afnd1_sppiv")
+   # sstk = data("afnd1_sstk")
+   # teq = data("afnd1_teq")
+   # transa = data("afnd1_transa")
+   # tsca = data("afnd1_tsca")
+   # tstk = data("afnd1_tstk")
+   # tstlta = data("afnd1_tstlta")
+   # txc = data("afnd1_txc")
+   # txdb = data("afnd1_txdb")
+   # txdc = data("afnd1_txdc")
+   # txdi = data("afnd1_txdi")
+   # txditc = data("afnd1_txditc")
+   # txo = data("afnd1_txo")
+   # txop = data("afnd1_txop")
+   # txp = data("afnd1_txp")
+   # txpd = data("afnd1_txpd")
+   # txt = data("afnd1_txt")
+   # txw = data("afnd1_txw")
+   # unl = data("afnd1_unl")
+   # unnp = data("afnd1_unnp")
+   # wcap = data("afnd1_wcap")
+   # wcapopc = data("afnd1_wcapopc")
+   # xacc = data("afnd1_xacc")
+   # xido = data("afnd1_xido")
+   # xint = data("afnd1_xint")
+   # xlr = data("afnd1_xlr")
+   # xopr = data("afnd1_xopr")
+   # xopro = data("afnd1_xopro")
+   # xpp = data("afnd1_xpp")
+   # xrd = data("afnd1_xrd")
+   # xrent = data("afnd1_xrent")
+   # xsga = data("afnd1_xsga")
+   # FinancialRatio(aco,acox,act,am,ao,aoloch,aox,ap,apch,apo,aqc,at,autxr,caps,capx,ceq,ch,che,cheb,chech,chee,cogs,cshfd,csho,cshpri,cshr,cstk,dc,dd1,dfxa,dlc,dlcch,dltt,do,dp,dpact,dpc,dv,dvc,dvt,ea,ebit,ebitda,emp,epsfi,epsfx,epspi,epspx,ero,exre,fca,fiao,fincf,fopo,gdwl,ib,ibc,ibmii,icapt,idit,intan,intanp,intc,intoact,intpn,invch,invfg,invo,invrm,invt,invwip,ivaco,ivaeq,ivao,ivch,ivncf,ivst,ivstch,lco,lcox,lct,lo,lse,lt,ltdch,mibn,mibt,mii,ni,nopi,np,oancf,oiadp,oibdp,pi,ppegt,ppent,prc,prv,psfix,pstk,pstkn,pstkr,re,recch,recco,rect,rectr,reuna,revt,rvlrv,rvutx,sale,saleq,sco,seq,siv,spi,sppiv,sstk,teq,transa,tsca,tstk,tstlta,txc,txdb,txdc,txdi,txditc,txo,txop,txp,txpd,txt,txw,unl,unnp,wcap,wcapopc,xacc,xido,xint,xlr,xopr,xopro,xpp,xrd,xrent,xsga)
+   FinancialRatio(aco,acox,act,am,ao,aoloch,aox,ap,apch,apo,aqc,at)
+}

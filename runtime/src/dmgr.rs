@@ -2,7 +2,7 @@ use flate2::read::GzDecoder;
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::PathBuf;
-use tch::{Device, Tensor, Kind};
+use tch::{Device, Kind, Tensor};
 
 pub struct DataManager {
     cache: HashMap<String, Tensor>,
@@ -37,13 +37,10 @@ impl DataManager {
             return Some(data.shallow_clone());
         }
 
-        let filename1 = self.data_dir.join(format!("{}.csv.gz", name));
-
-        let path = if filename1.exists() {
-            filename1
-        } else {
-            PathBuf::from(format!("../data/{}.csv.gz", name))
-        };
+        let path = self.data_dir.join(format!("{}.csv.gz", name));
+        if !path.exists() {
+            panic!("Data file not found: {:?}", path);
+        }
 
         let loaded_data = if let Ok(file) = File::open(&path) {
             let gz = GzDecoder::new(file);
@@ -87,14 +84,22 @@ impl DataManager {
             if rows == 0 {
                 Tensor::zeros(&[0, 0], (Kind::Float, self.device))
             } else {
-                println!("Creating tensor from slice, flat_data.len() = {}, rows = {}, cols = {}", flat_data.len(), rows, cols);
-                Tensor::from_slice(&flat_data).view((rows as i64, cols as i64)).to(self.device)
+                println!(
+                    "Creating tensor from slice, flat_data.len() = {}, rows = {}, cols = {}",
+                    flat_data.len(),
+                    rows,
+                    cols
+                );
+                Tensor::from_slice(&flat_data)
+                    .view((rows as i64, cols as i64))
+                    .to(self.device)
             }
         } else {
             panic!("Failed to load data file: {:?}", path);
         };
 
-        self.cache.insert(name.to_string(), loaded_data.shallow_clone());
+        self.cache
+            .insert(name.to_string(), loaded_data.shallow_clone());
         Some(loaded_data)
     }
 }

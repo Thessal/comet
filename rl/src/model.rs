@@ -1,4 +1,5 @@
 use runtime::runtime::Runtime;
+use stdlib::types;
 use tch::{
     Device, Tensor,
     nn::{self, Module},
@@ -238,7 +239,10 @@ impl Model for AgentModel {
         }
 
         let mut alpha_matrix = if data_tensors.is_empty() {
-            Tensor::zeros([1755, 5], (tch::Kind::Float, *device))
+            Tensor::zeros(
+                [types::SIZE[0], types::SIZE[1]],
+                (tch::Kind::Float, *device),
+            )
         } else {
             let stacked = Tensor::stack(&data_tensors, 0);
             let size = stacked.size();
