@@ -1,5 +1,4 @@
 use crate::{OperatorSpec, types::Signal};
-use tch::Tensor;
 
 pub static OP_RANK: OperatorSpec = OperatorSpec {
     name: "rank",
@@ -17,13 +16,17 @@ pub static OP_RANK: OperatorSpec = OperatorSpec {
                     .to_kind(a.kind())
                     .flip([1]);
                 let rank = (rank_fwd + rank_rev) / 2.0;
-                
+
                 // Rank 0 to N-1. Normalize it to 0-1
                 let valid = a.isnan().logical_not();
-                let count_valid = valid.to_kind(a.kind()).sum_dim_intlist(Some(&[1][..]), false, a.kind());
+                let count_valid =
+                    valid
+                        .to_kind(a.kind())
+                        .sum_dim_intlist(Some(&[1][..]), false, a.kind());
                 let rank = rank / (count_valid.unsqueeze(1) - 1.0).clamp_min(1.0);
-                
-                let nan = tch::Tensor::full(rank.size().as_slice(), f64::NAN, (a.kind(), a.device()));
+
+                let nan =
+                    tch::Tensor::full(rank.size().as_slice(), f64::NAN, (a.kind(), a.device()));
                 Signal::DataFrame(Some(rank.where_self(&valid, &nan)))
             }
             _ => panic!("rank expected DataFrame"),

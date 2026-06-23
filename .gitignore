@@ -6,3 +6,5 @@
 *.bin
 *.tar.gz
 /_old
+/wrds/data
+/result/logs

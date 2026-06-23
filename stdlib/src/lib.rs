@@ -13,7 +13,6 @@ mod op_time_series;
 mod op_ts_mean;
 
 pub mod types;
-use tch::Kind;
 use types::Signal;
 
 pub struct OperatorSpec {
@@ -154,8 +153,6 @@ impl OperatorSpec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tch::Tensor;
-
     fn generate_args(spec: &OperatorSpec, device: tch::Device) -> Vec<Signal> {
         spec.inputs
             .iter()
@@ -304,7 +301,7 @@ mod tests {
             for arg in &args {
                 match arg {
                     Signal::DataFrame(Some(t)) => {
-                        let mut modified = t.shallow_clone(); // + 0.0; // force a deep copy by adding 0.0
+                        let modified = t.shallow_clone(); // + 0.0; // force a deep copy by adding 0.0
                         // Mutate the "future" data (after t_split)
                         let mut future_slice =
                             modified.narrow(0, t_split, crate::types::SIZE[0] - t_split);
@@ -346,10 +343,6 @@ mod tests {
 
         for op_name in ops {
             if op_name == "data" {
-                continue;
-            }
-            // Temporarily ignore cs_rank if it's commented out in lib.rs
-            if op_name == "cs_rank" {
                 continue;
             }
             let spec: &OperatorSpec = op_name.into();

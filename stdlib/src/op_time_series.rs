@@ -1,5 +1,4 @@
 use crate::{OperatorSpec, types::Signal};
-use tch::Tensor;
 
 fn roll_window(a: &tch::Tensor, d: i64) -> tch::Tensor {
     let d_safe = std::cmp::max(1, d);
@@ -30,7 +29,7 @@ pub static OP_DELAY: OperatorSpec = OperatorSpec {
                 Signal::DataFrame(Some(a.shallow_clone()))
             } else {
                 let d_safe = std::cmp::min(d, t_len);
-                let mut res = a.roll(&[d_safe], &[0]);
+                let res = a.roll(&[d_safe], &[0]);
                 if d_safe > 0 && d_safe <= t_len {
                     let mut slice = res.narrow(0, 0, d_safe);
                     let nan = tch::Tensor::full(&[1], f64::NAN, (a.kind(), a.device()));
