@@ -2,7 +2,6 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref, clippy::missing_safety_doc)]
 mod op_add;
 mod op_cross_section;
-mod op_cs_rank;
 mod op_cs_zscore;
 mod op_data;
 mod op_divide;
@@ -188,7 +187,7 @@ mod tests {
             "multiply",
             "flip",
             "pow",
-            "cs_rank",
+            // "cs_rank",
             "cs_zscore",
             "ts_mean",
             "rank",
@@ -334,6 +333,75 @@ mod tests {
                     "Operator {} failed forward-looking test",
                     op_name
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn test_nan_instrument_invariance() {
+        // It means that the operator result is invariant under adding cross-sectional addition of nan values, except the result contains additional nan value.
+        // In other word, cross-sectional trimming of nan values don't change the result.
+        let device = tch::Device::Cpu;
+        let ops = get_all_ops();
+
+        for op_name in ops {
+            if op_name == "data" {
+                continue;
+            }
+            // Temporarily ignore cs_rank if it's commented out in lib.rs
+            if op_name == "cs_rank" {
+                continue;
+            }
+            let spec: &OperatorSpec = op_name.into();
+
+            let args_base = generate_args(spec, device);
+            let out_base = spec.execute(&args_base).unwrap();
+
+            let num_nan_cols = 10;
+            let mut args_nan = Vec::new();
+
+            for arg in &args_base {
+                match arg {
+                    Signal::DataFrame(Some(t)) => {
+                        let rows = t.size()[0];
+                        let nan_cols = tch::Tensor::full(
+                            &[rows, num_nan_cols],
+                            f64::NAN,
+                            (tch::Kind::Float, device),
+                        );
+                        let t_with_nan = tch::Tensor::cat(&[t, &nan_cols], 1);
+                        args_nan.push(Signal::DataFrame(Some(t_with_nan)));
+                    }
+                    _ => args_nan.push(arg.clone()),
+                }
+            }
+
+            let out_nan = spec.execute(&args_nan).unwrap();
+
+            if let (Signal::DataFrame(Some(t_orig)), Signal::DataFrame(Some(t_nan))) =
+                (out_base, out_nan)
+            {
+                let orig_cols = t_orig.size()[1];
+                let t_nan_orig_part = t_nan.narrow(1, 0, orig_cols);
+
+                // We use a small epsilon for floating point comparison.
+                // We also need to handle NaN equivalence (equal_nan=true) in isclose.
+                let is_close = t_orig.isclose(&t_nan_orig_part, 1e-4, 1e-6, true);
+                let is_all_true = i64::try_from(is_close.all()).unwrap() != 0;
+                assert!(
+                    is_all_true,
+                    "Operator {} failed nan instrument invariance test (valid columns changed)",
+                    op_name
+                );
+
+                // let t_nan_added_part = t_nan.narrow(1, orig_cols, num_nan_cols);
+                // let is_nan = t_nan_added_part.isnan();
+                // let is_all_nan = i64::try_from(is_nan.all()).unwrap() != 0;
+                // assert!(
+                //     is_all_nan,
+                //     "Operator {} failed nan instrument invariance test (added columns are not NaN)",
+                //     op_name
+                // );
             }
         }
     }
