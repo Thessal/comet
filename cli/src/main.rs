@@ -44,7 +44,22 @@ fn _main(args: Args) {
     // bruteforce::brute_force(network, action_space, use_cuda);
 
     let mut runtime = Runtime::new(10000, "./wrds/data".into(), Some(device));
-    let pool = transformer::transformer_search(network, action_space, device, None, &mut runtime);
+    // let batch_size = 64;
+    // let episodes_per_batch = 50;
+
+    let batch_size = 64;
+    let episodes_per_batch = 50;
+    // let batch_size = 4;
+    // let episodes_per_batch = 1;
+    let pool = transformer::transformer_search(
+        network,
+        action_space,
+        device,
+        None,
+        &mut runtime,
+        episodes_per_batch,
+        batch_size,
+    );
 
     println!("--- Expressions found ---");
     for expr in pool.exprs() {
@@ -100,8 +115,17 @@ fn _main_standard_ppo(args: Args) {
     let action_space: ActionSpace = behavior_decl.into();
     // bruteforce::brute_force(network, action_space, use_cuda);
     let mut runtime = Runtime::new(300, "./wrds/data".into(), Some(device));
-    let pool =
-        transformer::transformer_search(network, action_space, device, Some(0.0), &mut runtime);
+    let batch_size = 32;
+    let episodes_per_batch = 8;
+    let pool = transformer::transformer_search(
+        network,
+        action_space,
+        device,
+        Some(0.0),
+        &mut runtime,
+        episodes_per_batch,
+        batch_size,
+    );
 
     println!("--- Expressions found ---");
     for expr in pool.exprs() {

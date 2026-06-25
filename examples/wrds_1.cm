@@ -13,10 +13,10 @@ Behavior FinancialRatio(
     at : DataFrame
 ) {
     weights="weights/wrds_1.pth", train=true, supervised_epochs=100,
-    operators = [add, subtract, divide, multiply, flip, pow, cs_zscore, ts_mean, rank, rank_add, rank_sub, rank_mul, rank_div, sign, sigmoid, delay, delta, ts_return, ts_max, ts_min, ts_argmax, ts_argmin, ts_sum, ts_prod, ts_nanmean, ts_stddev, ts_rank, ts_cov, ts_corr],
+    operators = [add, subtract, divide, multiply, flip, pow, cs_zscore, rank ],
     integers = [ 1, 5, 21, 63 ], floats = [ 0.2, 0.8, 1.0, 5.0 ], strings=[]
 } -> DataFrame
-
+#    operators = [add, subtract, divide, multiply, flip, pow, cs_zscore, ts_mean, rank, rank_add, rank_sub, rank_mul, rank_div, sign, sigmoid, delay, delta, ts_return, ts_max, ts_min, ts_argmax, ts_argmin, ts_sum, ts_prod, ts_nanmean, ts_stddev, ts_rank, ts_cov, ts_corr],
 #    autxr : DataFrame, 
 #    caps : DataFrame, 
 #    capx : DataFrame, 

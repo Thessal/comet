@@ -79,9 +79,11 @@ pub fn transformer_search(
     device: Device,
     adj_coeff: Option<f64>, // orthogonal advantage adj. 1.0 is default
     mut runtime: &mut Runtime,
+    episodes_per_batch: usize,
+    batch_size: usize,
 ) -> rl::pool::Pool {
     // let mut runtime = Runtime::new(10000, "data".into(), Some(device));
-    let backtester = BasicBacktest::new(&mut runtime.dmgr, "returns_next");
+    let backtester = BasicBacktest::new(&mut runtime.dmgr, "returns_d1");
     let pool = Pool::new(backtester, device, adj_coeff.unwrap_or(1.0));
 
     let seq_len = 50;
@@ -103,8 +105,8 @@ pub fn transformer_search(
     let c1 = 0.5;
     let c2 = 0.05;
     let epochs = 4;
-    let batch_size = 512;
-    let episodes_per_batch = 50;
+    // let batch_size = 512;
+    // let episodes_per_batch = 50;
     let num_iterations = 2000;
     // let num_iterations = 20;
     let unfinished_penaly: f64 = 10.0;
@@ -131,8 +133,9 @@ pub fn transformer_search(
                 let mask: Tensor = env.get_valid_action_mask(&device);
 
                 // Get predictions from model
-                let (alpha_matrix, action_logits, value_tensor) =
-                    model.forward(&env.state, &mut runtime, &mask, &device, &actions);
+                let (alpha_matrix, action_logits, value_tensor) = tch::no_grad(|| {
+                    model.forward(&env.state, &mut runtime, &mask, &device, &actions)
+                });
 
                 // Sample action
                 let log_probs = action_logits.log_softmax(-1, tch::Kind::Float);
@@ -205,8 +208,9 @@ pub fn transformer_search(
                 ep_reward -= unfinished_penaly;
 
                 let mask: Tensor = env.get_valid_action_mask(&device);
-                let (_, _, value_tensor) =
-                    model.forward(&env.state, &mut runtime, &mask, &device, &actions);
+                let (_, _, value_tensor) = tch::no_grad(|| {
+                    model.forward(&env.state, &mut runtime, &mask, &device, &actions)
+                });
                 last_value_for_gae = value_tensor.double_value(&[0]) as f32;
                 if last_value_for_gae.is_nan() {
                     last_value_for_gae = 0.0;

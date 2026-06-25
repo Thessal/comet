@@ -11,7 +11,7 @@ impl BasicBacktest {
     pub fn new(dmgr: &mut DataManager, target_field: &str) -> Self {
         let returns = dmgr
             .get_data(target_field)
-            .expect("Failed to load close data")
+            .expect("Failed to load returns data")
             .shallow_clone();
         let returns = returns.nan_to_num(0.0, 0.0, 0.0);
         assert_eq!(returns.size(), DATA_SIZE);

@@ -11,6 +11,17 @@ mod op_pow;
 mod op_subtract;
 mod op_time_series;
 mod op_ts_mean;
+mod op_ts_max;
+mod op_ts_min;
+mod op_ts_argmax;
+mod op_ts_argmin;
+mod op_ts_sum;
+mod op_ts_prod;
+mod op_ts_nanmean;
+mod op_ts_stddev;
+mod op_ts_rank;
+mod op_ts_cov;
+mod op_ts_corr;
 
 pub mod types;
 use types::Signal;
@@ -57,17 +68,17 @@ impl From<&str> for &OperatorSpec {
             "delay" => &op_time_series::OP_DELAY,
             "delta" => &op_time_series::OP_DELTA,
             "ts_return" => &op_time_series::OP_TS_RETURN,
-            "ts_max" => &op_time_series::OP_TS_MAX,
-            "ts_min" => &op_time_series::OP_TS_MIN,
-            "ts_argmax" => &op_time_series::OP_TS_ARGMAX,
-            "ts_argmin" => &op_time_series::OP_TS_ARGMIN,
-            "ts_sum" => &op_time_series::OP_TS_SUM,
-            "ts_prod" => &op_time_series::OP_TS_PROD,
-            "ts_nanmean" => &op_time_series::OP_TS_NANMEAN,
-            "ts_stddev" => &op_time_series::OP_TS_STDDEV,
-            "ts_rank" => &op_time_series::OP_TS_RANK,
-            "ts_cov" => &op_time_series::OP_TS_COV,
-            "ts_corr" => &op_time_series::OP_TS_CORR,
+            "ts_max" => &op_ts_max::OP_TS_MAX,
+            "ts_min" => &op_ts_min::OP_TS_MIN,
+            "ts_argmax" => &op_ts_argmax::OP_TS_ARGMAX,
+            "ts_argmin" => &op_ts_argmin::OP_TS_ARGMIN,
+            "ts_sum" => &op_ts_sum::OP_TS_SUM,
+            "ts_prod" => &op_ts_prod::OP_TS_PROD,
+            "ts_nanmean" => &op_ts_nanmean::OP_TS_NANMEAN,
+            "ts_stddev" => &op_ts_stddev::OP_TS_STDDEV,
+            "ts_rank" => &op_ts_rank::OP_TS_RANK,
+            "ts_cov" => &op_ts_cov::OP_TS_COV,
+            "ts_corr" => &op_ts_corr::OP_TS_CORR,
             // "ts_diff" => OperatorSpec {
             //     name: "ts_diff",
             //     inputs: &[Signal::Int(None), Signal::DataFrame(None)],
