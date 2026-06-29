@@ -257,7 +257,7 @@ fn measure_rl_bottleneck(filename: &str, device: Device) {
     let iters_train = 10;
     let mut total_backward = std::time::Duration::new(0, 0);
     for _ in 0..iters_train {
-        let (logits, _) = model.decoder.forward(
+        let logits = model.decoder.forward(
             &Tensor::zeros([32, 50], (tch::Kind::Int64, device)),
             &Tensor::zeros(
                 [32, stdlib::types::SIZE[0], stdlib::types::SIZE[1]],

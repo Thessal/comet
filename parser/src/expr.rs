@@ -106,7 +106,7 @@ impl fmt::Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Literal::Integer(i) => write!(f, "{}", i),
-            Literal::Float(fl) => write!(f, "{}", fl),
+            Literal::Float(fl) => write!(f, "{:?}", fl),
             Literal::String(s) => write!(f, "\"{}\"", s),
             Literal::Boolean(b) => write!(f, "{}", b),
         }

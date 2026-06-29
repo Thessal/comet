@@ -210,41 +210,26 @@ impl Pool {
         &self,
         runtime: &mut Runtime,
         machine: &AbstractMachine,
-        is_done: bool,
+        // _is_done: bool,
+        pbest_reward: f64,
     ) -> f64 {
         let (stack, callgraph): (&Vec<(Signal, usize)>, &Network) = machine.get_stack();
-        if is_done {
-            if stack.len() != 1 {
-                return f64::NAN;
-            }
-            let (_signal_spec, addr) = &stack[0];
-            let returns = self.signal_to_returns(runtime, callgraph, *addr);
-            self.utility(&returns)
-        } else {
-            // Intermediate reward
-            if stack.is_empty() {
-                return f64::NAN;
-            }
-            let mut returns_list = Vec::with_capacity(stack.len());
-            for (_signal_spec, addr) in stack {
-                // (types, address)
-                returns_list.push(self.signal_to_returns(runtime, callgraph, *addr));
-            }
-            let returns_stacked = Tensor::stack(&returns_list, 0); // [stack_size, T]
-
-            // Calculate marginal utility and get the maximum
-            let marginal_utility = self.marginal_utility(&returns_stacked, 252, 0); // TODO: pass evaluation start/end days properly
-
-            // Mask out NaNs to effectively ignore them in max
-            let nan_mask = marginal_utility.isnan();
-            let masked_marginal = marginal_utility.masked_fill(&nan_mask, f64::NEG_INFINITY);
-
-            let max_val = f64::try_from(masked_marginal.max()).unwrap_or(f64::NAN);
-            if max_val == f64::NEG_INFINITY {
-                f64::NAN
-            } else {
-                max_val
-            }
+        if stack.is_empty() {
+            return f64::NAN;
         }
+        let mut returns_list = Vec::with_capacity(stack.len());
+        for (_signal_spec, addr) in stack {
+            // (types, address)
+            returns_list.push(self.signal_to_returns(runtime, callgraph, *addr));
+        }
+        let returns_stacked = Tensor::stack(&returns_list, 0); // [stack_size, T]
+
+        // Calculate marginal utility and get the maximum
+        let marginal_utility = self.marginal_utility(&returns_stacked, 252, 0); // TODO: pass evaluation start/end days properly
+
+        if bool::try_from(marginal_utility.isnan().any()).unwrap() == true {
+            panic!("NaN in marginal utility");
+        }
+        f64::try_from(marginal_utility.max()).unwrap() - pbest_reward
     }
 }

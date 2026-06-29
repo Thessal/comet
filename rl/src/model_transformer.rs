@@ -180,7 +180,7 @@ pub struct SRDecoderModel {
     pos_embedding: Tensor,
     layers: Vec<TransformerDecoderLayer>,
     output_linear: nn::Linear,
-    value_linear: nn::Linear,
+    // value_linear: nn::Linear,
 }
 
 impl SRDecoderModel {
@@ -219,7 +219,7 @@ impl SRDecoderModel {
             vocab_size,
             Default::default(),
         );
-        let value_linear = nn::linear(&vs.sub("value_linear"), d_model, 1, Default::default());
+        // let value_linear = nn::linear(&vs.sub("value_linear"), d_model, 1, Default::default());
 
         Self {
             d_model,
@@ -228,15 +228,11 @@ impl SRDecoderModel {
             pos_embedding,
             layers,
             output_linear,
-            value_linear,
+            // value_linear,
         }
     }
 
-    pub fn forward(
-        &self,
-        shifted_target_tokens: &Tensor,
-        alpha_matrix: &Tensor,
-    ) -> (Tensor, Tensor) {
+    pub fn forward(&self, shifted_target_tokens: &Tensor, alpha_matrix: &Tensor) -> Tensor {
         let size = shifted_target_tokens.size();
         let _batch_size = size[0];
         let seq_len = size[1];
@@ -265,8 +261,9 @@ impl SRDecoderModel {
         }
 
         let logits = self.output_linear.forward(&tgt_vectors);
-        let values = self.value_linear.forward(&tgt_vectors).squeeze_dim(-1);
+        // let values = self.value_linear.forward(&tgt_vectors).squeeze_dim(-1);
 
-        (logits, values)
+        // (logits, values)
+        logits
     }
 }

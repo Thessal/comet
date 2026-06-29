@@ -90,7 +90,7 @@ impl Environment {
             let valid = match &action {
                 Action::Done => {
                     stack.len() == 1 && matches!(stack[0].0, stdlib::types::Signal::DataFrame(_))
-                },
+                }
                 Action::Reduce(op_spec) => {
                     stack.len() >= op_spec.inputs.len() && // stack size checking
                     self.state.machine.check_reduce(&op_spec) // type checking
@@ -116,6 +116,7 @@ impl Environment {
         self.reset();
         let mut trajectory: Trajectory = Vec::new();
         let mut actions: Vec<i64> = Vec::new();
+        let mut pbest = 0.0f64;
         for _i in 0..self.config.max_length {
             let mask: Tensor = self.get_valid_action_mask(device);
             let (state_embedding, action_logits, value_tensor): (Tensor, Tensor, Tensor) =
@@ -131,9 +132,10 @@ impl Environment {
 
             actions.push(action_idx);
 
-            let is_done = action == Action::Done;
-            let reward: f64 = self.pool.calc_reward(runtime, &self.state.machine, is_done);
+            let reward: f64 = self.pool.calc_reward(runtime, &self.state.machine, pbest);
+            pbest = reward;
 
+            let is_done = action == Action::Done;
             let step = Step {
                 state_embedding,
                 action,

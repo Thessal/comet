@@ -176,6 +176,7 @@ impl Model for RandomModel {
 pub struct AgentModel {
     pub action_space: ActionSpace,
     pub decoder: crate::model_transformer::SRDecoderModel,
+    pub value_net: nn::Sequential,
     seq_len: i64,
 }
 
@@ -184,9 +185,19 @@ impl AgentModel {
         let vocab_size = action_space.size() as i64;
         let decoder =
             crate::model_transformer::SRDecoderModel::new(vs, vocab_size, d_model, 8, 512, 4);
+
+        let vs_v = vs.sub("value_net");
+        let value_net = nn::seq()
+            .add(nn::linear(&vs_v.sub("l1"), 5, 64, Default::default()))
+            .add_fn(|x| x.relu())
+            .add(nn::linear(&vs_v.sub("l2"), 64, 64, Default::default()))
+            .add_fn(|x| x.relu())
+            .add(nn::linear(&vs_v.sub("l3"), 64, 2, Default::default()));
+
         Self {
             action_space,
             decoder,
+            value_net,
             seq_len: 50,
         }
     }
@@ -214,6 +225,49 @@ impl AgentModel {
 
     pub fn calculate_value_loss(&self, values: &Tensor, returns: &Tensor) -> Tensor {
         values.mse_loss(returns, tch::Reduction::Mean)
+    }
+
+    pub fn compute_5d_embedding(
+        history: &[i64],
+        is_done: bool,
+        action_space: &ActionSpace,
+    ) -> [f32; 5] {
+        let len = history.len() as f32;
+        let mut num_data = 0.0;
+        let mut num_ops = 0.0;
+
+        let mut counts = std::collections::HashMap::new();
+        for &act_idx in history {
+            *counts.entry(act_idx).or_insert(0) += 1;
+            let action = action_space.get_action(act_idx as usize);
+            match action {
+                crate::action::Action::ShiftString(_) | crate::action::Action::ShiftParam(_) => {
+                    num_data += 1.0;
+                }
+                crate::action::Action::Reduce(_) => {
+                    num_ops += 1.0;
+                }
+                _ => {}
+            }
+        }
+
+        let mut entropy = 0.0;
+        if len > 0.0 {
+            for &count in counts.values() {
+                let p = (count as f32) / len;
+                entropy -= p * p.ln();
+            }
+        }
+
+        // Scale roughly to [0, 1] based on max length of 30
+        let scale = 30.0;
+        [
+            len / scale,
+            num_data / scale,
+            num_ops / scale,
+            entropy,
+            if is_done { 1.0 } else { 0.0 },
+        ]
     }
 }
 
@@ -264,11 +318,32 @@ impl Model for AgentModel {
         }
         let shifted_target_tokens = Tensor::from_slice(&target_tokens).to(*device).unsqueeze(0);
 
-        let (logits, values) = self.decoder.forward(&shifted_target_tokens, &alpha_matrix);
+        let logits = self.decoder.forward(&shifted_target_tokens, &alpha_matrix);
 
         let step_idx = std::cmp::min(actions.len(), self.seq_len as usize - 1) as i64;
         let step_logits = logits.select(1, step_idx); // (1, vocab_size)
-        let value = values.select(1, step_idx); // (1,)
+
+        let emb_5d = Self::compute_5d_embedding(actions, false, &self.action_space);
+        let emb_5d_t = Tensor::from_slice(&emb_5d).to(*device).unsqueeze(0);
+        let value_out = self.value_net.forward(&emb_5d_t).squeeze_dim(0); // (2,)
+
+        let mu = value_out.select(0, 0);
+        let log_sigma = value_out.select(0, 1).clamp(-20.0, 2.0);
+        let sigma = log_sigma.exp();
+        let value: tch::Tensor = &mu - 1.96 * &sigma; // 5% quantile // 0.05 0.95 : 2-sigma
+
+        // Debug printing (randomly print ~1% of the time to avoid spam, or just print if needed)
+        if rand::random::<f32>() < 0.01 {
+            let mu_val = mu.double_value(&[]);
+            let sigma_val = sigma.double_value(&[]);
+            println!(
+                "Debug ValueNet -> Inputs: {:?}, mu: {:.4}, sigma: {:.4}, value: {:.4}",
+                emb_5d,
+                mu_val,
+                sigma_val,
+                value.double_value(&[])
+            );
+        }
 
         let masked_logits =
             step_logits.masked_fill(&masks.logical_not().unsqueeze(0), std::f64::NEG_INFINITY);

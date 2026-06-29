@@ -8,7 +8,7 @@ use runtime::backtest::BasicBacktest;
 use runtime::runtime::Runtime;
 use tch::Device;
 use tch::Tensor;
-use tch::nn::OptimizerConfig;
+use tch::nn::{Module, OptimizerConfig};
 
 pub struct RolloutBuffer {
     pub states: Vec<(Tensor, Tensor, i64, Tensor)>, // shifted_tgt, data_pt, step_idx, mask
@@ -40,17 +40,17 @@ impl RolloutBuffer {
         self.dones.clear();
     }
 
-    pub fn calc_gae(&self, last_value: f32, gamma: f32, tau: f32) -> (Vec<f32>, Vec<f32>) {
+    pub fn calc_gae(&self, gamma: f32, tau: f32) -> (Vec<f32>, Vec<f32>) {
         let mut returns = vec![0.0; self.rewards.len()];
         let mut advantages = vec![0.0; self.rewards.len()];
-        let mut last_gae_lam = 0.0;
-        let mut last_v = last_value;
+        let mut gae_running = 0.0;
+        let mut last_v = 0.0; // ignore reward from truncated trajectory
 
         for t in (0..self.rewards.len()).rev() {
             let next_non_terminal = if self.dones[t] { 0.0 } else { 1.0 };
-            let delta = self.rewards[t] + gamma * last_v * next_non_terminal - self.values[t];
-            last_gae_lam = delta + gamma * tau * next_non_terminal * last_gae_lam;
-            advantages[t] = last_gae_lam;
+            let delta = self.rewards[t] + gamma * last_v * next_non_terminal - self.values[t]; // TD Error
+            gae_running = delta + gamma * tau * next_non_terminal * gae_running; // Accumulate the discounted advantage
+            advantages[t] = gae_running;
             returns[t] = advantages[t] + self.values[t];
             last_v = self.values[t];
         }
@@ -120,12 +120,13 @@ pub fn transformer_search(
         let mut ep_lengths = Vec::new();
         let mut ep_exprs = Vec::new();
 
-        let mut last_value_for_gae = 0.0;
+        // let mut last_value_for_gae = 0.0;
 
         for _ep in 0..episodes_per_batch {
             let mut actions = Vec::new();
             let mut ep_reward = 0.0;
             let mut is_done = false;
+            let mut pbest = 0.0;
 
             env.reset();
             let mut step_count = 0;
@@ -156,18 +157,19 @@ pub fn transformer_search(
                 let action_idx = sampled_action_idx[0][0];
 
                 let log_prob = log_probs.double_value(&[0, action_idx]) as f32;
-                let value = value_tensor.double_value(&[0]) as f32;
+                let value = value_tensor.double_value(&[]) as f32;
 
                 let action: Action = env.action_space.get_action(action_idx as usize);
                 env.step(&action);
 
                 is_done = action == Action::Done;
-                let mut reward = env
+                let reward = env
                     .pool
-                    .calc_reward(&mut runtime, &env.state.machine, is_done);
+                    .calc_reward(&mut runtime, &env.state.machine, pbest);
                 if reward.is_nan() || reward.is_infinite() {
-                    reward = -1.0;
+                    panic!("invalid reward");
                 }
+                pbest = reward;
 
                 ep_reward += reward;
 
@@ -204,20 +206,21 @@ pub fn transformer_search(
             }
 
             if !is_done {
+                // truncation
                 let len = buffer.rewards.len();
                 buffer.rewards[len - 1] -= unfinished_penaly as f32;
                 ep_reward -= unfinished_penaly;
 
-                let mask: Tensor = env.get_valid_action_mask(&device);
-                let (_, _, value_tensor) = tch::no_grad(|| {
-                    model.forward(&env.state, &mut runtime, &mask, &device, &actions)
-                });
-                last_value_for_gae = value_tensor.double_value(&[0]) as f32;
-                if last_value_for_gae.is_nan() {
-                    last_value_for_gae = 0.0;
-                }
+                // let mask: Tensor = env.get_valid_action_mask(&device);
+                // let (_, _, value_tensor) = tch::no_grad(|| {
+                //     model.forward(&env.state, &mut runtime, &mask, &device, &actions)
+                // });
+                // last_value_for_gae = value_tensor.double_value(&[]) as f32;
+                // if last_value_for_gae.is_nan() {
+                //     last_value_for_gae = 0.0;
+                // }
             } else {
-                last_value_for_gae = 0.0;
+                // last_value_for_gae = 0.0; // The future reward is exactly 0 after termination
             }
 
             ep_rewards.push(ep_reward);
@@ -231,15 +234,43 @@ pub fn transformer_search(
         }
 
         let avg_reward: f64 = ep_rewards.iter().sum::<f64>() / ep_rewards.len() as f64;
+        let std_reward: f64 = (ep_rewards
+            .iter()
+            .map(|x| (x - avg_reward).powi(2))
+            .sum::<f64>()
+            / ep_rewards.len() as f64)
+            .sqrt();
         let avg_length: f64 = ep_lengths.iter().sum::<usize>() as f64 / ep_lengths.len() as f64;
+
+        let avg_val = if buffer.values.is_empty() {
+            0.0
+        } else {
+            buffer.values.iter().sum::<f32>() / buffer.values.len() as f32
+        };
+        let std_val = if buffer.values.is_empty() {
+            0.0
+        } else {
+            (buffer
+                .values
+                .iter()
+                .map(|x| (x - avg_val).powi(2))
+                .sum::<f32>()
+                / buffer.values.len() as f32)
+                .sqrt()
+        };
+
         println!(
-            "Avg Reward: {:.4} | Avg Length: {:.1} | Pool Size: {}",
+            "Avg Reward: {:.4} (std: {:.4}) | Avg Value: {:.4} (std: {:.4}) | Avg Length: {:.1} | Pool Size: {}",
             avg_reward,
+            std_reward,
+            avg_val,
+            std_val,
             avg_length,
             env.pool.len()
         );
 
-        let (mut returns, mut advantages) = buffer.calc_gae(last_value_for_gae, 0.99, 0.95);
+        // gamma = 0.99, tau(lambda) = 0.95
+        let (mut returns, mut advantages) = buffer.calc_gae(0.99, 0.95);
         for i in 0..returns.len() {
             if returns[i].is_nan() || returns[i].is_infinite() {
                 returns[i] = 0.0;
@@ -281,6 +312,7 @@ pub fn transformer_search(
                 let mut data_pts = Vec::new();
                 let mut step_idxs = Vec::new();
                 let mut masks = Vec::new();
+                let mut emb_5ds = Vec::new();
 
                 let mut batch_old_log_probs = Vec::new();
                 let mut batch_advantages = Vec::new();
@@ -294,6 +326,13 @@ pub fn transformer_search(
                     step_idxs.push(*step_idx);
                     masks.push(mask.shallow_clone());
 
+                    let tgt_vec: Vec<i64> = shifted_tgt.try_into().unwrap();
+                    let history = &tgt_vec[1..(*step_idx as usize + 1)];
+                    let is_done = buffer.dones[idx];
+                    let emb_5d =
+                        AgentModel::compute_5d_embedding(history, is_done, &env.action_space);
+                    emb_5ds.push(Tensor::from_slice(&emb_5d).to(device));
+
                     batch_old_log_probs.push(buffer.log_probs[idx]);
                     batch_advantages.push(advantages[idx]);
                     batch_returns.push(returns[idx]);
@@ -303,6 +342,7 @@ pub fn transformer_search(
                 let shifted_tgts_t = Tensor::stack(&shifted_tgts, 0).to(device); // (b, seq_len)
                 let data_pts_t = Tensor::stack(&data_pts, 0).to(device); // (b, 1755, 5)
                 let masks_t = Tensor::stack(&masks, 0).to(device); // (b, vocab)
+                let emb_5ds_t = Tensor::stack(&emb_5ds, 0).to(device); // (b, 5)
 
                 let b_old_log_probs = Tensor::from_slice(&batch_old_log_probs).to(device);
                 let b_advantages = Tensor::from_slice(&batch_advantages).to(device);
@@ -310,7 +350,8 @@ pub fn transformer_search(
                 let b_old_actions = Tensor::from_slice(&batch_old_actions).to(device);
                 let step_idxs_t = Tensor::from_slice(&step_idxs).to(device);
 
-                let (new_logits, new_values) = model.decoder.forward(&shifted_tgts_t, &data_pts_t);
+                let new_logits = model.decoder.forward(&shifted_tgts_t, &data_pts_t);
+                let new_values_out = model.value_net.forward(&emb_5ds_t); // (b, 2)
 
                 let b_size = batch_indices.len() as i64;
                 let masked_logits = new_logits
@@ -352,10 +393,24 @@ pub fn transformer_search(
                 let surr2 = ratio.clamp(1.0 - clip_param, 1.0 + clip_param) * &b_advantages;
                 let policy_loss = -surr1.min_other(&surr2).mean(tch::Kind::Float);
 
-                let new_val_extracted = new_values
-                    .gather(1, &step_idxs_t.unsqueeze(1), false)
-                    .squeeze_dim(1);
-                let value_loss = new_val_extracted.mse_loss(&b_returns, tch::Reduction::Mean);
+                let mu = new_values_out.select(1, 0);
+                let log_sigma = new_values_out.select(1, 1).clamp(-20.0, 2.0);
+                let sigma = log_sigma.exp();
+                let variance = (&sigma * &sigma).clamp_min(1e-8);
+                let diff = &b_returns - &mu;
+                let nll: tch::Tensor =
+                    (diff.pow_tensor_scalar(2.0) / (&variance * 2.0)) + &log_sigma;
+                let value_loss = nll.mean(tch::Kind::Float);
+
+                if _epoch == 0 && start_idx == 0 {
+                    let sample_mu = mu.double_value(&[0]);
+                    let sample_sigma = sigma.double_value(&[0]);
+                    let sample_emb: Vec<f32> = emb_5ds_t.select(0, 0).try_into().unwrap_or(vec![]);
+                    println!(
+                        "Diagnostic - PPO ValueNet First Batch Item -> Inputs: {:?}, mu: {:.4}, sigma: {:.4}",
+                        sample_emb, sample_mu, sample_sigma
+                    );
+                }
 
                 let policy_val = policy_loss.double_value(&[]);
                 let value_val = value_loss.double_value(&[]);

@@ -18,7 +18,8 @@ impl BasicBacktest {
         Self { returns }
     }
     pub fn calc_returns(&self, position: &Tensor) -> Tensor {
-        (position * &self.returns).mean_dim(Some(&[1][..]), false, Kind::Float)
+        let clean_pos = position.nan_to_num(0.0, 0.0, 0.0);
+        (&clean_pos * &self.returns).mean_dim(Some(&[1][..]), false, Kind::Float)
     }
 }
 
