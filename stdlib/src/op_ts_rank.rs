@@ -7,7 +7,6 @@ pub static OP_TS_RANK: OperatorSpec = OperatorSpec {
     execute: |args| match (&args[0], &args[1]) {
         (Signal::DataFrame(Some(a)), Signal::Int(Some(d))) => {
             let d = *d as i64;
-            let t_len = a.size()[0];
             if d < 1 {
                 let nan = tch::Tensor::full(a.size().as_slice(), f64::NAN, (a.kind(), a.device()));
                 return Signal::DataFrame(Some(nan));
@@ -15,27 +14,21 @@ pub static OP_TS_RANK: OperatorSpec = OperatorSpec {
                 return Signal::DataFrame(Some(tch::Tensor::full(a.size().as_slice(), 1.0, (a.kind(), a.device()))));
             }
 
-            let res = tch::Tensor::empty(a.size().as_slice(), (a.kind(), a.device()));
-            for t in 0..t_len {
-                let start = std::cmp::max(0, t - d + 1);
-                let slice = a.narrow(0, start, t - start + 1);
-                let last_elem = a.narrow(0, t, 1);
-                
-                let less_equal = slice.less_equal_tensor(&last_elem);
-                let valid = slice.isnan().logical_not();
-                let valid_less_equal = less_equal.logical_and(&valid).to_kind(a.kind());
-                
-                let rank = valid_less_equal.sum_dim_intlist(Some(&[0][..]), false, a.kind());
-                let count_valid = valid.to_kind(a.kind()).sum_dim_intlist(Some(&[0][..]), false, a.kind());
-                let step_res = &rank / &count_valid;
-                
-                let is_last_nan = last_elem.isnan().squeeze_dim(0);
-                let nan = tch::Tensor::full(step_res.size().as_slice(), f64::NAN, (a.kind(), a.device()));
-                let step_res = step_res.where_self(&is_last_nan.logical_not(), &nan);
-                
-                let mut row = res.narrow(0, t, 1);
-                let _ = row.copy_(&step_res.unsqueeze(0));
-            }
+            let w = crate::op_time_series::roll_window(a, d);
+            let a_unsqueezed = a.unsqueeze(2);
+            let less_equal = w.less_equal_tensor(&a_unsqueezed);
+            
+            let valid = w.isnan().logical_not();
+            let valid_less_equal = less_equal.logical_and(&valid).to_kind(a.kind());
+            
+            let rank = valid_less_equal.sum_dim_intlist(Some(&[-1][..]), false, a.kind());
+            let count_valid = valid.to_kind(a.kind()).sum_dim_intlist(Some(&[-1][..]), false, a.kind());
+            let step_res = &rank / &count_valid;
+            
+            let is_last_nan = a.isnan();
+            let nan = tch::Tensor::full(step_res.size().as_slice(), f64::NAN, (a.kind(), a.device()));
+            let res = step_res.where_self(&is_last_nan.logical_not(), &nan);
+            
             Signal::DataFrame(Some(res))
         }
         _ => panic!("ts_rank expected DataFrame and Int"),

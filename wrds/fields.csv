@@ -5,7 +5,6 @@ s3://rhetenor/wrds_2022/basedata/low.csv.gz, ./data/low.csv.gz
 s3://rhetenor/wrds_2022/basedata/close.csv.gz, ./data/close.csv.gz
 s3://rhetenor/wrds_2022/basedata/volume.csv.gz, ./data/volume.csv.gz
 s3://rhetenor/wrds_2022/basedata/returns.csv.gz, ./data/returns.csv.gz
-s3://rhetenor/wrds_2022/basedata/returns_next.csv.gz, ./data/returns_next.csv.gz
 s3://rhetenor/wrds_2022/basedata/returns_d1.csv.gz, ./data/returns_d1.csv.gz
 s3://rhetenor/wrds_2022/afnd1/aco.csv.gz, ./data/afnd1_aco.csv.gz
 s3://rhetenor/wrds_2022/afnd1/acox.csv.gz, ./data/afnd1_acox.csv.gz

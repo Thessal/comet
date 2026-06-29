@@ -81,12 +81,13 @@ pub fn transformer_search(
     mut runtime: &mut Runtime,
     episodes_per_batch: usize,
     batch_size: usize,
+    seq_len: usize,
 ) -> rl::pool::Pool {
     // let mut runtime = Runtime::new(10000, "data".into(), Some(device));
     let backtester = BasicBacktest::new(&mut runtime.dmgr, "returns_d1");
     let pool = Pool::new(backtester, device, adj_coeff.unwrap_or(1.0));
 
-    let seq_len = 50;
+    // let seq_len = 50;
     let mut env = Environment::new(
         &network,
         action_space.clone(),

@@ -47,8 +47,9 @@ fn _main(args: Args) {
     // let batch_size = 64;
     // let episodes_per_batch = 50;
 
-    let batch_size = 64;
-    let episodes_per_batch = 50;
+    let batch_size = 32;
+    let episodes_per_batch = 32;
+    let seq_len = 32;
     // let batch_size = 4;
     // let episodes_per_batch = 1;
     let pool = transformer::transformer_search(
@@ -59,6 +60,7 @@ fn _main(args: Args) {
         &mut runtime,
         episodes_per_batch,
         batch_size,
+        seq_len,
     );
 
     println!("--- Expressions found ---");
@@ -117,6 +119,7 @@ fn _main_standard_ppo(args: Args) {
     let mut runtime = Runtime::new(300, "./wrds/data".into(), Some(device));
     let batch_size = 32;
     let episodes_per_batch = 8;
+    let seq_len = 20;
     let pool = transformer::transformer_search(
         network,
         action_space,
@@ -125,6 +128,7 @@ fn _main_standard_ppo(args: Args) {
         &mut runtime,
         episodes_per_batch,
         batch_size,
+        seq_len,
     );
 
     println!("--- Expressions found ---");

@@ -7,7 +7,6 @@ pub static OP_TS_MIN: OperatorSpec = OperatorSpec {
     execute: |args| match (&args[0], &args[1]) {
         (Signal::DataFrame(Some(a)), Signal::Int(Some(d))) => {
             let d = *d as i64;
-            let t_len = a.size()[0];
             if d < 1 {
                 let nan = tch::Tensor::full(a.size().as_slice(), f64::NAN, (a.kind(), a.device()));
                 return Signal::DataFrame(Some(nan));
@@ -15,18 +14,13 @@ pub static OP_TS_MIN: OperatorSpec = OperatorSpec {
                 return Signal::DataFrame(Some(a.shallow_clone()));
             }
 
-            let res = tch::Tensor::empty(a.size().as_slice(), (a.kind(), a.device()));
-            for t in 0..t_len {
-                let start = std::cmp::max(0, t - d + 1);
-                let slice = a.narrow(0, start, t - start + 1);
-                let step_res = slice.nan_to_num(std::f64::INFINITY, std::f64::INFINITY, std::f64::INFINITY)
-                    .amin(&[0], false);
-                let is_posinf = step_res.eq(std::f64::INFINITY);
-                let nan = tch::Tensor::full(step_res.size().as_slice(), f64::NAN, (a.kind(), a.device()));
-                let step_res = step_res.where_self(&is_posinf.logical_not(), &nan);
-                let mut row = res.narrow(0, t, 1);
-                let _ = row.copy_(&step_res.unsqueeze(0));
-            }
+            let w = crate::op_time_series::roll_window(a, d);
+            let step_res = w.nan_to_num(std::f64::INFINITY, std::f64::INFINITY, std::f64::INFINITY)
+                .amin(&[-1], false);
+            let is_posinf = step_res.eq(std::f64::INFINITY);
+            let nan = tch::Tensor::full(step_res.size().as_slice(), f64::NAN, (a.kind(), a.device()));
+            let res = step_res.where_self(&is_posinf.logical_not(), &nan);
+            
             Signal::DataFrame(Some(res))
         }
         _ => panic!("ts_min expected DataFrame and Int"),

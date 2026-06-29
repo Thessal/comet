@@ -64,7 +64,7 @@ impl Runtime {
                     let args: Vec<Signal> = node
                         .children
                         .iter()
-                        .map(|&child| self.run(network, child))
+                        .map(|&child| self.lookup_or_run(network, child).clone())
                         .collect();
                     self.execute(spec, args).unwrap()
                 }

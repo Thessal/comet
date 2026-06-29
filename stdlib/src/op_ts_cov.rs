@@ -7,42 +7,35 @@ pub static OP_TS_COV: OperatorSpec = OperatorSpec {
     execute: |args| match (&args[0], &args[1], &args[2]) {
         (Signal::DataFrame(Some(x)), Signal::DataFrame(Some(y)), Signal::Int(Some(d))) => {
             let d = *d as i64;
-            let t_len = x.size()[0];
             if d < 2 {
                 let nan = tch::Tensor::full(x.size().as_slice(), f64::NAN, (x.kind(), x.device()));
                 return Signal::DataFrame(Some(nan));
             }
 
-            let res = tch::Tensor::empty(x.size().as_slice(), (x.kind(), x.device()));
-            for t in 0..t_len {
-                let start = std::cmp::max(0, t - d + 1);
-                let slice_x = x.narrow(0, start, t - start + 1);
-                let slice_y = y.narrow(0, start, t - start + 1);
-                
-                let valid_x = slice_x.isnan().logical_not();
-                let valid_y = slice_y.isnan().logical_not();
-                let valid_both = valid_x.logical_and(&valid_y);
-                let count_both = valid_both.to_kind(x.kind()).sum_dim_intlist(Some(&[0][..]), false, x.kind());
-                
-                let zeros = tch::Tensor::zeros(&[1], (x.kind(), x.device()));
-                let x_masked = slice_x.where_self(&valid_both, &zeros);
-                let y_masked = slice_y.where_self(&valid_both, &zeros);
-                
-                let mean_x = x_masked.sum_dim_intlist(Some(&[0][..]), false, x.kind()) / &count_both;
-                let mean_y = y_masked.sum_dim_intlist(Some(&[0][..]), false, x.kind()) / &count_both;
-                
-                let diff_x = (&x_masked - mean_x.unsqueeze(0)).where_self(&valid_both, &zeros);
-                let diff_y = (&y_masked - mean_y.unsqueeze(0)).where_self(&valid_both, &zeros);
-                
-                let cov = (&diff_x * &diff_y).sum_dim_intlist(Some(&[0][..]), false, x.kind()) / (&count_both - 1.0);
-                
-                let is_invalid = count_both.less_equal(1.0);
-                let nan = tch::Tensor::full(cov.size().as_slice(), f64::NAN, (x.kind(), x.device()));
-                let step_res = cov.where_self(&is_invalid.logical_not(), &nan);
-                
-                let mut row = res.narrow(0, t, 1);
-                let _ = row.copy_(&step_res.unsqueeze(0));
-            }
+            let wx = crate::op_time_series::roll_window(x, d);
+            let wy = crate::op_time_series::roll_window(y, d);
+            
+            let valid_x = wx.isnan().logical_not();
+            let valid_y = wy.isnan().logical_not();
+            let valid_both = valid_x.logical_and(&valid_y);
+            let count_both = valid_both.to_kind(x.kind()).sum_dim_intlist(Some(&[-1][..]), false, x.kind());
+            
+            let zeros = tch::Tensor::zeros(&[1], (x.kind(), x.device()));
+            let x_masked = wx.where_self(&valid_both, &zeros);
+            let y_masked = wy.where_self(&valid_both, &zeros);
+            
+            let mean_x = x_masked.sum_dim_intlist(Some(&[-1][..]), false, x.kind()) / &count_both;
+            let mean_y = y_masked.sum_dim_intlist(Some(&[-1][..]), false, x.kind()) / &count_both;
+            
+            let diff_x = (&x_masked - mean_x.unsqueeze(-1)).where_self(&valid_both, &zeros);
+            let diff_y = (&y_masked - mean_y.unsqueeze(-1)).where_self(&valid_both, &zeros);
+            
+            let cov = (&diff_x * &diff_y).sum_dim_intlist(Some(&[-1][..]), false, x.kind()) / (&count_both - 1.0);
+            
+            let is_invalid = count_both.less_equal(1.0);
+            let nan = tch::Tensor::full(cov.size().as_slice(), f64::NAN, (x.kind(), x.device()));
+            let res = cov.where_self(&is_invalid.logical_not(), &nan);
+            
             Signal::DataFrame(Some(res))
         }
         _ => panic!("ts_cov expected DataFrame, DataFrame and Int"),

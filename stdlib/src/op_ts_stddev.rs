@@ -7,34 +7,27 @@ pub static OP_TS_STDDEV: OperatorSpec = OperatorSpec {
     execute: |args| match (&args[0], &args[1]) {
         (Signal::DataFrame(Some(a)), Signal::Int(Some(d))) => {
             let d = *d as i64;
-            let t_len = a.size()[0];
             if d < 2 {
                 let nan = tch::Tensor::full(a.size().as_slice(), f64::NAN, (a.kind(), a.device()));
                 return Signal::DataFrame(Some(nan));
             }
 
-            let res = tch::Tensor::empty(a.size().as_slice(), (a.kind(), a.device()));
-            for t in 0..t_len {
-                let start = std::cmp::max(0, t - d + 1);
-                let slice = a.narrow(0, start, t - start + 1);
-                
-                let valid = slice.isnan().logical_not();
-                let count_valid = valid.to_kind(a.kind()).sum_dim_intlist(Some(&[0][..]), false, a.kind());
-                
-                let nansum = slice.nan_to_num(0.0, 0.0, 0.0).sum_dim_intlist(Some(&[0][..]), false, a.kind());
-                let mean = &nansum / &count_valid;
-                
-                let diff = &slice - mean.unsqueeze(0);
-                let var = diff.square().nan_to_num(0.0, 0.0, 0.0).sum_dim_intlist(Some(&[0][..]), false, a.kind()) / (&count_valid - 1.0);
-                let stddev = var.sqrt();
-                
-                let is_invalid = count_valid.less_equal(1.0);
-                let nan = tch::Tensor::full(stddev.size().as_slice(), f64::NAN, (a.kind(), a.device()));
-                let step_res = stddev.where_self(&is_invalid.logical_not(), &nan);
-                
-                let mut row = res.narrow(0, t, 1);
-                let _ = row.copy_(&step_res.unsqueeze(0));
-            }
+            let w = crate::op_time_series::roll_window(a, d);
+            
+            let valid = w.isnan().logical_not();
+            let count_valid = valid.to_kind(a.kind()).sum_dim_intlist(Some(&[-1][..]), false, a.kind());
+            
+            let nansum = w.nan_to_num(0.0, 0.0, 0.0).sum_dim_intlist(Some(&[-1][..]), false, a.kind());
+            let mean = &nansum / &count_valid;
+            
+            let diff = &w - mean.unsqueeze(-1);
+            let var = diff.square().nan_to_num(0.0, 0.0, 0.0).sum_dim_intlist(Some(&[-1][..]), false, a.kind()) / (&count_valid - 1.0);
+            let stddev = var.sqrt();
+            
+            let is_invalid = count_valid.less_equal(1.0);
+            let nan = tch::Tensor::full(stddev.size().as_slice(), f64::NAN, (a.kind(), a.device()));
+            let res = stddev.where_self(&is_invalid.logical_not(), &nan);
+            
             Signal::DataFrame(Some(res))
         }
         _ => panic!("ts_stddev expected DataFrame and Int"),

@@ -7,7 +7,6 @@ pub static OP_TS_SUM: OperatorSpec = OperatorSpec {
     execute: |args| match (&args[0], &args[1]) {
         (Signal::DataFrame(Some(a)), Signal::Int(Some(d))) => {
             let d = *d as i64;
-            let t_len = a.size()[0];
             if d < 1 {
                 let nan = tch::Tensor::full(a.size().as_slice(), f64::NAN, (a.kind(), a.device()));
                 return Signal::DataFrame(Some(nan));
@@ -15,17 +14,12 @@ pub static OP_TS_SUM: OperatorSpec = OperatorSpec {
                 return Signal::DataFrame(Some(a.shallow_clone()));
             }
 
-            let res = tch::Tensor::empty(a.size().as_slice(), (a.kind(), a.device()));
-            for t in 0..t_len {
-                let start = std::cmp::max(0, t - d + 1);
-                let slice = a.narrow(0, start, t - start + 1);
-                let nansum = slice.nan_to_num(0.0, 0.0, 0.0).sum_dim_intlist(Some(&[0][..]), false, a.kind());
-                let all_nan = slice.isnan().all_dim(0, false);
-                let nan = tch::Tensor::full(nansum.size().as_slice(), f64::NAN, (a.kind(), a.device()));
-                let step_res = nansum.where_self(&all_nan.logical_not(), &nan);
-                let mut row = res.narrow(0, t, 1);
-                let _ = row.copy_(&step_res.unsqueeze(0));
-            }
+            let w = crate::op_time_series::roll_window(a, d);
+            let nansum = w.nan_to_num(0.0, 0.0, 0.0).sum_dim_intlist(Some(&[-1][..]), false, a.kind());
+            let all_nan = w.isnan().all_dim(-1, false);
+            let nan = tch::Tensor::full(nansum.size().as_slice(), f64::NAN, (a.kind(), a.device()));
+            let res = nansum.where_self(&all_nan.logical_not(), &nan);
+            
             Signal::DataFrame(Some(res))
         }
         _ => panic!("ts_sum expected DataFrame and Int"),

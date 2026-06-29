@@ -7,34 +7,21 @@ pub static OP_TS_ARGMIN: OperatorSpec = OperatorSpec {
     execute: |args| match (&args[0], &args[1]) {
         (Signal::DataFrame(Some(a)), Signal::Int(Some(d))) => {
             let d = *d as i64;
-            let t_len = a.size()[0];
             if d < 0 {
                 let nan = tch::Tensor::full(a.size().as_slice(), f64::NAN, (a.kind(), a.device()));
                 return Signal::DataFrame(Some(nan));
             }
             let window_size = d + 1;
-            let res = tch::Tensor::empty(a.size().as_slice(), (a.kind(), a.device()));
-            for t in 0..t_len {
-                let start = std::cmp::max(0, t - window_size + 1);
-                let slice = a.narrow(0, start, t - start + 1);
-                let reversed = slice.flip([0]);
-                let pad_len = window_size - reversed.size()[0];
-                let filled = reversed.nan_to_num(std::f64::INFINITY, std::f64::INFINITY, std::f64::INFINITY);
-                let padded = if pad_len > 0 {
-                    let mut pad_shape = filled.size();
-                    pad_shape[0] = pad_len;
-                    let inf_pad = tch::Tensor::full(&pad_shape, std::f64::INFINITY, (a.kind(), a.device()));
-                    tch::Tensor::cat(&[&filled, &inf_pad], 0)
-                } else {
-                    filled
-                };
-                let step_argmin = padded.argmin(0, false).to_kind(a.kind());
-                let all_nan = slice.isnan().all_dim(0, false);
-                let nan = tch::Tensor::full(step_argmin.size().as_slice(), f64::NAN, (a.kind(), a.device()));
-                let step_res = step_argmin.where_self(&all_nan.logical_not(), &nan);
-                let mut row = res.narrow(0, t, 1);
-                let _ = row.copy_(&step_res.unsqueeze(0));
-            }
+
+            let w = crate::op_time_series::roll_window(a, window_size);
+            let reversed = w.flip([-1]);
+            let filled = reversed.nan_to_num(std::f64::INFINITY, std::f64::INFINITY, std::f64::INFINITY);
+            let step_argmin = filled.argmin(-1, false).to_kind(a.kind());
+            
+            let all_nan = w.isnan().all_dim(-1, false);
+            let nan = tch::Tensor::full(step_argmin.size().as_slice(), f64::NAN, (a.kind(), a.device()));
+            let res = step_argmin.where_self(&all_nan.logical_not(), &nan);
+            
             Signal::DataFrame(Some(res))
         }
         _ => panic!("ts_argmin expected DataFrame and Int"),

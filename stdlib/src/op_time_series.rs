@@ -1,6 +1,6 @@
 use crate::{OperatorSpec, types::Signal};
 
-fn roll_window(a: &tch::Tensor, d: i64) -> tch::Tensor {
+pub fn roll_window(a: &tch::Tensor, d: i64) -> tch::Tensor {
     let d_safe = std::cmp::max(1, d);
     let pad_len = d_safe - 1;
     if pad_len == 0 {
@@ -12,6 +12,7 @@ fn roll_window(a: &tch::Tensor, d: i64) -> tch::Tensor {
     let padded = tch::Tensor::cat(&[&nan_pad, a], 0);
     padded.unfold(0, d_safe, 1)
 }
+
 
 pub static OP_DELAY: OperatorSpec = OperatorSpec {
     name: "delay",
