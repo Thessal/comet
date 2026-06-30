@@ -211,11 +211,11 @@ impl Pool {
         runtime: &mut Runtime,
         machine: &AbstractMachine,
         // _is_done: bool,
-        pbest_reward: f64,
-    ) -> f64 {
+        pbest_potential: f64,
+    ) -> Result<(f64, f64), &'static str> {
         let (stack, callgraph): (&Vec<(Signal, usize)>, &Network) = machine.get_stack();
         if stack.is_empty() {
-            return f64::NAN;
+            return Err("Empty Stack");
         }
         let mut returns_list = Vec::with_capacity(stack.len());
         for (_signal_spec, addr) in stack {
@@ -228,8 +228,38 @@ impl Pool {
         let marginal_utility = self.marginal_utility(&returns_stacked, 252, 0); // TODO: pass evaluation start/end days properly
 
         if bool::try_from(marginal_utility.isnan().any()).unwrap() == true {
-            panic!("NaN in marginal utility");
+            return Err("NaN in marginal utility.");
         }
-        f64::try_from(marginal_utility.max()).unwrap() - pbest_reward
+        let potential = f64::try_from(marginal_utility.max()).unwrap();
+        if potential.is_nan() || potential.is_infinite() {
+            for (_signal_spec, addr) in stack {
+                let incoming_pos = runtime
+                    .lookup_or_run(callgraph, *addr)
+                    .to_dataframe(self.device);
+                let incoming_ret = self.backtester.calc_returns(&incoming_pos);
+                let pos_nan_count = incoming_pos.isnan().sum(tch::Kind::Int64).double_value(&[]);
+                let ret_nan_count = incoming_ret.isnan().sum(tch::Kind::Int64).double_value(&[]);
+                println!(
+                    "Debug Pool -> Position NaN count: {}, Returns NaN count: {}",
+                    pos_nan_count, ret_nan_count
+                );
+                println!(
+                    "Debug Pool -> Raw returns series: {:?}",
+                    Vec::<f32>::try_from(incoming_ret.flatten(0, -1)).unwrap_or_default()
+                );
+                // let human_readable_traj: Vec<String> = actions
+                //     .iter()
+                //     .map(|&idx| format!("{:?}", self.action_space.get_action(idx as usize)))
+                //     .collect();
+                // println!("WARNING: invalid reward detected!");
+                // println!(
+                //     "State Machine Stack Size: {}",
+                //     self.state.machine.get_stack().0.len()
+                // );
+                // println!("Trajectory: {:?}", human_readable_traj);
+            }
+        }
+        let reward = potential - pbest_potential;
+        Ok((potential, reward))
     }
 }

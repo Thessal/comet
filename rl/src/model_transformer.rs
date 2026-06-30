@@ -121,7 +121,7 @@ impl TransformerDecoderLayer {
             .transpose(1, 2);
 
         let scores = q.matmul(&k.transpose(-2, -1)) / (self.head_dim as f64).sqrt();
-        let scores = scores + tgt_mask.unsqueeze(0).unsqueeze(0); // Add causal mask
+        let scores = scores.masked_fill(&tgt_mask.unsqueeze(0).unsqueeze(0), std::f64::NEG_INFINITY); // Safely apply causal mask
         let attn_weights = scores.softmax(-1, Kind::Float);
 
         let context = attn_weights
@@ -248,13 +248,8 @@ impl SRDecoderModel {
         let pos_emb_slice = self.pos_embedding.slice(1, 0, seq_len, 1);
         let mut tgt_vectors = tgt_vectors + pos_emb_slice;
 
-        // Causal mask: -inf on upper triangle, 0 on lower
-        let causal_mask = Tensor::ones([seq_len, seq_len], (Kind::Float, device))
-            .triu(1)
-            .masked_fill(
-                &Tensor::ones([seq_len, seq_len], (Kind::Bool, device)).triu(1),
-                std::f64::NEG_INFINITY,
-            );
+        // Causal mask: true on upper triangle, false on lower
+        let causal_mask = Tensor::ones([seq_len, seq_len], (Kind::Bool, device)).triu(1);
 
         for layer in &self.layers {
             tgt_vectors = layer.forward(&tgt_vectors, &memory_context, &causal_mask);

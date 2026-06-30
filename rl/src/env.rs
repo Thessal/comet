@@ -132,8 +132,13 @@ impl Environment {
 
             actions.push(action_idx);
 
-            let reward: f64 = self.pool.calc_reward(runtime, &self.state.machine, pbest);
-            pbest = reward;
+            let (potential, reward): (f64, f64) = self
+                .pool
+                .calc_reward(runtime, &self.state.machine, pbest)
+                .unwrap();
+            if pbest < potential {
+                pbest = potential;
+            }
 
             let is_done = action == Action::Done;
             let step = Step {

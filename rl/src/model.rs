@@ -332,18 +332,18 @@ impl Model for AgentModel {
         let sigma = log_sigma.exp();
         let value: tch::Tensor = &mu - 1.96 * &sigma; // 5% quantile // 0.05 0.95 : 2-sigma
 
-        // Debug printing (randomly print ~1% of the time to avoid spam, or just print if needed)
-        if rand::random::<f32>() < 0.01 {
-            let mu_val = mu.double_value(&[]);
-            let sigma_val = sigma.double_value(&[]);
-            println!(
-                "Debug ValueNet -> Inputs: {:?}, mu: {:.4}, sigma: {:.4}, value: {:.4}",
-                emb_5d,
-                mu_val,
-                sigma_val,
-                value.double_value(&[])
-            );
-        }
+        // // Debug printing (randomly print ~1% of the time to avoid spam, or just print if needed)
+        // if rand::random::<f32>() < 0.01 {
+        //     let mu_val = mu.double_value(&[]);
+        //     let sigma_val = sigma.double_value(&[]);
+        //     println!(
+        //         "Debug ValueNet -> Inputs: {:?}, mu: {:.4}, sigma: {:.4}, value: {:.4}",
+        //         emb_5d,
+        //         mu_val,
+        //         sigma_val,
+        //         value.double_value(&[])
+        //     );
+        // }
 
         let masked_logits =
             step_logits.masked_fill(&masks.logical_not().unsqueeze(0), std::f64::NEG_INFINITY);

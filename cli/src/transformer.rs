@@ -163,13 +163,14 @@ pub fn transformer_search(
                 env.step(&action);
 
                 is_done = action == Action::Done;
-                let reward = env
+
+                let (potential, reward): (f64, f64) = env
                     .pool
-                    .calc_reward(&mut runtime, &env.state.machine, pbest);
-                if reward.is_nan() || reward.is_infinite() {
-                    panic!("invalid reward");
+                    .calc_reward(runtime, &env.state.machine, pbest)
+                    .unwrap();
+                if pbest < potential {
+                    pbest = potential;
                 }
-                pbest = reward;
 
                 ep_reward += reward;
 
@@ -369,26 +370,19 @@ pub fn transformer_search(
 
                 let new_log_probs = masked_logits.log_softmax(-1, tch::Kind::Float);
                 let new_probs = new_log_probs.exp();
-                let sums = new_probs.sum_dim_intlist(Some(&[-1][..]), true, tch::Kind::Float);
-                let safe_sums = sums.clamp_min(1e-8);
-                let new_probs = (&new_probs / &safe_sums).where_self(
-                    &sums.gt(0.0),
-                    &(Tensor::ones_like(&new_probs) / (new_probs.size()[1] as f64)),
-                );
 
-                // Calculate log prob of old action
-                let new_log_prob = new_probs
+                // Calculate log prob of old action directly from log_probs for numerical stability
+                let new_log_prob = new_log_probs
                     .gather(1, &b_old_actions.unsqueeze(1), false)
-                    .squeeze_dim(1)
-                    .clamp_min(1e-8)
-                    .log();
+                    .squeeze_dim(1);
 
                 let safe_log_probs = new_log_probs.clamp_min(-1e8);
                 let entropy = -(new_probs.shallow_clone() * &safe_log_probs)
                     .sum_dim_intlist(Some(&[-1][..]), false, tch::Kind::Float)
                     .mean(tch::Kind::Float);
 
-                let ratio = (new_log_prob - b_old_log_probs).exp();
+                let log_ratio = (new_log_prob - b_old_log_probs).clamp_max(10.0);
+                let ratio = log_ratio.exp();
                 let surr1 = &ratio * &b_advantages;
                 let surr2 = ratio.clamp(1.0 - clip_param, 1.0 + clip_param) * &b_advantages;
                 let policy_loss = -surr1.min_other(&surr2).mean(tch::Kind::Float);
@@ -402,15 +396,15 @@ pub fn transformer_search(
                     (diff.pow_tensor_scalar(2.0) / (&variance * 2.0)) + &log_sigma;
                 let value_loss = nll.mean(tch::Kind::Float);
 
-                if _epoch == 0 && start_idx == 0 {
-                    let sample_mu = mu.double_value(&[0]);
-                    let sample_sigma = sigma.double_value(&[0]);
-                    let sample_emb: Vec<f32> = emb_5ds_t.select(0, 0).try_into().unwrap_or(vec![]);
-                    println!(
-                        "Diagnostic - PPO ValueNet First Batch Item -> Inputs: {:?}, mu: {:.4}, sigma: {:.4}",
-                        sample_emb, sample_mu, sample_sigma
-                    );
-                }
+                // if _epoch == 0 && start_idx == 0 {
+                //     let sample_mu = mu.double_value(&[0]);
+                //     let sample_sigma = sigma.double_value(&[0]);
+                //     let sample_emb: Vec<f32> = emb_5ds_t.select(0, 0).try_into().unwrap_or(vec![]);
+                //     println!(
+                //         "Diagnostic - PPO ValueNet First Batch Item -> Inputs: {:?}, mu: {:.4}, sigma: {:.4}",
+                //         sample_emb, sample_mu, sample_sigma
+                //     );
+                // }
 
                 let policy_val = policy_loss.double_value(&[]);
                 let value_val = value_loss.double_value(&[]);
@@ -442,6 +436,46 @@ pub fn transformer_search(
                         "Diagnostic - Batch Old Actions (Indices): {:?}",
                         batch_old_actions
                     );
+                    println!("Diagnostic - States and Trajectories:");
+                    for (i, &idx) in batch_indices.iter().enumerate() {
+                        let (shifted_tgt, _, step_idx, mask) = &buffer.states[idx];
+                        let tgt_vec: Vec<i64> = shifted_tgt.try_into().unwrap_or_default();
+                        let history_len = (*step_idx as usize + 1).min(tgt_vec.len());
+                        let history = if history_len > 1 {
+                            &tgt_vec[1..history_len]
+                        } else {
+                            &[]
+                        };
+
+                        let mask_vec: Vec<i64> = mask
+                            .to_kind(tch::Kind::Int64)
+                            .try_into()
+                            .unwrap_or_default();
+                        let valid_actions: Vec<usize> = mask_vec
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(a_idx, &b)| if b > 0 { Some(a_idx) } else { None })
+                            .collect();
+
+                        let mut traj_strs = Vec::new();
+                        for &a_idx in history {
+                            let action = env.action_space.get_action(a_idx as usize);
+                            let action_str: String = (&action).into();
+                            traj_strs.push(action_str);
+                        }
+                        let act = env.action_space.get_action(batch_old_actions[i] as usize);
+                        let act_str: String = (&act).into();
+
+                        println!(
+                            "  [Batch {}] step: {}, action: {}, traj: {:?}, num_valid: {}, valid: {:?}",
+                            i,
+                            step_idx,
+                            act_str,
+                            traj_strs,
+                            valid_actions.len(),
+                            valid_actions
+                        );
+                    }
                     continue;
                 }
 
