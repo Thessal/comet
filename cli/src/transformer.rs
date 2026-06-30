@@ -82,7 +82,9 @@ pub fn transformer_search(
     episodes_per_batch: usize,
     batch_size: usize,
     seq_len: usize,
-) -> rl::pool::Pool {
+    weights_path: &Option<String>,
+    num_iterations: usize,
+) -> (rl::pool::Pool, tch::nn::VarStore) {
     // let mut runtime = Runtime::new(10000, "data".into(), Some(device));
     let backtester = BasicBacktest::new(&mut runtime.dmgr, "returns_d1");
     let pool = Pool::new(backtester, device, adj_coeff.unwrap_or(1.0));
@@ -96,7 +98,8 @@ pub fn transformer_search(
         1,       // batch_size
     );
 
-    let vs = tch::nn::VarStore::new(device);
+    let mut vs = tch::nn::VarStore::new(device);
+    crate::weights::load(&mut vs, weights_path);
     let mut model = AgentModel::new(&vs.root(), env.action_space.clone(), 256);
     let mut opt = tch::nn::Adam::default().build(&vs, 1e-4).unwrap();
     let mut buffer = RolloutBuffer::new();
@@ -108,7 +111,8 @@ pub fn transformer_search(
     let epochs = 4;
     // let batch_size = 512;
     // let episodes_per_batch = 50;
-    let num_iterations = 2000;
+    // let num_iterations = 2000;
+    // let num_iterations = 00;
     // let num_iterations = 20;
     let unfinished_penaly: f64 = 10.0;
 
@@ -138,6 +142,19 @@ pub fn transformer_search(
                 let (alpha_matrix, action_logits, value_tensor) = tch::no_grad(|| {
                     model.forward(&env.state, &mut runtime, &mask, &device, &actions)
                 });
+
+                // Add assertion
+                let has_nan = action_logits.isnan().any().double_value(&[]);
+                if has_nan != 0f64 {
+                    println!("CRITICAL WARNING: action_logits contains NaN during rollout!");
+                }
+                let max_logit = action_logits.max().double_value(&[]);
+                if max_logit > 1e4 || max_logit.is_nan() {
+                    println!(
+                        "WARNING: action_logits max value is extreme or NaN: {}",
+                        max_logit
+                    );
+                }
 
                 // Sample action
                 let log_probs = action_logits.log_softmax(-1, tch::Kind::Float);
@@ -492,5 +509,5 @@ pub fn transformer_search(
             );
         }
     }
-    env.pool
+    (env.pool, vs)
 }

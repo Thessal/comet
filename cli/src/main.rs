@@ -1,5 +1,6 @@
 pub mod bruteforce;
 pub mod transformer;
+mod weights;
 use clap::Parser;
 use parser::ast::NodeType;
 use parser::behavior::BehaviorDecl;
@@ -7,6 +8,7 @@ use rl::action::ActionSpace;
 use runtime::runtime::Runtime;
 use std::fs;
 use tch::Device;
+use weights::{load, save};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -50,9 +52,8 @@ fn _main(args: Args) {
     let batch_size = 32;
     let episodes_per_batch = 32;
     let seq_len = 32;
-    // let batch_size = 4;
-    // let episodes_per_batch = 1;
-    let pool = transformer::transformer_search(
+    let weights_path = behavior_decl.weights.clone();
+    let (pool, model) = transformer::transformer_search(
         network,
         action_space,
         device,
@@ -61,6 +62,8 @@ fn _main(args: Args) {
         episodes_per_batch,
         batch_size,
         seq_len,
+        &weights_path,
+        2000,
     );
 
     println!("--- Expressions found ---");
@@ -68,7 +71,10 @@ fn _main(args: Args) {
         println!("{}", expr);
     }
 
-    pool.save_returns("returns.csv")
+    let _ = pool.save_returns("returns.csv");
+
+    save(&model, &weights_path);
+    // save model weights
 }
 
 fn _main_bruteforce(args: Args) {
@@ -120,7 +126,8 @@ fn _main_standard_ppo(args: Args) {
     let batch_size = 32;
     let episodes_per_batch = 8;
     let seq_len = 20;
-    let pool = transformer::transformer_search(
+    let weights_path = behavior_decl.weights.clone();
+    let (pool, model) = transformer::transformer_search(
         network,
         action_space,
         device,
@@ -129,6 +136,8 @@ fn _main_standard_ppo(args: Args) {
         episodes_per_batch,
         batch_size,
         seq_len,
+        &weights_path,
+        100,
     );
 
     println!("--- Expressions found ---");
@@ -136,7 +145,9 @@ fn _main_standard_ppo(args: Args) {
         println!("{}", expr);
     }
 
-    pool.save_returns("returns_ppo.csv")
+    let _ = pool.save_returns("returns_ppo.csv");
+
+    save(&model, &weights_path);
 }
 #[cfg(test)]
 mod tests {

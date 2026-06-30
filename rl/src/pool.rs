@@ -179,28 +179,29 @@ impl Pool {
             .portfolio_returns
             .narrow(0, evaluation_start_days, eval_len);
 
-        // Calculate incoming utility for all in stack
-        let mean = returns_eval.mean_dim(Some([1_i64].as_slice()), false, tch::Kind::Float);
-        let std = returns_eval.std_dim(Some([1_i64].as_slice()), false, false);
-        let incoming_utility = &mean / std.clamp_min(1e-9);
+        let pool_size = self.len() as f64;
 
-        // Calculate portfolio properties
-        let port_mean = port_eval.mean(None);
-        let port_std = port_eval.std(false).clamp_min(1e-9);
-        let port_utility = &port_mean / &port_std;
-        let port_centered = &port_eval - &port_mean;
+        let fitness_old = if pool_size == 0.0 {
+            tch::Tensor::zeros(&[returns_eval.size()[0]], (tch::Kind::Float, self.device))
+        } else {
+            let old_mean = port_eval.mean(None);
+            let old_std = port_eval.std(false).clamp_min(1e-9);
+            (&old_mean / &old_std).broadcast_to(&[returns_eval.size()[0]])
+        };
 
-        // Calculate correlation for all in stack
-        let returns_centered =
-            &returns_eval - returns_eval.mean_dim(Some([1_i64].as_slice()), true, tch::Kind::Float);
-        let cov = (&returns_centered * port_centered).mean_dim(
-            Some([1_i64].as_slice()),
-            false,
-            tch::Kind::Float,
-        );
-        let corr = cov / (&std * &port_std).clamp_min(1e-9);
+        let returns_new = if pool_size == 0.0 {
+            returns_eval.shallow_clone()
+        } else {
+            let weight_old = pool_size / (pool_size + 1.0);
+            let weight_new = 1.0 / (pool_size + 1.0); // TODO: use optimizer, instead of uniform weight
+            (&port_eval * weight_old) + (returns_eval * weight_new)
+        };
 
-        let marginal_utility = incoming_utility - port_utility * corr * self.adj_coeff;
+        let new_mean = returns_new.mean_dim(Some([1_i64].as_slice()), false, tch::Kind::Float);
+        let new_std = returns_new.std_dim(Some([1_i64].as_slice()), false, false);
+        let fitness_new = &new_mean / new_std.clamp_min(1e-9);
+
+        let marginal_utility = fitness_new - fitness_old;
         marginal_utility
     }
 }
@@ -218,10 +219,22 @@ impl Pool {
             return Err("Empty Stack");
         }
         let mut returns_list = Vec::with_capacity(stack.len());
-        for (_signal_spec, addr) in stack {
+        for (signal_spec, addr) in stack {
             // (types, address)
-            returns_list.push(self.signal_to_returns(runtime, callgraph, *addr));
+            if let Signal::DataFrame(_) = signal_spec {
+                returns_list.push(self.signal_to_returns(runtime, callgraph, *addr));
+            } else {
+                // println!("Diagnostic - Ignoring non-dataframe signal in calc_reward: {:?}", signal_spec);
+            }
         }
+
+        if returns_list.is_empty() {
+            // If the stack contains only literals, the agent hasn't built a portfolio yet.
+            // Return 0.0 reward to avoid NaN computations.
+            // println!("Diagnostic - returns_list is empty, returning 0.0 reward.");
+            return Ok((pbest_potential, 0.0));
+        }
+
         let returns_stacked = Tensor::stack(&returns_list, 0); // [stack_size, T]
 
         // Calculate marginal utility and get the maximum
@@ -258,6 +271,10 @@ impl Pool {
                 // );
                 // println!("Trajectory: {:?}", human_readable_traj);
             }
+            return Err("NaN in marginal utility.");
+        }
+        if potential.is_infinite() {
+            return Err("Inf in marginal utility.");
         }
         let reward = potential - pbest_potential;
         Ok((potential, reward))
