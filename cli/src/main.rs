@@ -49,8 +49,11 @@ fn _main(args: Args) {
     // let batch_size = 64;
     // let episodes_per_batch = 50;
 
+    // let batch_size = 32;
+    // let episodes_per_batch = 32;
+    // let seq_len = 32;
     let batch_size = 32;
-    let episodes_per_batch = 32;
+    let episodes_per_batch = 4;
     let seq_len = 32;
     let weights_path = behavior_decl.weights.clone();
     let (pool, model) = transformer::transformer_search(
@@ -63,7 +66,7 @@ fn _main(args: Args) {
         batch_size,
         seq_len,
         &weights_path,
-        2000,
+        500,
     );
 
     println!("--- Expressions found ---");

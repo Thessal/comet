@@ -116,7 +116,7 @@ impl Environment {
         self.reset();
         let mut trajectory: Trajectory = Vec::new();
         let mut actions: Vec<i64> = Vec::new();
-        let mut pbest = 0.0f64;
+        let mut prev_potential = 0.0f64;
         for _i in 0..self.config.max_length {
             let mask: Tensor = self.get_valid_action_mask(device);
             let (state_embedding, action_logits, value_tensor): (Tensor, Tensor, Tensor) =
@@ -134,11 +134,9 @@ impl Environment {
 
             let (potential, reward): (f64, f64) = self
                 .pool
-                .calc_reward(runtime, &self.state.machine, pbest)
+                .calc_potential(runtime, &self.state.machine, prev_potential)
                 .unwrap();
-            if pbest < potential {
-                pbest = potential;
-            }
+            prev_potential = potential;
 
             let is_done = action == Action::Done;
             let step = Step {

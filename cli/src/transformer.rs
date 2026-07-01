@@ -40,17 +40,17 @@ impl RolloutBuffer {
         self.dones.clear();
     }
 
-    pub fn calc_gae(&self, gamma: f32, tau: f32) -> (Vec<f32>, Vec<f32>) {
+    pub fn calc_gae(&self, last_value: f32, gamma: f32, tau: f32) -> (Vec<f32>, Vec<f32>) {
         let mut returns = vec![0.0; self.rewards.len()];
         let mut advantages = vec![0.0; self.rewards.len()];
-        let mut gae_running = 0.0;
-        let mut last_v = 0.0; // ignore reward from truncated trajectory
+        let mut last_gae_lam = 0.0;
+        let mut last_v = last_value;
 
         for t in (0..self.rewards.len()).rev() {
             let next_non_terminal = if self.dones[t] { 0.0 } else { 1.0 };
-            let delta = self.rewards[t] + gamma * last_v * next_non_terminal - self.values[t]; // TD Error
-            gae_running = delta + gamma * tau * next_non_terminal * gae_running; // Accumulate the discounted advantage
-            advantages[t] = gae_running;
+            let delta = self.rewards[t] + gamma * last_v * next_non_terminal - self.values[t];
+            last_gae_lam = delta + gamma * tau * next_non_terminal * last_gae_lam;
+            advantages[t] = last_gae_lam;
             returns[t] = advantages[t] + self.values[t];
             last_v = self.values[t];
         }
@@ -73,6 +73,7 @@ impl TransformerSearch {
     }
 }
 
+// TODO : move reward calculation into rl/src
 pub fn transformer_search(
     network: Network,
     action_space: rl::action::ActionSpace,
@@ -99,7 +100,8 @@ pub fn transformer_search(
     );
 
     let mut vs = tch::nn::VarStore::new(device);
-    crate::weights::load(&mut vs, weights_path);
+    println!("Not loading weights");
+    // crate::weights::load(&mut vs, weights_path);
     let mut model = AgentModel::new(&vs.root(), env.action_space.clone(), 256);
     let mut opt = tch::nn::Adam::default().build(&vs, 1e-4).unwrap();
     let mut buffer = RolloutBuffer::new();
@@ -107,14 +109,14 @@ pub fn transformer_search(
     let clip_param = 0.2;
     //  loss = policy_loss + value_loss * c1 - entropy * c2;
     let c1 = 0.5;
-    let c2 = 0.05;
+    let c2 = 0.00;
     let epochs = 4;
     // let batch_size = 512;
     // let episodes_per_batch = 50;
     // let num_iterations = 2000;
     // let num_iterations = 00;
     // let num_iterations = 20;
-    let unfinished_penaly: f64 = 10.0;
+    let unfinished_penaly: f64 = 1.0;
 
     for iteration in 0..num_iterations {
         println!("--- Iteration {} ---", iteration);
@@ -124,13 +126,13 @@ pub fn transformer_search(
         let mut ep_lengths = Vec::new();
         let mut ep_exprs = Vec::new();
 
-        // let mut last_value_for_gae = 0.0;
+        let mut last_value_for_gae = 0.0;
 
         for _ep in 0..episodes_per_batch {
             let mut actions = Vec::new();
-            let mut ep_reward = 0.0;
+            let mut ep_reward = 0.0; // ep_reward is for monitoring 
             let mut is_done = false;
-            let mut pbest = 0.0;
+            let mut prev_potential = 0.0;
 
             env.reset();
             let mut step_count = 0;
@@ -183,13 +185,21 @@ pub fn transformer_search(
 
                 let (potential, reward): (f64, f64) = env
                     .pool
-                    .calc_reward(runtime, &env.state.machine, pbest)
-                    .unwrap();
-                if pbest < potential {
-                    pbest = potential;
-                }
+                    .calc_potential(runtime, &env.state.machine, prev_potential)
+                    .unwrap_or_else(|_| {
+                        let expr = env
+                            .state
+                            .machine
+                            .callgraph
+                            .format_node(env.state.machine.callgraph.root);
+                        println!("NaN in marginal utility for expr: {}", expr);
+                        (-99.0, -99.0)
+                    });
+                prev_potential = potential;
 
-                ep_reward += reward;
+                if ep_reward < reward {
+                    ep_reward = reward
+                };
 
                 // Build shifted target tokens locally to save in buffer
                 let mut target_tokens = actions.clone();
@@ -227,18 +237,14 @@ pub fn transformer_search(
                 // truncation
                 let len = buffer.rewards.len();
                 buffer.rewards[len - 1] -= unfinished_penaly as f32;
-                ep_reward -= unfinished_penaly;
 
-                // let mask: Tensor = env.get_valid_action_mask(&device);
-                // let (_, _, value_tensor) = tch::no_grad(|| {
-                //     model.forward(&env.state, &mut runtime, &mask, &device, &actions)
-                // });
-                // last_value_for_gae = value_tensor.double_value(&[]) as f32;
-                // if last_value_for_gae.is_nan() {
-                //     last_value_for_gae = 0.0;
-                // }
+                let mask: Tensor = env.get_valid_action_mask(&device);
+                let (_, _, value_tensor) = tch::no_grad(|| {
+                    model.forward(&env.state, &mut runtime, &mask, &device, &actions)
+                });
+                last_value_for_gae = value_tensor.double_value(&[]) as f32;
             } else {
-                // last_value_for_gae = 0.0; // The future reward is exactly 0 after termination
+                last_value_for_gae = 0.0; // The future reward is exactly 0 after termination
             }
 
             ep_rewards.push(ep_reward);
@@ -288,7 +294,7 @@ pub fn transformer_search(
         );
 
         // gamma = 0.99, tau(lambda) = 0.95
-        let (mut returns, mut advantages) = buffer.calc_gae(0.99, 0.95);
+        let (mut returns, mut advantages) = buffer.calc_gae(last_value_for_gae, 0.99, 0.95);
         for i in 0..returns.len() {
             if returns[i].is_nan() || returns[i].is_infinite() {
                 returns[i] = 0.0;
@@ -398,19 +404,25 @@ pub fn transformer_search(
                     .sum_dim_intlist(Some(&[-1][..]), false, tch::Kind::Float)
                     .mean(tch::Kind::Float);
 
-                let log_ratio = (new_log_prob - b_old_log_probs).clamp_max(10.0);
+                let log_ratio = (new_log_prob - b_old_log_probs).clamp_max(2.0);
                 let ratio = log_ratio.exp();
                 let surr1 = &ratio * &b_advantages;
                 let surr2 = ratio.clamp(1.0 - clip_param, 1.0 + clip_param) * &b_advantages;
                 let policy_loss = -surr1.min_other(&surr2).mean(tch::Kind::Float);
 
                 let mu = new_values_out.select(1, 0);
-                let log_sigma = new_values_out.select(1, 1).clamp(-20.0, 2.0);
+                let log_sigma = new_values_out.select(1, 1).clamp(-2.0, 2.0);
                 let sigma = log_sigma.exp();
-                let variance = (&sigma * &sigma).clamp_min(1e-8);
-                let diff = &b_returns - &mu;
-                let nll: tch::Tensor =
-                    (diff.pow_tensor_scalar(2.0) / (&variance * 2.0)) + &log_sigma;
+                // let variance = (&sigma * &sigma).clamp_min(1e-3);
+                // let diff = &b_returns - &mu;
+                // // let nll: tch::Tensor = (diff.abs() / (&variance * 2.0)) + &log_sigma;
+                // let nll: tch::Tensor =
+                //     (diff.pow_tensor_scalar(2.0) / (&variance * 2.0)) + &log_sigma;
+
+                let diff_abs = (&b_returns - &mu).abs();
+                // sqrt(2) ≈ 1.41421356
+                let nll: tch::Tensor = ((diff_abs * 1.41421356) / &sigma) + &log_sigma;
+
                 let value_loss = nll.mean(tch::Kind::Float);
 
                 // if _epoch == 0 && start_idx == 0 {
@@ -431,7 +443,7 @@ pub fn transformer_search(
                 total_value_loss += value_val * (batch_indices.len() as f64);
                 total_entropy += entropy_val * (batch_indices.len() as f64);
 
-                let loss = policy_loss + value_loss * c1 - entropy * c2;
+                let loss = policy_loss + value_loss * c1; //- entropy * c2;
                 let loss_val = loss.double_value(&[]);
 
                 if loss_val.is_nan()
@@ -496,7 +508,8 @@ pub fn transformer_search(
                     continue;
                 }
 
-                opt.backward_step_clip(&loss, 0.5);
+                // opt.backward_step_clip(&loss, 0.5);
+                opt.backward_step(&loss);
             }
             let n_states = buffer.states.len() as f64;
             println!(

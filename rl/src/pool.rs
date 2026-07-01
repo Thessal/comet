@@ -90,6 +90,7 @@ impl Pool {
         // you can use Network::extract_subtree to get subtrees
         let hash_str: String = sub_ast.format_node(sub_ast.root);
         if !self.asts.contains_key(&hash_str) {
+            println!("Inserting new equation to the pool : {}", hash_str);
             let pos = runtime.lookup_or_run(&sub_ast, sub_ast.root);
             let returns = self.backtester.calc_returns(&pos.to_dataframe(self.device));
             self.asts.insert(hash_str.clone(), sub_ast);
@@ -207,12 +208,12 @@ impl Pool {
 }
 
 impl Pool {
-    pub fn calc_reward(
+    pub fn calc_potential(
         &self,
         runtime: &mut Runtime,
         machine: &AbstractMachine,
         // _is_done: bool,
-        pbest_potential: f64,
+        prev_potential: f64,
     ) -> Result<(f64, f64), &'static str> {
         let (stack, callgraph): (&Vec<(Signal, usize)>, &Network) = machine.get_stack();
         if stack.is_empty() {
@@ -232,7 +233,12 @@ impl Pool {
             // If the stack contains only literals, the agent hasn't built a portfolio yet.
             // Return 0.0 reward to avoid NaN computations.
             // println!("Diagnostic - returns_list is empty, returning 0.0 reward.");
-            return Ok((pbest_potential, 0.0));
+            // return Ok((-pbest_potential, 0.0));
+            let potential = 0.0;
+            let reward = 0.0;
+            // let reward = potential - pbest_potential;
+            // return Ok((potential, reward));
+            return Ok((potential, reward));
         }
 
         let returns_stacked = Tensor::stack(&returns_list, 0); // [stack_size, T]
@@ -276,7 +282,13 @@ impl Pool {
         if potential.is_infinite() {
             return Err("Inf in marginal utility.");
         }
-        let reward = potential - pbest_potential;
+        // let potential = if potential > prev_potential {
+        //     potential
+        // } else {
+        //     prev_potential
+        // };
+        let reward = potential - prev_potential;
         Ok((potential, reward))
+        // Ok((potential, reward))
     }
 }

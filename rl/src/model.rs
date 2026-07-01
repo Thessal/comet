@@ -202,31 +202,6 @@ impl AgentModel {
         }
     }
 
-    pub fn calculate_ppo_loss(
-        &self,
-        log_probs: &Tensor,
-        old_log_probs: &Tensor,
-        advantages: &Tensor,
-        entropy: Option<&Tensor>,
-        entropy_coef: f64,
-        clip_coef: f64,
-    ) -> Tensor {
-        let ratio = (log_probs - old_log_probs).exp();
-        let loss1 = &ratio * advantages;
-        let loss2 = ratio.clamp(1.0 - clip_coef, 1.0 + clip_coef) * advantages;
-
-        let mut policy_loss = -loss1.min_other(&loss2).mean(tch::Kind::Float);
-
-        if let Some(ent) = entropy {
-            policy_loss = policy_loss - ent.mean(tch::Kind::Float) * entropy_coef;
-        }
-        policy_loss
-    }
-
-    pub fn calculate_value_loss(&self, values: &Tensor, returns: &Tensor) -> Tensor {
-        values.mse_loss(returns, tch::Reduction::Mean)
-    }
-
     pub fn compute_5d_embedding(
         history: &[i64],
         is_done: bool,
@@ -330,7 +305,10 @@ impl Model for AgentModel {
         let mu = value_out.select(0, 0);
         let log_sigma = value_out.select(0, 1).clamp(-20.0, 2.0);
         let sigma = log_sigma.exp();
-        let value: tch::Tensor = &mu - 1.96 * &sigma; // 5% quantile // 0.05 0.95 : 2-sigma
+        let value: tch::Tensor = &mu + 1.96 * &sigma; // 5% quantile // 0.05 0.95 : 2-sigma
+        // let value = value.clamp_min(0);
+        // let value: tch::Tensor = &mu + &sigma;
+        // let value: tch::Tensor = &mu + &sigma;
 
         // // Debug printing (randomly print ~1% of the time to avoid spam, or just print if needed)
         // if rand::random::<f32>() < 0.01 {
