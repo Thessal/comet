@@ -1,11 +1,12 @@
 Behavior TechnicalIndicator(volume_ratio: DataFrame, returns: DataFrame, intraday_ret: DataFrame) {
-    weights="behavior_1_compare.pth", train=true, supervised_epochs=100,
-    operators = [add, subtract, multiply, divide, flip, ts_mean, pow],
+    weights="weights/behavior_2_compare.pth", train=true, supervised_epochs=100,
+    operators = [add, subtract, multiply, divide, flip, ts_mean],
     integers = [ 1,2,3,4,5 ], floats = [ 1.0, 2.0, 3.0, 4.0, 5.0 ], strings=[]
 } -> DataFrame
 
 Flow technicalindicator_example {
-    v = divide(data("volume"), data("adv20"))
+    v20 = ts_mean(data("volume"),20)
+    v = divide(data("volume"), v20)
     r = data("returns")
     i = divide(data("close"), data("open"))
     TechnicalIndicator(v, r, i)

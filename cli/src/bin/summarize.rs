@@ -106,7 +106,9 @@ fn main() {
             let action_logits =
                 action_logits.masked_fill(&mask.logical_not().unsqueeze(0), std::f64::NEG_INFINITY);
 
-            let log_probs = action_logits.log_softmax(-1, tch::Kind::Float);
+            let log_probs = action_logits
+                .multiply_scalar(0.1)
+                .log_softmax(-1, tch::Kind::Float);
             let mut probs = log_probs.exp().nan_to_num(0.0, 0.0, 0.0).clamp(0.0, 1.0);
             let sum = probs.sum(tch::Kind::Float);
             if sum.double_value(&[]) <= 1e-8 {

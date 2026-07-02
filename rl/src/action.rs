@@ -91,6 +91,20 @@ impl ActionSpace {
         }
         Tensor::from_slice(&mask)
     }
+
+    pub fn get_class_matrix(&self, device: &tch::Device) -> Tensor {
+        let mut matrix = vec![0.0f32; 3 * self.size()];
+        for i in 0..self.size() {
+            let action = self.get_action(i);
+            let class_idx = match action {
+                Action::ShiftInt(_) | Action::ShiftFloat(_) | Action::ShiftString(_) => 0,
+                Action::ShiftParam(_) => 1,
+                Action::Reduce(_) | Action::Done => 2,
+            };
+            matrix[i * 3 + class_idx] = 1.0;
+        }
+        Tensor::from_slice(&matrix).view([self.size() as i64, 3]).to(*device)
+    }
 }
 
 impl From<&BehaviorDecl> for ActionSpace {

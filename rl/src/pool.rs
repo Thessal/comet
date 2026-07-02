@@ -63,7 +63,7 @@ impl Pool {
         for (expr, r) in self.returns.iter() {
             let utility: f64 = self.utility(r);
             let marginal_utility =
-                f64::try_from(self.marginal_utility(&r.unsqueeze(0), 252, 0).max())
+                f64::try_from(self.marginal_utility(&r.unsqueeze(0), 252, 0, false).max())
                     .unwrap_or(f64::NAN); // TODO: pass evaluation start/end days
             let corr = self.corr(&self.portfolio_returns, r);
             let maxcorr = max_corrs.get(expr).copied().unwrap_or(f64::NAN);
@@ -170,15 +170,48 @@ impl Pool {
         returns_stacked: &Tensor,
         evaluation_start_days: i64,
         evaluation_end_days: i64,
+        debug: bool,
     ) -> Tensor {
+        let debug_tensor = if debug {
+            |name: &str, t: &tch::Tensor| {
+                let shape = t.size();
+                let numel = t.numel();
+                let nan_count = t.isnan().sum(tch::Kind::Int64).double_value(&[]);
+                let inf_count = t.isinf().sum(tch::Kind::Int64).double_value(&[]);
+
+                let flat_ret = Vec::<f32>::try_from(t.flatten(0, -1)).unwrap_or_default();
+                let zero_count = flat_ret.iter().filter(|&&v| v == 0.0).count();
+
+                println!(
+                    "Debug MU ({}) -> Shape: {:?}, Total: {}, NaN: {}, Inf: {}, Zero: {}",
+                    name, shape, numel, nan_count, inf_count, zero_count
+                );
+
+                if !shape.is_empty() && shape[0] > 0 {
+                    let first_line =
+                        Vec::<f32>::try_from(t.get(0).flatten(0, -1)).unwrap_or_default();
+                    let last_line = Vec::<f32>::try_from(t.get(shape[0] - 1).flatten(0, -1))
+                        .unwrap_or_default();
+                    // println!("Debug MU ({}) -> First line: {:?}", name, first_line);
+                    // println!("Debug MU ({}) -> Last line: {:?}", name, last_line);
+                }
+            }
+        } else {
+            |name: &str, t: &tch::Tensor| {}
+        };
         // returns_stacked : [*, T]
         let t_dim = returns_stacked.size()[1];
         let eval_len = t_dim - evaluation_start_days - evaluation_end_days;
+
+        debug_tensor("returns_stacked", returns_stacked);
 
         let returns_eval = returns_stacked.narrow(1, evaluation_start_days, eval_len);
         let port_eval = self
             .portfolio_returns
             .narrow(0, evaluation_start_days, eval_len);
+
+        debug_tensor("returns_eval", &returns_eval);
+        debug_tensor("port_eval", &port_eval);
 
         let pool_size = self.len() as f64;
 
@@ -186,9 +219,12 @@ impl Pool {
             tch::Tensor::zeros(&[returns_eval.size()[0]], (tch::Kind::Float, self.device))
         } else {
             let old_mean = port_eval.mean(None);
-            let old_std = port_eval.std(false).clamp_min(1e-9);
-            (&old_mean / &old_std).broadcast_to(&[returns_eval.size()[0]])
+            let old_std = port_eval.std(false).clamp_min(1e-6);
+            (&old_mean / &old_std)
+                .clamp(-10, 10)
+                .broadcast_to(&[returns_eval.size()[0]])
         };
+        debug_tensor("fitness_old", &fitness_old);
 
         let returns_new = if pool_size == 0.0 {
             returns_eval.shallow_clone()
@@ -197,12 +233,19 @@ impl Pool {
             let weight_new = 1.0 / (pool_size + 1.0); // TODO: use optimizer, instead of uniform weight
             (&port_eval * weight_old) + (returns_eval * weight_new)
         };
+        debug_tensor("returns_new", &returns_new);
 
         let new_mean = returns_new.mean_dim(Some([1_i64].as_slice()), false, tch::Kind::Float);
         let new_std = returns_new.std_dim(Some([1_i64].as_slice()), false, false);
-        let fitness_new = &new_mean / new_std.clamp_min(1e-9);
+        debug_tensor("new_mean", &new_mean);
+        debug_tensor("new_std", &new_std);
 
-        let marginal_utility = fitness_new - fitness_old;
+        let fitness_new = (&new_mean / new_std.clamp_min(1e-6)).clamp(-10, 10);
+        debug_tensor("fitness_new", &fitness_new);
+
+        let marginal_utility = (fitness_new - fitness_old * 0.90) * (pool_size + 1.0); // 0.90 to give some reward to repeated output
+        debug_tensor("marginal_utility", &marginal_utility);
+
         marginal_utility
     }
 }
@@ -212,7 +255,7 @@ impl Pool {
         &self,
         runtime: &mut Runtime,
         machine: &AbstractMachine,
-        // _is_done: bool,
+        is_done: bool,
         prev_potential: f64,
     ) -> Result<(f64, f64), &'static str> {
         let (stack, callgraph): (&Vec<(Signal, usize)>, &Network) = machine.get_stack();
@@ -235,7 +278,7 @@ impl Pool {
             // println!("Diagnostic - returns_list is empty, returning 0.0 reward.");
             // return Ok((-pbest_potential, 0.0));
             let potential = 0.0;
-            let reward = 0.0;
+            let reward = -0.1;
             // let reward = potential - pbest_potential;
             // return Ok((potential, reward));
             return Ok((potential, reward));
@@ -244,28 +287,44 @@ impl Pool {
         let returns_stacked = Tensor::stack(&returns_list, 0); // [stack_size, T]
 
         // Calculate marginal utility and get the maximum
-        let marginal_utility = self.marginal_utility(&returns_stacked, 252, 0); // TODO: pass evaluation start/end days properly
+        // let show_debug = is_done == true;
+        let show_debug = false;
+        let marginal_utility = self.marginal_utility(&returns_stacked, 252, 0, show_debug); // TODO: pass evaluation start/end days properly
 
         if bool::try_from(marginal_utility.isnan().any()).unwrap() == true {
             return Err("NaN in marginal utility.");
         }
-        let potential = f64::try_from(marginal_utility.max()).unwrap();
+        let potential = f64::try_from(marginal_utility.max()).unwrap().exp() - 1.0; // exponential utility
         if potential.is_nan() || potential.is_infinite() {
             for (_signal_spec, addr) in stack {
                 let incoming_pos = runtime
                     .lookup_or_run(callgraph, *addr)
                     .to_dataframe(self.device);
                 let incoming_ret = self.backtester.calc_returns(&incoming_pos);
+                let shape = incoming_ret.size();
+                let numel = incoming_ret.numel();
                 let pos_nan_count = incoming_pos.isnan().sum(tch::Kind::Int64).double_value(&[]);
-                let ret_nan_count = incoming_ret.isnan().sum(tch::Kind::Int64).double_value(&[]);
+                let nan_count = incoming_ret.isnan().sum(tch::Kind::Int64).double_value(&[]);
+                let inf_count = incoming_ret.isinf().sum(tch::Kind::Int64).double_value(&[]);
+
+                let flat_ret =
+                    Vec::<f32>::try_from(incoming_ret.flatten(0, -1)).unwrap_or_default();
+                let zero_count = flat_ret.iter().filter(|&&v| v == 0.0).count();
+
                 println!(
-                    "Debug Pool -> Position NaN count: {}, Returns NaN count: {}",
-                    pos_nan_count, ret_nan_count
+                    "Debug Pool -> Shape: {:?}, Total: {}, NaN (Pos/Ret): {}/{}, Inf: {}, Zero: {}",
+                    shape, numel, pos_nan_count, nan_count, inf_count, zero_count
                 );
-                println!(
-                    "Debug Pool -> Raw returns series: {:?}",
-                    Vec::<f32>::try_from(incoming_ret.flatten(0, -1)).unwrap_or_default()
-                );
+
+                if !shape.is_empty() && shape[0] > 0 {
+                    let first_line = Vec::<f32>::try_from(incoming_ret.get(0).flatten(0, -1))
+                        .unwrap_or_default();
+                    let last_line =
+                        Vec::<f32>::try_from(incoming_ret.get(shape[0] - 1).flatten(0, -1))
+                            .unwrap_or_default();
+                    // println!("Debug Pool -> First line: {:?}", first_line);
+                    // println!("Debug Pool -> Last line: {:?}", last_line);
+                }
                 // let human_readable_traj: Vec<String> = actions
                 //     .iter()
                 //     .map(|&idx| format!("{:?}", self.action_space.get_action(idx as usize)))

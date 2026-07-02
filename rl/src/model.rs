@@ -305,7 +305,8 @@ impl Model for AgentModel {
         let mu = value_out.select(0, 0);
         let log_sigma = value_out.select(0, 1).clamp(-20.0, 2.0);
         let sigma = log_sigma.exp();
-        let value: tch::Tensor = &mu + 1.96 * &sigma; // 5% quantile // 0.05 0.95 : 2-sigma
+        // let value: tch::Tensor = &mu + 1.96 * &sigma; // 5% quantile // 0.05 0.95 : 2-sigma
+        let value: tch::Tensor = &mu - 1.96 * &sigma; // 5% quantile // 0.05 0.95 : 2-sigma
         // let value = value.clamp_min(0);
         // let value: tch::Tensor = &mu + &sigma;
         // let value: tch::Tensor = &mu + &sigma;

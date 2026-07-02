@@ -83,6 +83,7 @@ impl Environment {
     }
 
     pub fn get_valid_action_mask(&self, device: &Device) -> Tensor {
+        let max_stack_len = 5;
         let (stack, _callgraph) = self.state.machine.get_stack();
         let mut valid_actions: Vec<Action> = vec![];
         for action_idx in 0..self.action_space.size() {
@@ -95,9 +96,13 @@ impl Environment {
                     stack.len() >= op_spec.inputs.len() && // stack size checking
                     self.state.machine.check_reduce(&op_spec) // type checking
                 }
-                _ => {
+                // Action::ShiftInt(_) | Action::ShiftFloat(_) | Action::ShiftString(_) => {
+                Action::ShiftInt(_) | Action::ShiftFloat(_) => {
+                    !stack.is_empty() && (stack.len() < max_stack_len)
+                }
+                Action::ShiftParam(_) | Action::ShiftString(_) => {
                     // introducing new variable is always valid
-                    true
+                    stack.len() < max_stack_len
                 }
             };
             if valid {
@@ -132,13 +137,13 @@ impl Environment {
 
             actions.push(action_idx);
 
+            let is_done = action == Action::Done;
             let (potential, reward): (f64, f64) = self
                 .pool
-                .calc_potential(runtime, &self.state.machine, prev_potential)
+                .calc_potential(runtime, &self.state.machine, is_done, prev_potential)
                 .unwrap();
             prev_potential = potential;
 
-            let is_done = action == Action::Done;
             let step = Step {
                 state_embedding,
                 action,

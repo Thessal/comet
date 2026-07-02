@@ -9,7 +9,8 @@ pub static OP_TS_MEAN: OperatorSpec = OperatorSpec {
             let t = std::cmp::max(1, *t as i64);
             let t_len = a.size()[0];
 
-            let cumsum = a.cumsum(0, a.kind());
+            let a_clean = a.nan_to_num(0.0, 0.0, 0.0);
+            let cumsum = a_clean.cumsum(0, a.kind());
 
             let mut zeros_shape = a.size();
             zeros_shape[0] = t;
@@ -25,15 +26,26 @@ pub static OP_TS_MEAN: OperatorSpec = OperatorSpec {
 
             let sum = &cumsum - &sub;
 
-            let div_vec: Vec<f64> = (0..t_len).map(|i| std::cmp::min(i + 1, t) as f64).collect();
-            let mut div_shape = vec![1; a.size().len()];
-            div_shape[0] = t_len;
-            let divisor = tch::Tensor::from_slice(&div_vec)
-                .to_device(a.device())
-                .to_kind(a.kind())
-                .view(div_shape.as_slice());
+            let is_valid = a.isnan().logical_not().to_kind(a.kind());
+            let count_cumsum = is_valid.cumsum(0, a.kind());
 
-            Signal::DataFrame(Some(sum / divisor))
+            let count_sub = if t_len > t {
+                tch::Tensor::cat(&[&zeros, &count_cumsum.narrow(0, 0, t_len - t)], 0)
+            } else {
+                let mut full_zeros_shape = a.size();
+                full_zeros_shape[0] = t_len;
+                tch::Tensor::zeros(&full_zeros_shape, (a.kind(), a.device()))
+            };
+
+            let count = &count_cumsum - &count_sub;
+
+            let mean = sum / &count;
+            
+            let is_zero = count.eq(0.0);
+            let nan = tch::Tensor::full(mean.size().as_slice(), f64::NAN, (a.kind(), a.device()));
+            let res = mean.where_self(&is_zero.logical_not(), &nan);
+
+            Signal::DataFrame(Some(res))
         }
         _ => panic!("ts_mean expected DataFrame and Int"),
     },
