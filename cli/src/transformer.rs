@@ -141,14 +141,20 @@ pub fn transformer_search(
                 // Add assertion
                 let has_nan = action_logits.isnan().any().double_value(&[]);
                 if has_nan != 0f64 {
-                    println!("CRITICAL WARNING: action_logits contains NaN during rollout!");
+                    println!(
+                        "CRITICAL WARNING: action_logits contains NaN during rollout! Resampling episode."
+                    );
+                    resample_episode = true;
+                    break;
                 }
                 let max_logit = action_logits.max().double_value(&[]);
                 if max_logit > 1e4 || max_logit.is_nan() {
                     println!(
-                        "WARNING: action_logits max value is extreme or NaN: {}",
+                        "WARNING: action_logits max value is extreme or NaN: {}. Resampling episode.",
                         max_logit
                     );
+                    resample_episode = true;
+                    break;
                 }
 
                 // Sample action
@@ -586,8 +592,8 @@ pub fn transformer_search(
                     continue;
                 }
 
-                // opt.backward_step_clip(&loss, 0.5);
-                opt.backward_step(&loss);
+                opt.backward_step_clip(&loss, 0.5);
+                // opt.backward_step(&loss);
             }
             let n_states = buffer.states.len() as f64;
             println!(

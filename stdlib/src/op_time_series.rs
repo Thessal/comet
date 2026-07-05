@@ -13,7 +13,6 @@ pub fn roll_window(a: &tch::Tensor, d: i64) -> tch::Tensor {
     padded.unfold(0, d_safe, 1)
 }
 
-
 pub static OP_DELAY: OperatorSpec = OperatorSpec {
     name: "delay",
     inputs: &[Signal::DataFrame(None), Signal::Int(None)],
@@ -44,7 +43,7 @@ pub static OP_DELAY: OperatorSpec = OperatorSpec {
 };
 
 pub static OP_DELTA: OperatorSpec = OperatorSpec {
-    name: "delta",
+    name: "delta", // FIXME: usually, ts_diff(x,1) is delta(x), isn't it?
     inputs: &[Signal::DataFrame(None), Signal::Int(None)],
     output_shape: Signal::DataFrame(None),
     execute: |args| {
@@ -76,4 +75,3 @@ pub static OP_TS_RETURN: OperatorSpec = OperatorSpec {
         }
     },
 };
-

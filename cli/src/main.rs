@@ -45,7 +45,7 @@ fn _main(args: Args) {
     let action_space: ActionSpace = behavior_decl.into();
     // bruteforce::brute_force(network, action_space, use_cuda);
 
-    let mut runtime = Runtime::new(10000, "./wrds/data".into(), Some(device));
+    let mut runtime = Runtime::new(300, "./wrds/data".into(), Some(device));
     // let batch_size = 64;
     // let episodes_per_batch = 50;
 

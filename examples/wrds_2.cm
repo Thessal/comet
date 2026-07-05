@@ -1,0 +1,79 @@
+# https://www.cfainstitute.org/sites/default/files/-/media/documents/support/programs/cfa/cfa_program_level_ii_financial_ratio_list.pdf
+Behavior FinancialRatio(
+    revt : DataFrame, 
+    ni : DataFrame, 
+    seq : DataFrame, 
+    dltt : DataFrame, 
+    dlc : DataFrame, 
+    cogs : DataFrame, 
+    ebit : DataFrame, 
+    rect : DataFrame, 
+    pi : DataFrame, 
+    dvp : DataFrame, 
+    at : DataFrame, 
+    lct : DataFrame, 
+    xint : DataFrame, 
+    invt : DataFrame, 
+    invch : DataFrame, 
+    dvc : DataFrame, 
+    che : DataFrame, 
+    ap : DataFrame, 
+    xrent : DataFrame, 
+    txt : DataFrame, 
+    oiadp : DataFrame, 
+    oancf : DataFrame, 
+    ceq : DataFrame, 
+    capx : DataFrame, 
+    act : DataFrame, 
+    xsga : DataFrame, 
+    ppent : DataFrame, 
+    gp : DataFrame, 
+    dp : DataFrame, 
+    dltr : DataFrame, 
+    dltis : DataFrame, 
+    dlcch : DataFrame, 
+    cshpri : DataFrame, 
+    csho : DataFrame
+) {
+    weights="weights/wrds_2.pth", train=true, supervised_epochs=100,
+    operators = [add, subtract, divide, multiply, flip, cs_zscore, rank, delta, ts_nanmean], 
+    integers = [ 21, 63, 252 ], floats = [], strings=[]
+} -> DataFrame
+
+Flow financialratio_example {
+    revt = data("afnd1_revt")
+    ni = data("afnd1_ni")
+    seq = data("afnd1_seq")
+    dltt = data("afnd1_dltt")
+    dlc = data("afnd1_dlc")
+    cogs = data("afnd1_cogs")
+    ebit = data("afnd1_ebit")
+    rect = data("afnd1_rect")
+    pi = data("afnd1_pi")
+    dvp = data("afnd1_dvp")
+    at = data("afnd1_at")
+    lct = data("afnd1_lct")
+    xint = data("afnd1_xint")
+    invt = data("afnd1_invt")
+    invch = data("afnd1_invch")
+    dvc = data("afnd1_dvc")
+    che = data("afnd1_che")
+    ap = data("afnd1_ap")
+    xrent = data("afnd1_xrent")
+    txt = data("afnd1_txt")
+    oiadp = data("afnd1_oiadp")
+    oancf = data("afnd1_oancf")
+    ceq = data("afnd1_ceq")
+    capx = data("afnd1_capx")
+    act = data("afnd1_act")
+    xsga = data("afnd1_xsga")
+    ppent = data("afnd1_ppent")
+    gp = data("afnd1_gp")
+    dp = data("afnd1_dp")
+    dltr = data("afnd1_dltr")
+    dltis = data("afnd1_dltis")
+    dlcch = data("afnd1_dlcch")
+    cshpri = data("afnd1_cshpri")
+    csho = data("afnd1_csho")
+    FinancialRatio(revt,ni,seq,dltt,dlc,cogs,ebit,rect,pi,dvp,at,lct,xint,invt,invch,dvc,che,ap,xrent,txt,oiadp,oancf,ceq,capx,act,xsga,ppent,gp,dp,dltr,dltis,dlcch,cshpri,csho)
+}

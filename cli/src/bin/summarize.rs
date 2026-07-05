@@ -177,26 +177,45 @@ fn main() {
     }
 
     // 2. Value network visualization
-    println!(
-        "\n=== Value Network Visualization (\u{03bc} and \u{03c3} over varying complexity) ==="
-    );
-    println!("Evaluating with fixed data & ops ratio, varying sequence length (complexity).");
+    println!("\n=== Value Network Visualization Grid Scan ===");
+    let csv_filename = format!("{}.summary.csv", filename);
+    let mut file = std::fs::File::create(&csv_filename).expect("Failed to create CSV file");
+    use std::io::Write;
+    let header = "length,num_data,num_ops,entropy,is_done,mu,sigma";
+    writeln!(file, "{}", header).unwrap();
+    println!("{}", header);
+
     for len in 1..=30 {
-        let mut history = vec![];
-        for _ in 0..len {
-            history.push(1); // dummy action to construct 5d embedding
+        for num_data in 1..=10 {
+            for num_ops in 1..=10 {
+                for entropy_idx in 0..=30 {
+                    let entropy = (entropy_idx as f32) * 0.1;
+                    for &is_done_bool in &[false, true] {
+                        let is_done = if is_done_bool { 1.0 } else { 0.0 };
+                        let scale = 30.0;
+                        let emb_5d = [
+                            (len as f32) / scale,
+                            (num_data as f32) / scale,
+                            (num_ops as f32) / scale,
+                            entropy,
+                            is_done,
+                        ];
+                        let emb_5d_t = Tensor::from_slice(&emb_5d).to(device).unsqueeze(0);
+
+                        let value_out = tch::no_grad(|| model.value_net.forward(&emb_5d_t).squeeze_dim(0));
+                        let mu = value_out.double_value(&[0]);
+                        let log_sigma = value_out.double_value(&[1]).clamp(-20.0, 2.0);
+                        let sigma = std::f64::consts::E.powf(log_sigma);
+
+                        let line = format!("{},{},{},{:.1},{},{:.6},{:.6}", len, num_data, num_ops, entropy, is_done, mu, sigma);
+                        writeln!(file, "{}", line).unwrap();
+                        
+                        // Print to console as requested
+                        println!("{}", line);
+                    }
+                }
+            }
         }
-        let emb_5d = AgentModel::compute_5d_embedding(&history, false, &action_space);
-        let emb_5d_t = Tensor::from_slice(&emb_5d).to(device).unsqueeze(0);
-
-        let value_out = tch::no_grad(|| model.value_net.forward(&emb_5d_t).squeeze_dim(0));
-        let mu = value_out.double_value(&[0]);
-        let log_sigma = value_out.double_value(&[1]).clamp(-20.0, 2.0);
-        let sigma = std::f64::consts::E.powf(log_sigma);
-
-        println!(
-            "Length (Complexity): {:>2} | \u{03bc} = {:>7.4} | \u{03c3} = {:>7.4}",
-            len, mu, sigma
-        );
     }
+    println!("Successfully saved grid scan to {}", csv_filename);
 }

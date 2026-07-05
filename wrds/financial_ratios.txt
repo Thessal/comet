@@ -1,0 +1,167 @@
+https://www.cfainstitute.org/sites/default/files/-/media/documents/support/programs/cfa/cfa_program_level_ii_financial_ratio_list.pdf
+using compustat accounts
+
+1. Current ratio
+    Annual: ACT / LCT
+    Quarterly: ACTQ / LCTQ
+
+2. Quick ratio
+    Annual: (CHE + RECT) / LCT
+    Quarterly: (CHEQ + RECTQ) / LCTQ
+
+3. Cash ratio
+    Annual: CHE / LCT
+    Quarterly: CHEQ / LCTQ
+
+4. Defensive interval ratio
+    Annual: (CHE + RECT) / (COGS + XSGA - DP)
+    Quarterly: (CHEQ + RECTQ) / (COGSQ + XSGAQ - DPQ)
+
+5. Receivables turnover ratio
+    Annual: REVT / RECT
+    Quarterly: REVTQ / RECTQ
+
+6. Days of sales outstanding (DSO)
+    Annual: RECT / REVT
+    Quarterly: RECTQ / REVTQ / 4
+
+7. Inventory turnover ratio
+    Annual: COGS / INVT
+    Quarterly: COGSQ / INVTQ
+
+8. Days of inventory on hand (DOH)
+    Annual: COGS / INVT
+    Quarterly: COGSQ / INVTQ / 4
+
+9. Payables turnover ratio
+    Annual: (COGS + INVCH) / AP
+    Quarterly: (COGSQ + ts_diff(INVTQ,63)) / APQ
+
+10. Number of days of payables
+    Annual: AP / (COGS + INVCH)
+    Quarterly: APQ / (COGSQ + ts_diff(INVTQ,63)) / 4
+
+11. Cash conversion cycle (net operating cycle)
+
+    Annual: COGS / INVT + RECT / REVT - AP / (COGS + INVCH)
+    Quarterly: ( COGSQ / INVTQ + RECTQ / REVTQ - APQ / (COGSQ + ts_diff(INVTQ,63)) ) / 4
+
+12. Working capital turnover ratio
+    Annual: REVT / (ACT - LCT)
+    Quarterly: REVTQ / (ACTQ - LCTQ)
+
+13. Fixed asset turnover ratio
+    Annual: REVT / PPENT
+    Quarterly: REVTQ / PPENTQ
+
+14. Total asset turnover ratio
+    Annual: REVT / AT
+    Quarterly: REVTQ / ATQ
+
+15. Gross profit margin
+    Annual: GP / REVT
+    Quarterly: GPQ / REVTQ
+
+16. Operating profit margin
+    Annual: OIADP / REVT
+    Quarterly: OIADPQ / REVTQ
+
+17. Pretax margin
+    Annual: PI / REVT
+    Quarterly: PIQ / REVTQ
+
+18. Net profit margin
+    Annual: NI / REVT
+    Quarterly: NIQ / REVTQ
+
+19. Operating return on assets
+    Annual: OIADP / AT
+    Quarterly: OIADPQ / ATQ
+
+20. Return on assets
+    Annual: NI / AT
+    Quarterly: NIQ / ATQ
+
+21. Return on equity
+    Annual: NI / SEQ
+    Quarterly: NIQ / SEQQ
+
+22. Return on invested capital (pre-tax)
+    Annual: (EBIT) / (DLC + DLTT + SEQ)
+    Quarterly: (PIQ + XINTQ) / (DLCQ + DLTTQ + SEQQ)
+
+23. Return on invested capital
+    Annual: (EBIT * (1 - (TXT / PI))) / (DLC + DLTT + SEQ)
+    Quarterly: ((PIQ + XINTQ) * (1 - (TXTQ / PIQ))) / (DLCQ + DLTTQ + SEQQ)
+
+24. Return on common equity
+    Annual: (NI - DVP) / CEQ
+    Quarterly: (NIQ - DVPQ) / CEQQ
+
+25. Tax burden
+    Annual: NI / PI
+    Quarterly: NIQ / PIQ
+
+26. Interest burden
+    Annual: PI / EBIT
+    Quarterly: PIQ / (PIQ + XINTQ)
+
+27. EBIT margin
+    Annual: EBIT / REVT
+    Quarterly: (PIQ + XINTQ) / REVTQ
+
+28. Financial leverage ratio (equity multiplier)
+    Annual: AT / SEQ
+    Quarterly: ATQ / SEQQ
+
+29. Total debt "The total of interest-bearing short-term and long-term debt, excluding liabilities such as accrued expenses and accounts payable"
+    Annual: DLC + DLTT
+    Quarterly: DLCQ + DLTTQ
+
+30. Debt-to-assets ratio
+    Annual: (DLC + DLTT) / AT
+    Quarterly: (DLCQ + DLTTQ) / ATQ
+
+31. Debt-to-equity ratio
+    Annual: (DLC + DLTT) / SEQ
+    Quarterly: (DLCQ + DLTTQ) / SEQQ
+
+32. Debt-to-capital ratio
+    Annual: (DLC + DLTT) / (DLC + DLTT + SEQ)
+    Quarterly: (DLCQ + DLTTQ) / (DLCQ + DLTTQ + SEQQ)
+
+33. Interest coverage ratio
+    Annual: (EBIT) / XINT
+    Quarterly: (PIQ + XINTQ) / XINTQ
+
+34. Fixed charge coverage ratio
+    Annual: (EBIT + XRENT) / (XINT + XRENT)
+    Quarterly: (PIQ + XINTQ + XRENT / 4) / (XINTQ + XRENT / 4)
+
+35. Dividend payout ratio
+    Annual: DVC / (NI - DVP)
+    Quarterly: DVC / 4 / (NIQ - DVPQ)
+
+36. Retention rate
+    Annual: 1 - (DVC / (NI - DVP))
+    Quarterly: 1 - (DVC / 4 / (NIQ - DVPQ))
+
+37. Sustainable growth rate
+    Annual: (1 - (DVC / (NI - DVP))) * (NI / avg(SEQ))
+    Quarterly: (1 - (DVC / 4 / (NIQ - DVPQ))) * (NIQ / avg(SEQQ))
+
+38. Earnings per share
+    Annual: (NI - DVP) / CSHPRI
+    Quarterly: (NIQ - DVPQ) / CSHPRI
+
+39. Book value per share
+    Annual: CEQ / CSHO
+    Quarterly: CEQQ / CSHOQ
+
+40. Free cash flow to equity (FCFE)
+    Annual: OANCF - CAPX + DLTIS - DLTR + DLCCH
+    Quarterly: OANCF - CAPX + 4 * (ts_diff(DLCQ + DLTTQ, 63))
+
+41. Free cash flow to the firm (FCFF)
+    Annual: OANCF + XINT * (1 - (TXT / PI)) - CAPX
+    Quarterly: OANCF + 4 * XINTQ * (1 - (TXTQ / PIQ)) - CAPX

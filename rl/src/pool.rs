@@ -258,6 +258,7 @@ impl Pool {
         is_done: bool,
         prev_potential: f64,
     ) -> Result<(f64, f64), &'static str> {
+        let step_penalty = 0.02;
         let (stack, callgraph): (&Vec<(Signal, usize)>, &Network) = machine.get_stack();
         if stack.is_empty() {
             return Err("Empty Stack");
@@ -278,7 +279,7 @@ impl Pool {
             // println!("Diagnostic - returns_list is empty, returning 0.0 reward.");
             // return Ok((-pbest_potential, 0.0));
             let potential = 0.0;
-            let reward = -0.1;
+            let reward = -step_penalty;
             // let reward = potential - pbest_potential;
             // return Ok((potential, reward));
             return Ok((potential, reward));
@@ -347,7 +348,7 @@ impl Pool {
         //     prev_potential
         // };
         let reward = potential - prev_potential;
-        Ok((potential, reward))
+        Ok((potential, reward - step_penalty))
         // Ok((potential, reward))
     }
 }
