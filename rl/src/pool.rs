@@ -8,6 +8,11 @@ use crate::state::AbstractMachine;
 use runtime::backtest::BasicBacktest;
 use runtime::runtime::Runtime;
 
+pub enum Metric {
+    Mae,
+    Sharpe,
+}
+
 static SIGNAL_LENGTH: i64 = stdlib::types::SIZE[0] as i64;
 
 pub struct Pool {
@@ -17,6 +22,7 @@ pub struct Pool {
     backtester: BasicBacktest,
     device: tch::Device,
     adj_coeff: f64,
+    pub metric: Metric,
 } // TODO: evicting pool, do not add invalid equations to the pool
 
 impl Pool {
@@ -36,7 +42,17 @@ impl Pool {
         }
     }
 
-    pub fn new(backtester: BasicBacktest, device: tch::Device, adj_coeff: f64) -> Self {
+    pub fn new(
+        backtester: BasicBacktest,
+        device: tch::Device,
+        adj_coeff: f64,
+        metric: String,
+    ) -> Self {
+        let metric = match metric.as_str() {
+            "mae" => Metric::Mae,
+            "sharpe" => Metric::Sharpe,
+            _ => panic!("Invalid metric"),
+        };
         Pool {
             asts: HashMap::new(),
             returns: HashMap::new(),
@@ -44,6 +60,7 @@ impl Pool {
             backtester,
             device,
             adj_coeff,
+            metric,
         }
     }
 
@@ -100,11 +117,19 @@ impl Pool {
     }
 
     fn utility(&self, returns: &Tensor) -> f64 {
-        let mean = f64::try_from(returns.mean(None)).unwrap();
-        let std = f64::try_from(returns.std(false)).unwrap();
-        let val = mean / std.max(1e-9);
-        // if val.is_nan() { 0.0 } else { val }
-        val
+        match self.metric {
+            Metric::Mae => {
+                let mae = f64::try_from(returns.abs().mean(None)).unwrap();
+                -mae
+            }
+            Metric::Sharpe => {
+                let mean = f64::try_from(returns.mean(None)).unwrap();
+                let std = f64::try_from(returns.std(false)).unwrap();
+                let val = mean / std.max(1e-9);
+                // if val.is_nan() { 0.0 } else { val }
+                val
+            }
+        }
     }
 
     fn signal_to_returns(&self, runtime: &mut Runtime, callgraph: &Network, root: usize) -> Tensor {
@@ -218,11 +243,19 @@ impl Pool {
         let fitness_old = if pool_size == 0.0 {
             tch::Tensor::zeros(&[returns_eval.size()[0]], (tch::Kind::Float, self.device))
         } else {
-            let old_mean = port_eval.mean(None);
-            let old_std = port_eval.std(false).clamp_min(1e-6);
-            (&old_mean / &old_std)
-                .clamp(-10, 10)
-                .broadcast_to(&[returns_eval.size()[0]])
+            match self.metric {
+                Metric::Mae => {
+                    let old_mae = port_eval.abs().mean(None);
+                    (-old_mae).broadcast_to(&[returns_eval.size()[0]])
+                }
+                Metric::Sharpe => {
+                    let old_mean = port_eval.mean(None);
+                    let old_std = port_eval.std(false).clamp_min(1e-6);
+                    (&old_mean / &old_std)
+                        .clamp(-10, 10)
+                        .broadcast_to(&[returns_eval.size()[0]])
+                }
+            }
         };
         debug_tensor("fitness_old", &fitness_old);
 
@@ -235,12 +268,23 @@ impl Pool {
         };
         debug_tensor("returns_new", &returns_new);
 
-        let new_mean = returns_new.mean_dim(Some([1_i64].as_slice()), false, tch::Kind::Float);
-        let new_std = returns_new.std_dim(Some([1_i64].as_slice()), false, false);
-        debug_tensor("new_mean", &new_mean);
-        debug_tensor("new_std", &new_std);
-
-        let fitness_new = (&new_mean / new_std.clamp_min(1e-6)).clamp(-10, 10);
+        let fitness_new = match self.metric {
+            Metric::Mae => {
+                let new_mae =
+                    returns_new
+                        .abs()
+                        .mean_dim(Some([1_i64].as_slice()), false, tch::Kind::Float);
+                -new_mae
+            }
+            Metric::Sharpe => {
+                let new_mean =
+                    returns_new.mean_dim(Some([1_i64].as_slice()), false, tch::Kind::Float);
+                let new_std = returns_new.std_dim(Some([1_i64].as_slice()), false, false);
+                debug_tensor("new_mean", &new_mean);
+                debug_tensor("new_std", &new_std);
+                (&new_mean / new_std.clamp_min(1e-6)).clamp(-10, 10)
+            }
+        };
         debug_tensor("fitness_new", &fitness_new);
 
         let marginal_utility = (fitness_new - fitness_old * 0.90) * (pool_size + 1.0); // 0.90 to give some reward to repeated output

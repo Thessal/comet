@@ -26,6 +26,7 @@ pub fn brute_force(
     network: Network,
     action_space: rl::action::ActionSpace,
     use_cuda: bool,
+    metric: String,
 ) -> Pool {
     let device = if use_cuda {
         Device::cuda_if_available()
@@ -34,7 +35,7 @@ pub fn brute_force(
     };
     let mut runtime = Runtime::new(10000, "data".into(), Some(device));
     let backtester = BasicBacktest::new(&mut runtime.dmgr, "returns_d1");
-    let pool = Pool::new(backtester, device, 1.0);
+    let pool = Pool::new(backtester, device, 1.0, metric);
 
     let mut env = Environment::new(
         &network,

@@ -23,6 +23,9 @@ pub struct BehaviorDecl {
     pub floats: Option<Vec<f64>>,
     pub strings: Option<Vec<String>>,
 
+    pub datadir: Option<String>,
+    pub metric: Option<String>,
+
     pub weights: Option<String>,
     pub train: Option<bool>,
     pub supervised_epochs: Option<usize>,
@@ -41,6 +44,8 @@ impl BehaviorDecl {
             weights: None,
             train: None,
             supervised_epochs: None,
+            datadir: None,
+            metric: None,
         }
     }
 }
@@ -75,6 +80,12 @@ impl fmt::Display for BehaviorDecl {
         }
         if let Some(ss) = self.supervised_epochs {
             props.push(format!("supervised_epochs = {}", ss));
+        }
+        if let Some(d) = &self.datadir {
+            props.push(format!("datadir = \"{}\"", d));
+        }
+        if let Some(m) = &self.metric {
+            props.push(format!("metric = \"{}\"", m));
         }
         if let Some(ops) = &self.operators {
             props.push(format!("operators = [{}]", ops.join(", ")));

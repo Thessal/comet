@@ -7,6 +7,7 @@ mod op_data;
 mod op_divide;
 mod op_flip;
 mod op_multiply;
+mod op_neutralize;
 mod op_pow;
 mod op_subtract;
 mod op_time_series;
@@ -53,6 +54,7 @@ impl From<&str> for &OperatorSpec {
             "subtract" => &op_subtract::OP_SUBTRACT,
             "divide" => &op_divide::OP_DIVIDE,
             "multiply" => &op_multiply::OP_MULTIPLY,
+            "neutralize" => &op_neutralize::OP_NEUTRALIZE,
             "flip" => &op_flip::OP_FLIP,
             "pow" => &op_pow::OP_POW,
             // "cs_rank" => &op_cs_rank::OP_CS_RANK, same with rank()
@@ -193,6 +195,7 @@ mod tests {
             "subtract",
             "divide",
             "multiply",
+            "neutralize",
             "flip",
             "pow",
             // "cs_rank",

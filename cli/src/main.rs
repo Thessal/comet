@@ -45,7 +45,8 @@ fn _main(args: Args) {
     let action_space: ActionSpace = behavior_decl.into();
     // bruteforce::brute_force(network, action_space, use_cuda);
 
-    let mut runtime = Runtime::new(300, "./wrds/data".into(), Some(device));
+    let datadir = behavior_decl.datadir.clone().unwrap_or_else(|| "./data".to_string());
+    let mut runtime = Runtime::new(300, datadir.into(), Some(device));
     // let batch_size = 64;
     // let episodes_per_batch = 50;
 
@@ -57,6 +58,7 @@ fn _main(args: Args) {
     let episodes_per_batch = 32;
     let seq_len = 32;
     let weights_path = behavior_decl.weights.clone();
+    let metric = behavior_decl.metric.clone().unwrap_or_else(|| "sharpe".to_string());
     let (pool, model) = transformer::transformer_search(
         network,
         action_space,
@@ -68,6 +70,7 @@ fn _main(args: Args) {
         seq_len,
         &weights_path,
         500,
+        metric,
     );
 
     println!("--- Expressions found ---");
@@ -95,7 +98,8 @@ fn _main_bruteforce(args: Args) {
         _ => unreachable!(),
     };
     let action_space: ActionSpace = behavior_decl.into();
-    let pool = bruteforce::brute_force(network, action_space, use_cuda);
+    let metric = behavior_decl.metric.clone().unwrap_or_else(|| "sharpe".to_string());
+    let pool = bruteforce::brute_force(network, action_space, use_cuda, metric);
 
     println!("--- Expressions found ---");
     for expr in pool.exprs() {
@@ -126,11 +130,13 @@ fn _main_standard_ppo(args: Args) {
     };
     let action_space: ActionSpace = behavior_decl.into();
     // bruteforce::brute_force(network, action_space, use_cuda);
-    let mut runtime = Runtime::new(300, "./wrds/data".into(), Some(device));
+    let datadir = behavior_decl.datadir.clone().unwrap_or_else(|| "./data".to_string());
+    let mut runtime = Runtime::new(300, datadir.into(), Some(device));
     let batch_size = 32;
     let episodes_per_batch = 8;
     let seq_len = 20;
     let weights_path = behavior_decl.weights.clone();
+    let metric = behavior_decl.metric.clone().unwrap_or_else(|| "sharpe".to_string());
     let (pool, model) = transformer::transformer_search(
         network,
         action_space,
@@ -142,6 +148,7 @@ fn _main_standard_ppo(args: Args) {
         seq_len,
         &weights_path,
         100,
+        metric,
     );
 
     println!("--- Expressions found ---");

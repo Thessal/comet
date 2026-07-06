@@ -221,6 +221,8 @@ fn parse_behavior(
                     "supervised_epochs" => {
                         bdecl.supervised_epochs = Some(extract_int(&prop_val)? as usize)
                     }
+                    "datadir" => bdecl.datadir = Some(extract_string(&prop_val)?),
+                    "metric" => bdecl.metric = Some(extract_string(&prop_val)?),
                     "operators" => bdecl.operators = Some(extract_ident_list(&prop_val)?),
                     "integers" => bdecl.integers = Some(extract_int_list(&prop_val)?),
                     "floats" => bdecl.floats = Some(extract_float_list(&prop_val)?),

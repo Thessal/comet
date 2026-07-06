@@ -188,6 +188,7 @@ fn measure_rl_bottleneck(filename: &str, device: Device) {
             runtime::backtest::BasicBacktest::new(&mut runtime.dmgr, "returns_d1"),
             device,
             1.0,
+            behavior_decl.metric.clone().unwrap_or_else(|| "sharpe".to_string()),
         ),
         seq_len,
         1,
