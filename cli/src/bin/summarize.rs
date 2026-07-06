@@ -202,14 +202,18 @@ fn main() {
                         ];
                         let emb_5d_t = Tensor::from_slice(&emb_5d).to(device).unsqueeze(0);
 
-                        let value_out = tch::no_grad(|| model.value_net.forward(&emb_5d_t).squeeze_dim(0));
+                        let value_out =
+                            tch::no_grad(|| model.value_net.forward(&emb_5d_t).squeeze_dim(0));
                         let mu = value_out.double_value(&[0]);
                         let log_sigma = value_out.double_value(&[1]).clamp(-20.0, 2.0);
                         let sigma = std::f64::consts::E.powf(log_sigma);
 
-                        let line = format!("{},{},{},{:.1},{},{:.6},{:.6}", len, num_data, num_ops, entropy, is_done, mu, sigma);
+                        let line = format!(
+                            "{},{},{},{:.1},{},{:.6},{:.6}",
+                            len, num_data, num_ops, entropy, is_done, mu, sigma
+                        );
                         writeln!(file, "{}", line).unwrap();
-                        
+
                         // Print to console as requested
                         println!("{}", line);
                     }

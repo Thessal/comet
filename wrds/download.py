@@ -7,6 +7,10 @@ def process_file(remote_path, local_path, dates, instruments):
         remote_path = remote_path.strip()
         local_path = local_path.strip()
         
+        if os.path.exists(local_path):
+            print(f"Skipping {remote_path} -> {local_path} (already exists)")
+            return
+
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
         
         df = pd.read_csv(remote_path, index_col=0)

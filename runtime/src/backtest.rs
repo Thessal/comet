@@ -18,7 +18,10 @@ impl BasicBacktest {
         Self { returns }
     }
     pub fn calc_returns(&self, position: &Tensor) -> Tensor {
-        let clean_pos = position.nan_to_num(0.0, 0.0, 0.0);
+        let mut clean_pos = position - position.nanmean(Some(&[1][..]), true, Kind::Float); // market neutral (See Giglio 2020 for omitted factor bias)
+        // TODO: max position clipping if needed
+        // TODO: long/short balance (side by side neutralization, if it is common practice in academia)
+        clean_pos = clean_pos.nan_to_num(0.0, 0.0, 0.0);
         (&clean_pos * &self.returns).mean_dim(Some(&[1][..]), false, Kind::Float)
     }
 }

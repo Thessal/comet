@@ -88,10 +88,13 @@ pub fn transformer_search(
     let mut opt = tch::nn::Adam::default().build(&vs, 1e-4).unwrap();
     let mut buffer = RolloutBuffer::new();
 
-    let clip_param = 0.2;
+    // let clip_param = 0.2;
+    let clip_param = (0.2, 5.0); // max 5x importance sampling
     //  loss = policy_loss + value_loss * c1 - entropy * c2;
-    let c1 = 0.5;
-    let c2 = 0.01;
+    // let c1 = 0.5;
+    let c1 = 1.0;
+    // let c2 = 0.01;
+    let c2 = 0.00; // we are observing the pareto front, so don't enforce high entropy additionally
     let epochs = 4;
     // let batch_size = 512;
     // let episodes_per_batch = 50;
@@ -491,7 +494,7 @@ pub fn transformer_search(
                 let log_ratio = (new_log_prob - b_old_log_probs).clamp_max(2.0);
                 let ratio = log_ratio.exp();
                 let surr1 = &ratio * &b_advantages;
-                let surr2 = ratio.clamp(1.0 - clip_param, 1.0 + clip_param) * &b_advantages;
+                let surr2 = ratio.clamp(clip_param.0, clip_param.1) * &b_advantages;
                 let policy_loss = -surr1.min_other(&surr2).mean(tch::Kind::Float);
 
                 let mu = new_values_out.select(1, 0);
