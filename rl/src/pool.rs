@@ -247,14 +247,16 @@ impl Pool {
                     (-old_mae).broadcast_to(&[returns_eval.size()[0]])
                 }
                 MetricChoice::Mse => {
-                    let old_mse = port_eval.square().clamp(-10, 10).mean(None);
-                    (-old_mse).broadcast_to(&[returns_eval.size()[0]])
+                    let old_mse = port_eval.square().mean(None);
+                    (-old_mse)
+                        .clamp(-3.0, 3.0)
+                        .broadcast_to(&[returns_eval.size()[0]])
                 }
                 MetricChoice::Sharpe => {
                     let old_mean = port_eval.mean(None);
                     let old_std = port_eval.std(false).clamp_min(1e-6);
                     (&old_mean / &old_std)
-                        .clamp(-10, 10)
+                        .clamp(-3.0, 3.0)
                         .broadcast_to(&[returns_eval.size()[0]])
                 }
             }
@@ -279,12 +281,11 @@ impl Pool {
                 -new_mae
             }
             MetricChoice::Mse => {
-                let new_mse = returns_new.square().clamp(-10, 10).mean_dim(
-                    Some([1_i64].as_slice()),
-                    false,
-                    tch::Kind::Float,
-                );
-                -new_mse
+                let new_mse = returns_new
+                    .square()
+                    .mean_dim(Some([1_i64].as_slice()), false, tch::Kind::Float)
+                    .clamp(-3.0, 3.0);
+                -new_mse.clamp(-3.0, 3.0)
             }
             MetricChoice::Sharpe => {
                 let new_mean =
@@ -292,7 +293,7 @@ impl Pool {
                 let new_std = returns_new.std_dim(Some([1_i64].as_slice()), false, false);
                 debug_tensor("new_mean", &new_mean);
                 debug_tensor("new_std", &new_std);
-                (&new_mean / new_std.clamp_min(1e-6)).clamp(-10, 10)
+                (&new_mean / new_std.clamp_min(1e-6)).clamp(-3.0, 3.0)
             }
         };
         debug_tensor("fitness_new", &fitness_new);
@@ -300,9 +301,6 @@ impl Pool {
 
         let marginal_utility = (fitness_new - fitness_old * 0.90) * (pool_size + 1.0); // 0.90 to give some reward to repeated output
         debug_tensor("marginal_utility", &marginal_utility);
-        if marginal_utility.sum(tch::Kind::Float).double_value(&[]) > 100.0 {
-            println!("Debug marginal_utility: {}", marginal_utility);
-        }
 
         marginal_utility
     }

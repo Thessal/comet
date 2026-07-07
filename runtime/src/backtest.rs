@@ -45,12 +45,11 @@ impl BasicBacktest {
         } else {
             position.nan_to_num(0.0, 0.0, 0.0)
         };
-        match self.metric {
+        let ret = match self.metric {
             MetricChoice::Mae | MetricChoice::Mse => &clean_pos - &self.returns,
-            MetricChoice::Sharpe => {
-                (&clean_pos * &self.returns).mean_dim(Some(&[1][..]), false, Kind::Float)
-            }
-        }
+            MetricChoice::Sharpe => &clean_pos * &self.returns,
+        };
+        ret.mean_dim(Some(&[1][..]), false, Kind::Float)
     }
 }
 
