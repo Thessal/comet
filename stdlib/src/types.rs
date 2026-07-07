@@ -1,9 +1,19 @@
 use std::fmt::{self};
 use tch::Tensor;
 
-// pub static SIZE: [i64; 2] = [1755, 5];
-pub static SIZE: [i64; 2] = [1782, 703];
+use std::sync::atomic::{AtomicI64, Ordering};
 
+pub static SIZE_0: AtomicI64 = AtomicI64::new(1782);
+pub static SIZE_1: AtomicI64 = AtomicI64::new(703);
+
+pub fn get_size() -> [i64; 2] {
+    [SIZE_0.load(Ordering::Relaxed), SIZE_1.load(Ordering::Relaxed)]
+}
+
+pub fn set_size(size0: i64, size1: i64) {
+    SIZE_0.store(size0, Ordering::Relaxed);
+    SIZE_1.store(size1, Ordering::Relaxed);
+}
 #[repr(usize)]
 pub enum Signal {
     // Used to evaluate parameters in runtime
@@ -102,17 +112,16 @@ impl Signal {
     }
     // cast data into dataframe, for embedding
     pub fn to_dataframe(&self, device: tch::Device) -> Tensor {
-        // let shape = [size.0 as i64, size.1 as i64];
-        let shape = &SIZE;
+        let shape = get_size();
         match self {
-            Signal::Void => Tensor::zeros(shape, (tch::Kind::Float, device)),
-            Signal::Float(Some(x)) => Tensor::full(shape, *x, (tch::Kind::Float, device)),
-            Signal::Int(Some(i)) => Tensor::full(shape, *i as f64, (tch::Kind::Float, device)),
-            Signal::String(Some(_s)) => Tensor::zeros(shape, (tch::Kind::Float, device)),
+            Signal::Void => Tensor::zeros(&shape, (tch::Kind::Float, device)),
+            Signal::Float(Some(x)) => Tensor::full(&shape, *x, (tch::Kind::Float, device)),
+            Signal::Int(Some(i)) => Tensor::full(&shape, *i as f64, (tch::Kind::Float, device)),
+            Signal::String(Some(_s)) => Tensor::zeros(&shape, (tch::Kind::Float, device)),
             Signal::DataFrame(Some(df)) => {
                 assert_eq!(
                     df.size(),
-                    *shape,
+                    shape,
                     "DataFrame size does not match expected size"
                 );
                 df.shallow_clone()

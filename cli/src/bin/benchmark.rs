@@ -219,7 +219,7 @@ fn measure_rl_bottleneck(filename: &str, device: Device) {
 
         let mut alpha_matrix = if data_tensors.is_empty() {
             Tensor::zeros(
-                [stdlib::types::SIZE[0], stdlib::types::SIZE[1]],
+                [stdlib::types::get_size()[0], stdlib::types::get_size()[1]],
                 (tch::Kind::Float, device),
             )
         } else {
@@ -261,7 +261,7 @@ fn measure_rl_bottleneck(filename: &str, device: Device) {
         let logits = model.decoder.forward(
             &Tensor::zeros([32, 50], (tch::Kind::Int64, device)),
             &Tensor::zeros(
-                [32, stdlib::types::SIZE[0], stdlib::types::SIZE[1]],
+                [32, stdlib::types::get_size()[0], stdlib::types::get_size()[1]],
                 (tch::Kind::Float, device),
             ),
         );

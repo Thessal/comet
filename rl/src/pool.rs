@@ -10,10 +10,10 @@ use runtime::runtime::Runtime;
 
 pub enum Metric {
     Mae,
+    Mse,
     Sharpe,
 }
 
-static SIGNAL_LENGTH: i64 = stdlib::types::SIZE[0] as i64;
 
 pub struct Pool {
     asts: HashMap<String, Network>,
@@ -50,13 +50,14 @@ impl Pool {
     ) -> Self {
         let metric = match metric.as_str() {
             "mae" => Metric::Mae,
+            "mse" => Metric::Mse,
             "sharpe" => Metric::Sharpe,
             _ => panic!("Invalid metric"),
         };
         Pool {
             asts: HashMap::new(),
             returns: HashMap::new(),
-            portfolio_returns: tch::Tensor::zeros(SIGNAL_LENGTH, (tch::Kind::Float, device)),
+            portfolio_returns: tch::Tensor::zeros(stdlib::types::get_size()[0] as i64, (tch::Kind::Float, device)),
             backtester,
             device,
             adj_coeff,
@@ -93,7 +94,7 @@ impl Pool {
         let returns: Vec<&Tensor> = self.returns.values().map(|ret| ret).collect();
         if returns.is_empty() {
             self.portfolio_returns =
-                tch::Tensor::zeros(SIGNAL_LENGTH, (tch::Kind::Float, self.device));
+                tch::Tensor::zeros(stdlib::types::get_size()[0] as i64, (tch::Kind::Float, self.device));
         } else {
             self.portfolio_returns = tch::Tensor::stack(&returns, 0).mean_dim(
                 Some([0_i64].as_slice()),
@@ -121,6 +122,10 @@ impl Pool {
             Metric::Mae => {
                 let mae = f64::try_from(returns.abs().mean(None)).unwrap();
                 -mae
+            }
+            Metric::Mse => {
+                let mse = f64::try_from(returns.square().mean(None)).unwrap();
+                -mse
             }
             Metric::Sharpe => {
                 let mean = f64::try_from(returns.mean(None)).unwrap();
@@ -248,6 +253,10 @@ impl Pool {
                     let old_mae = port_eval.abs().mean(None);
                     (-old_mae).broadcast_to(&[returns_eval.size()[0]])
                 }
+                Metric::Mse => {
+                    let old_mse = port_eval.square().mean(None);
+                    (-old_mse).broadcast_to(&[returns_eval.size()[0]])
+                }
                 Metric::Sharpe => {
                     let old_mean = port_eval.mean(None);
                     let old_std = port_eval.std(false).clamp_min(1e-6);
@@ -275,6 +284,14 @@ impl Pool {
                         .abs()
                         .mean_dim(Some([1_i64].as_slice()), false, tch::Kind::Float);
                 -new_mae
+            }
+            Metric::Mse => {
+                let new_mse = returns_new.square().mean_dim(
+                    Some([1_i64].as_slice()),
+                    false,
+                    tch::Kind::Float,
+                );
+                -new_mse
             }
             Metric::Sharpe => {
                 let new_mean =

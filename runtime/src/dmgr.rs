@@ -2,6 +2,7 @@ use flate2::read::GzDecoder;
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::PathBuf;
+use stdlib::types::get_size;
 use tch::{Device, Kind, Tensor};
 
 pub struct DataManager {
@@ -27,8 +28,9 @@ impl DataManager {
             data_size: (0, 0),
             device: dev,
         };
-        let data = dmgr.get_data("close").unwrap();
-        dmgr.data_size = (data.size()[0] as usize, data.size()[1] as usize);
+        // let data = dmgr.get_data("close").unwrap();
+        let sz = get_size();
+        dmgr.data_size = (sz[0] as usize, sz[1] as usize);
         dmgr
     }
 

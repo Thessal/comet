@@ -174,7 +174,7 @@ mod tests {
                     Signal::DataFrame(_) => {
                         // Random array with values in [0, 1)
                         Signal::DataFrame(Some(tch::Tensor::rand(
-                            &crate::types::SIZE,
+                            &crate::types::get_size(),
                             (tch::Kind::Float, device),
                         )))
                     }
@@ -239,7 +239,7 @@ mod tests {
             if let Signal::DataFrame(Some(t)) = out {
                 assert_eq!(
                     t.size(),
-                    crate::types::SIZE,
+                    crate::types::get_size(),
                     "Operator {} changed dataframe size",
                     op_name
                 );
@@ -258,7 +258,7 @@ mod tests {
             let spec: &OperatorSpec = op_name.into();
             let args = generate_args(spec, device);
 
-            let num_assets = crate::types::SIZE[1];
+            let num_assets = crate::types::get_size()[1];
             if num_assets < 2 {
                 continue;
             }
@@ -300,7 +300,7 @@ mod tests {
     fn test_forward_looking() {
         let device = tch::Device::Cpu;
         let ops = get_all_ops();
-        let t_split = std::cmp::min(100, crate::types::SIZE[0] / 2);
+        let t_split = std::cmp::min(100, crate::types::get_size()[0] / 2);
 
         for op_name in ops {
             if op_name == "data" {
@@ -318,7 +318,7 @@ mod tests {
                         let modified = t.shallow_clone(); // + 0.0; // force a deep copy by adding 0.0
                         // Mutate the "future" data (after t_split)
                         let mut future_slice =
-                            modified.narrow(0, t_split, crate::types::SIZE[0] - t_split);
+                            modified.narrow(0, t_split, crate::types::get_size()[0] - t_split);
                         let _ = future_slice.copy_(&tch::Tensor::rand(
                             future_slice.size().as_slice(),
                             (tch::Kind::Float, device),

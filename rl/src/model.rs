@@ -269,7 +269,7 @@ impl Model for AgentModel {
 
         let mut alpha_matrix = if data_tensors.is_empty() {
             Tensor::zeros(
-                [types::SIZE[0], types::SIZE[1]],
+                [types::get_size()[0], types::get_size()[1]],
                 (tch::Kind::Float, *device),
             )
         } else {

@@ -56,7 +56,7 @@ fn main() {
     let mut counts = vec![vec![0; vocab_size]; vocab_size];
 
     let alpha_matrix = Tensor::zeros(
-        [stdlib::types::SIZE[0] as i64, stdlib::types::SIZE[1] as i64],
+        [stdlib::types::get_size()[0] as i64, stdlib::types::get_size()[1] as i64],
         (tch::Kind::Float, device),
     )
     .unsqueeze(0);

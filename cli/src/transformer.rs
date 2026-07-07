@@ -68,9 +68,10 @@ pub fn transformer_search(
     weights_path: &Option<String>,
     num_iterations: usize,
     metric: String,
+    target_field: String,
 ) -> (rl::pool::Pool, tch::nn::VarStore) {
     // let mut runtime = Runtime::new(10000, "data".into(), Some(device));
-    let backtester = BasicBacktest::new(&mut runtime.dmgr, "returns_d1");
+    let backtester = BasicBacktest::new(&mut runtime.dmgr, &target_field);
     let pool = Pool::new(backtester, device, adj_coeff.unwrap_or(1.0), metric);
 
     // let seq_len = 50;

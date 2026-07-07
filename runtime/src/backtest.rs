@@ -1,7 +1,6 @@
 use crate::dmgr::DataManager;
 use tch::{Kind, Tensor};
 
-static DATA_SIZE: [i64; 2] = [stdlib::types::SIZE[0] as i64, stdlib::types::SIZE[1] as i64];
 
 pub struct BasicBacktest {
     pub returns: Tensor,
@@ -14,11 +13,17 @@ impl BasicBacktest {
             .expect("Failed to load returns data")
             .shallow_clone();
         let returns = returns.nan_to_num(0.0, 0.0, 0.0);
-        assert_eq!(returns.size(), DATA_SIZE);
+        let data_size = [stdlib::types::get_size()[0] as i64, stdlib::types::get_size()[1] as i64];
+        assert_eq!(returns.size(), data_size);
         Self { returns }
     }
     pub fn calc_returns(&self, position: &Tensor) -> Tensor {
-        let mut clean_pos = position.nan_to_num(0.0, 0.0, 0.0);
+        // NOTE: This method is used for evaluation of intermediate stack state too.
+        //       So it is logically different from adding neutralization after the behavior.
+        let mut clean_pos = position - position.nanmean(Some(&[1][..]), true, Kind::Float); // market neutral (See Giglio 2020 for omitted factor bias)
+        // TODO: max position clipping if needed
+        // TODO: long/short balance (side by side neutralization, if it is common practice in academia)
+        clean_pos = clean_pos.nan_to_num(0.0, 0.0, 0.0);
         (&clean_pos * &self.returns).mean_dim(Some(&[1][..]), false, Kind::Float)
     }
 }

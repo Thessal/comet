@@ -45,7 +45,19 @@ fn _main(args: Args) {
     let action_space: ActionSpace = behavior_decl.into();
     // bruteforce::brute_force(network, action_space, use_cuda);
 
-    let datadir = behavior_decl.datadir.clone().unwrap_or_else(|| "./data".to_string());
+    let datadir = behavior_decl
+        .datadir
+        .clone()
+        .unwrap_or_else(|| "./data".to_string());
+
+    let info = fs::read_to_string(format!("{}/info.json", datadir)).expect("Failed to read file");
+    let info: serde_json::Value = serde_json::from_str(&info).expect("Failed to parse file");
+    let target_field = info["target"].as_str().expect("Failed to parse file");
+    stdlib::types::set_size(
+        info["rows"].as_i64().expect("Failed to parse file"),
+        info["columns"].as_i64().expect("Failed to parse file"),
+    );
+
     let mut runtime = Runtime::new(300, datadir.into(), Some(device));
     // let batch_size = 64;
     // let episodes_per_batch = 50;
@@ -58,7 +70,10 @@ fn _main(args: Args) {
     let episodes_per_batch = 32;
     let seq_len = 32;
     let weights_path = behavior_decl.weights.clone();
-    let metric = behavior_decl.metric.clone().unwrap_or_else(|| "sharpe".to_string());
+    let metric = behavior_decl
+        .metric
+        .clone()
+        .unwrap_or_else(|| "sharpe".to_string());
     let (pool, model) = transformer::transformer_search(
         network,
         action_space,
@@ -71,6 +86,7 @@ fn _main(args: Args) {
         &weights_path,
         500,
         metric,
+        target_field.to_string(),
     );
 
     println!("--- Expressions found ---");
@@ -98,7 +114,10 @@ fn _main_bruteforce(args: Args) {
         _ => unreachable!(),
     };
     let action_space: ActionSpace = behavior_decl.into();
-    let metric = behavior_decl.metric.clone().unwrap_or_else(|| "sharpe".to_string());
+    let metric = behavior_decl
+        .metric
+        .clone()
+        .unwrap_or_else(|| "sharpe".to_string());
     let pool = bruteforce::brute_force(network, action_space, use_cuda, metric);
 
     println!("--- Expressions found ---");
@@ -130,13 +149,26 @@ fn _main_standard_ppo(args: Args) {
     };
     let action_space: ActionSpace = behavior_decl.into();
     // bruteforce::brute_force(network, action_space, use_cuda);
-    let datadir = behavior_decl.datadir.clone().unwrap_or_else(|| "./data".to_string());
+    let datadir = behavior_decl
+        .datadir
+        .clone()
+        .unwrap_or_else(|| "./data".to_string());
+    let info = fs::read_to_string(format!("{}/info.json", datadir)).expect("Failed to read file");
+    let info: serde_json::Value = serde_json::from_str(&info).expect("Failed to parse file");
+    let target_field = info["target"].as_str().expect("Failed to parse file");
+    stdlib::types::set_size(
+        info["columns"].as_i64().expect("Failed to parse file"),
+        info["rows"].as_i64().expect("Failed to parse file"),
+    );
     let mut runtime = Runtime::new(300, datadir.into(), Some(device));
     let batch_size = 32;
     let episodes_per_batch = 8;
     let seq_len = 20;
     let weights_path = behavior_decl.weights.clone();
-    let metric = behavior_decl.metric.clone().unwrap_or_else(|| "sharpe".to_string());
+    let metric = behavior_decl
+        .metric
+        .clone()
+        .unwrap_or_else(|| "sharpe".to_string());
     let (pool, model) = transformer::transformer_search(
         network,
         action_space,
@@ -149,6 +181,7 @@ fn _main_standard_ppo(args: Args) {
         &weights_path,
         100,
         metric,
+        target_field.to_string(),
     );
 
     println!("--- Expressions found ---");
