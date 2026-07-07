@@ -1,30 +1,56 @@
 use crate::dmgr::DataManager;
+use crate::stats::MetricChoice;
 use tch::{Kind, Tensor};
-
 
 pub struct BasicBacktest {
     pub returns: Tensor,
+    neutralize: bool,
+    metric: MetricChoice,
 }
 
 impl BasicBacktest {
-    pub fn new(dmgr: &mut DataManager, target_field: &str) -> Self {
+    pub fn new(dmgr: &mut DataManager, target_field: &str, metric: MetricChoice) -> Self {
         let returns = dmgr
             .get_data(target_field)
             .expect("Failed to load returns data")
             .shallow_clone();
-        let returns = returns.nan_to_num(0.0, 0.0, 0.0);
-        let data_size = [stdlib::types::get_size()[0] as i64, stdlib::types::get_size()[1] as i64];
+        let returns = returns.nan_to_num(0.0, 0.0, 0.0); // target field is not neutralized intentionally.
+        let data_size = [
+            stdlib::types::get_size()[0] as i64,
+            stdlib::types::get_size()[1] as i64,
+        ];
         assert_eq!(returns.size(), data_size);
-        Self { returns }
+        let neutralize_after_return_calculation = match metric {
+            // non-financial utility
+            MetricChoice::Mae => false,
+            MetricChoice::Mse => false,
+            // financial utility
+            MetricChoice::Sharpe => true,
+            _ => unreachable!(),
+        };
+        Self {
+            returns,
+            neutralize: neutralize_after_return_calculation,
+            metric,
+        }
     }
     pub fn calc_returns(&self, position: &Tensor) -> Tensor {
         // NOTE: This method is used for evaluation of intermediate stack state too.
         //       So it is logically different from adding neutralization after the behavior.
-        let mut clean_pos = position - position.nanmean(Some(&[1][..]), true, Kind::Float); // market neutral (See Giglio 2020 for omitted factor bias)
-        // TODO: max position clipping if needed
-        // TODO: long/short balance (side by side neutralization, if it is common practice in academia)
-        clean_pos = clean_pos.nan_to_num(0.0, 0.0, 0.0);
-        (&clean_pos * &self.returns).mean_dim(Some(&[1][..]), false, Kind::Float)
+        let clean_pos = if self.neutralize {
+            let clean_pos = position - position.nanmean(Some(&[1][..]), true, Kind::Float); // market neutral (See Giglio 2020 for omitted factor bias)
+            // TODO: max position clipping if needed
+            // TODO: long/short balance (side by side neutralization, if it is common practice in academia)
+            clean_pos.nan_to_num(0.0, 0.0, 0.0)
+        } else {
+            position.nan_to_num(0.0, 0.0, 0.0)
+        };
+        match self.metric {
+            MetricChoice::Mae | MetricChoice::Mse => &clean_pos - &self.returns,
+            MetricChoice::Sharpe => {
+                (&clean_pos * &self.returns).mean_dim(Some(&[1][..]), false, Kind::Float)
+            }
+        }
     }
 }
 

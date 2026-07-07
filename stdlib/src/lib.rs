@@ -23,6 +23,11 @@ mod op_ts_stddev;
 mod op_ts_rank;
 mod op_ts_cov;
 mod op_ts_corr;
+mod op_sqrt;
+mod op_sin;
+mod op_cos;
+mod op_ln;
+mod op_exp;
 
 pub mod types;
 use types::Signal;
@@ -57,6 +62,11 @@ impl From<&str> for &OperatorSpec {
             "neutralize" => &op_neutralize::OP_NEUTRALIZE,
             "flip" => &op_flip::OP_FLIP,
             "pow" => &op_pow::OP_POW,
+            "sqrt" => &op_sqrt::OP_SQRT,
+            "sin" => &op_sin::OP_SIN,
+            "cos" => &op_cos::OP_COS,
+            "ln" => &op_ln::OP_LN,
+            "exp" => &op_exp::OP_EXP,
             // "cs_rank" => &op_cs_rank::OP_CS_RANK, same with rank()
             "cs_zscore" => &op_cs_zscore::OP_CS_ZSCORE,
             "ts_mean" => &op_ts_mean::OP_TS_MEAN,
@@ -198,6 +208,11 @@ mod tests {
             "neutralize",
             "flip",
             "pow",
+            "sqrt",
+            "sin",
+            "cos",
+            "ln",
+            "exp",
             // "cs_rank",
             "cs_zscore",
             "ts_mean",

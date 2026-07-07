@@ -4,6 +4,7 @@ use parser::behavior::BehaviorDecl;
 use rl::action::ActionSpace;
 use rl::model::{AgentModel, Model};
 use runtime::runtime::Runtime;
+use runtime::stats::MetricChoice;
 use std::fs;
 use std::time::Instant;
 use tch::Device;
@@ -77,7 +78,7 @@ fn measure_sample_expression(device: Device) {
     println!("Expression: add(ts_rank(data(\"close\"), 10), rank(data(\"close\")))");
     println!("Average Time: {:?}", elapsed);
     println!();
-    
+
     // Benchmark just rank(data("close"))
     let src2 = r#"
     Behavior Bench(d: DataFrame) {
@@ -119,7 +120,7 @@ fn measure_sample_expression(device: Device) {
     println!("Expression: ts_rank(data(\"close\"), 10)");
     println!("Average Time: {:?}", elapsed3);
     println!();
-    
+
     // Benchmark just ts_corr(data("close"), data("open"), 10)
     let src4 = r#"
     Behavior Bench(d: DataFrame) {
@@ -134,13 +135,14 @@ fn measure_sample_expression(device: Device) {
     let start4 = Instant::now();
     for _ in 0..iters {
         rt.lookup_or_run(&network4, network4.root);
-        rt.expr_cache.pop("ts_corr(data(\"close\"), data(\"open\"), 10)");
+        rt.expr_cache
+            .pop("ts_corr(data(\"close\"), data(\"open\"), 10)");
     }
     let elapsed4 = start4.elapsed() / iters;
     println!("Expression: ts_corr(data(\"close\"), data(\"open\"), 10)");
     println!("Average Time: {:?}", elapsed4);
     println!();
-    
+
     // Benchmark just ts_stddev(data("close"), 10)
     let src5 = r#"
     Behavior Bench(d: DataFrame) {
@@ -181,14 +183,20 @@ fn measure_rl_bottleneck(filename: &str, device: Device) {
     let mut model = AgentModel::new(&vs.root(), action_space.clone(), 256);
     let mut opt = tch::nn::Adam::default().build(&vs, 1e-4).unwrap();
 
+    let metric: MetricChoice = behavior_decl
+        .metric
+        .clone()
+        .unwrap_or_else(|| "sharpe".to_string())
+        .into();
+
     let mut env = rl::env::Environment::new(
         &network,
         action_space.clone(),
         rl::pool::Pool::new(
-            runtime::backtest::BasicBacktest::new(&mut runtime.dmgr, "returns_d1"),
+            runtime::backtest::BasicBacktest::new(&mut runtime.dmgr, "returns_d1", metric),
             device,
             1.0,
-            behavior_decl.metric.clone().unwrap_or_else(|| "sharpe".to_string()),
+            metric,
         ),
         seq_len,
         1,
@@ -261,7 +269,11 @@ fn measure_rl_bottleneck(filename: &str, device: Device) {
         let logits = model.decoder.forward(
             &Tensor::zeros([32, 50], (tch::Kind::Int64, device)),
             &Tensor::zeros(
-                [32, stdlib::types::get_size()[0], stdlib::types::get_size()[1]],
+                [
+                    32,
+                    stdlib::types::get_size()[0],
+                    stdlib::types::get_size()[1],
+                ],
                 (tch::Kind::Float, device),
             ),
         );

@@ -92,3 +92,20 @@ pub struct Stats {
 //         Self { values }
 //     }
 // }
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MetricChoice {
+    Mae,
+    Mse,
+    Sharpe,
+}
+impl From<String> for MetricChoice {
+    fn from(metric_str: String) -> MetricChoice {
+        match metric_str.as_str() {
+            "mae" => MetricChoice::Mae,
+            "mse" => MetricChoice::Mse,
+            "sharpe" => MetricChoice::Sharpe,
+            _ => panic!("Invalid metric"),
+        }
+    }
+}

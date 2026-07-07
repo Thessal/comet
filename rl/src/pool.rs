@@ -1,19 +1,13 @@
 use std::collections::HashMap;
 
 use parser::ast::Network;
+use runtime::stats::MetricChoice;
 use stdlib::types::Signal;
 use tch::Tensor;
 
 use crate::state::AbstractMachine;
 use runtime::backtest::BasicBacktest;
 use runtime::runtime::Runtime;
-
-pub enum Metric {
-    Mae,
-    Mse,
-    Sharpe,
-}
-
 
 pub struct Pool {
     asts: HashMap<String, Network>,
@@ -22,7 +16,7 @@ pub struct Pool {
     backtester: BasicBacktest,
     device: tch::Device,
     adj_coeff: f64,
-    pub metric: Metric,
+    pub metric: MetricChoice,
 } // TODO: evicting pool, do not add invalid equations to the pool
 
 impl Pool {
@@ -46,18 +40,15 @@ impl Pool {
         backtester: BasicBacktest,
         device: tch::Device,
         adj_coeff: f64,
-        metric: String,
+        metric: MetricChoice,
     ) -> Self {
-        let metric = match metric.as_str() {
-            "mae" => Metric::Mae,
-            "mse" => Metric::Mse,
-            "sharpe" => Metric::Sharpe,
-            _ => panic!("Invalid metric"),
-        };
         Pool {
             asts: HashMap::new(),
             returns: HashMap::new(),
-            portfolio_returns: tch::Tensor::zeros(stdlib::types::get_size()[0] as i64, (tch::Kind::Float, device)),
+            portfolio_returns: tch::Tensor::zeros(
+                stdlib::types::get_size()[0] as i64,
+                (tch::Kind::Float, device),
+            ),
             backtester,
             device,
             adj_coeff,
@@ -93,8 +84,10 @@ impl Pool {
     fn calc_portfolio_returns(&mut self) {
         let returns: Vec<&Tensor> = self.returns.values().map(|ret| ret).collect();
         if returns.is_empty() {
-            self.portfolio_returns =
-                tch::Tensor::zeros(stdlib::types::get_size()[0] as i64, (tch::Kind::Float, self.device));
+            self.portfolio_returns = tch::Tensor::zeros(
+                stdlib::types::get_size()[0] as i64,
+                (tch::Kind::Float, self.device),
+            );
         } else {
             self.portfolio_returns = tch::Tensor::stack(&returns, 0).mean_dim(
                 Some([0_i64].as_slice()),
@@ -119,15 +112,15 @@ impl Pool {
 
     fn utility(&self, returns: &Tensor) -> f64 {
         match self.metric {
-            Metric::Mae => {
+            MetricChoice::Mae => {
                 let mae = f64::try_from(returns.abs().mean(None)).unwrap();
                 -mae
             }
-            Metric::Mse => {
+            MetricChoice::Mse => {
                 let mse = f64::try_from(returns.square().mean(None)).unwrap();
                 -mse
             }
-            Metric::Sharpe => {
+            MetricChoice::Sharpe => {
                 let mean = f64::try_from(returns.mean(None)).unwrap();
                 let std = f64::try_from(returns.std(false)).unwrap();
                 let val = mean / std.max(1e-9);
@@ -249,15 +242,15 @@ impl Pool {
             tch::Tensor::zeros(&[returns_eval.size()[0]], (tch::Kind::Float, self.device))
         } else {
             match self.metric {
-                Metric::Mae => {
+                MetricChoice::Mae => {
                     let old_mae = port_eval.abs().mean(None);
                     (-old_mae).broadcast_to(&[returns_eval.size()[0]])
                 }
-                Metric::Mse => {
-                    let old_mse = port_eval.square().mean(None);
+                MetricChoice::Mse => {
+                    let old_mse = port_eval.square().clamp(-10, 10).mean(None);
                     (-old_mse).broadcast_to(&[returns_eval.size()[0]])
                 }
-                Metric::Sharpe => {
+                MetricChoice::Sharpe => {
                     let old_mean = port_eval.mean(None);
                     let old_std = port_eval.std(false).clamp_min(1e-6);
                     (&old_mean / &old_std)
@@ -278,22 +271,22 @@ impl Pool {
         debug_tensor("returns_new", &returns_new);
 
         let fitness_new = match self.metric {
-            Metric::Mae => {
+            MetricChoice::Mae => {
                 let new_mae =
                     returns_new
                         .abs()
                         .mean_dim(Some([1_i64].as_slice()), false, tch::Kind::Float);
                 -new_mae
             }
-            Metric::Mse => {
-                let new_mse = returns_new.square().mean_dim(
+            MetricChoice::Mse => {
+                let new_mse = returns_new.square().clamp(-10, 10).mean_dim(
                     Some([1_i64].as_slice()),
                     false,
                     tch::Kind::Float,
                 );
                 -new_mse
             }
-            Metric::Sharpe => {
+            MetricChoice::Sharpe => {
                 let new_mean =
                     returns_new.mean_dim(Some([1_i64].as_slice()), false, tch::Kind::Float);
                 let new_std = returns_new.std_dim(Some([1_i64].as_slice()), false, false);
@@ -303,9 +296,13 @@ impl Pool {
             }
         };
         debug_tensor("fitness_new", &fitness_new);
+        // println!("Debug fitness_new: {}", fitness_new);
 
         let marginal_utility = (fitness_new - fitness_old * 0.90) * (pool_size + 1.0); // 0.90 to give some reward to repeated output
         debug_tensor("marginal_utility", &marginal_utility);
+        if marginal_utility.sum(tch::Kind::Float).double_value(&[]) > 100.0 {
+            println!("Debug marginal_utility: {}", marginal_utility);
+        }
 
         marginal_utility
     }

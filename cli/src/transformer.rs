@@ -6,6 +6,7 @@ use rl::model::{AgentModel, Model};
 use rl::pool::Pool;
 use runtime::backtest::BasicBacktest;
 use runtime::runtime::Runtime;
+use runtime::stats::MetricChoice;
 use tch::Device;
 use tch::Tensor;
 use tch::nn::{Module, OptimizerConfig};
@@ -71,7 +72,9 @@ pub fn transformer_search(
     target_field: String,
 ) -> (rl::pool::Pool, tch::nn::VarStore) {
     // let mut runtime = Runtime::new(10000, "data".into(), Some(device));
-    let backtester = BasicBacktest::new(&mut runtime.dmgr, &target_field);
+    let metric: MetricChoice = metric.into();
+
+    let backtester = BasicBacktest::new(&mut runtime.dmgr, &target_field, metric);
     let pool = Pool::new(backtester, device, adj_coeff.unwrap_or(1.0), metric);
 
     // let seq_len = 50;

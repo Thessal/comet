@@ -3,10 +3,13 @@ Behavior Feynman(
     x2 : DataFrame, 
     x3 : DataFrame, 
     x4 : DataFrame, 
-    one : DataFrame
+    one : DataFrame,
+    negone : DataFrame,
+    pi : DataFrame
 ) {
     weights="weights/feynman_1.pth", train=true, supervised_epochs=100,
-    operators = [add, subtract, divide, multiply, flip ], 
+   # operators = [add, subtract, divide, multiply, flip, sqrt, sin, cos, ln, exp ], 
+    operators = [add, subtract, multiply, flip], 
     integers = [ ], floats = [ 0.0, 1.0 ], strings=[], datadir="./data_feynman", metric="mse"
 } -> DataFrame
 
@@ -16,5 +19,7 @@ Flow financialratio_example {
     x3 = data("x3")
     x4 = data("x4")
     one = data("one")
-    Feynman(x1, x2, x3, x4, one)
+    negone = data("negone")
+    pi = data("pi")
+    Feynman(x1, x2, x3, x4, one, negone, pi)
 }
