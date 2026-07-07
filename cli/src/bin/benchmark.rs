@@ -189,6 +189,8 @@ fn measure_rl_bottleneck(filename: &str, device: Device) {
         .unwrap_or_else(|| "sharpe".to_string())
         .into();
 
+    // let eval_skip_margins = (252,0);
+    let eval_skip_margins = (252, 0);
     let mut env = rl::env::Environment::new(
         &network,
         action_space.clone(),
@@ -197,6 +199,7 @@ fn measure_rl_bottleneck(filename: &str, device: Device) {
             device,
             1.0,
             metric,
+            eval_skip_margins,
         ),
         seq_len,
         1,

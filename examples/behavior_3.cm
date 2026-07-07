@@ -1,5 +1,5 @@
 Behavior TechnicalIndicator(volume_ratio: DataFrame, returns: DataFrame, intraday_ret: DataFrame) {
-    weights="behavior_1_compare.pth", train=true, supervised_epochs=100,
+    weights="behavior_1_compare.pth", train=true, epochs=500,
     operators = [add, subtract, divide, multiply, flip, cs_zscore, ts_mean, rank, rank_add, rank_sub, rank_mul, rank_div, sign, sigmoid, delay, delta, ts_return, ts_max, ts_min, ts_argmax, ts_argmin, ts_sum, ts_prod, ts_nanmean, ts_stddev, ts_rank, ts_cov, ts_corr],
     integers = [ 1,2,3,5,21 ], floats = [ 0.5, 1.0, 2.0, 3.0, 4.0, 5.0 ], strings=[]
 } -> DataFrame

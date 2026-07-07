@@ -218,9 +218,7 @@ fn parse_behavior(
                 match prop_name {
                     "weights" => bdecl.weights = Some(extract_string(&prop_val)?),
                     "train" => bdecl.train = Some(extract_bool(&prop_val)?),
-                    "supervised_epochs" => {
-                        bdecl.supervised_epochs = Some(extract_int(&prop_val)? as usize)
-                    }
+                    "epochs" => bdecl.epochs = Some(extract_int(&prop_val)? as usize),
                     "datadir" => bdecl.datadir = Some(extract_string(&prop_val)?),
                     "metric" => bdecl.metric = Some(extract_string(&prop_val)?),
                     "operators" => bdecl.operators = Some(extract_ident_list(&prop_val)?),
@@ -505,7 +503,7 @@ fn parse_literal(pair: pest::iterators::Pair<Rule>) -> Result<crate::expr::Liter
 fn test_parse_behavior_decl() {
     let input = r#"
         Behavior Comparator(signal: DataFrame, eps: Float, reference: DataFrame) {
-            weights="behavior_1_compare.pth", train=true, supervised_epochs=100,
+            weights="behavior_1_compare.pth", train=true, epochs=100,
             operators = [add, divide, ts_mean, ts_diff, consume_float, cs_rank],
             integers = [5, 21, 252], floats = [0.1, 0.5, 0.9], strings=["volume", "adv20"]
         } -> DataFrame

@@ -1,0 +1,30 @@
+Behavior ExactCover(
+    x0 : DataFrame,
+    x1 : DataFrame,
+    x2 : DataFrame,
+    x3 : DataFrame,
+    x4 : DataFrame,
+    x5 : DataFrame,
+    x6 : DataFrame,
+    x7 : DataFrame,
+    x8 : DataFrame,
+    x9 : DataFrame
+) {
+    weights="weights/exact_cover_d10.pth", train=true, epochs=5000,
+    operators = [add, subtract, multiply, flip], 
+    integers = [ ], floats = [ ], strings=[], datadir="./data_exact_cover", metric="mse"
+} -> DataFrame
+
+Flow exact_cover_1 {
+    x0 = data("x0") 
+    x1 = data("x1") 
+    x2 = data("x2") 
+    x3 = data("x3") 
+    x4 = data("x4") 
+    x5 = data("x5") 
+    x6 = data("x6") 
+    x7 = data("x7") 
+    x8 = data("x8") 
+    x9 = data("x9") 
+    ExactCover(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9)
+}

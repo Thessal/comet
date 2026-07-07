@@ -35,7 +35,7 @@ Behavior FinancialRatio(
     cshpri : DataFrame, 
     csho : DataFrame
 ) {
-    weights="weights/wrds_2.pth", train=true, supervised_epochs=100,
+    weights="weights/wrds_2.pth", train=true, epochs=500,
     operators = [add, subtract, divide, multiply, flip, cs_zscore, rank, delta, ts_nanmean], 
     integers = [ 21, 63, 252 ], floats = [], strings=[]
 } -> DataFrame

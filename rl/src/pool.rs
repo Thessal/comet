@@ -17,6 +17,7 @@ pub struct Pool {
     device: tch::Device,
     adj_coeff: f64,
     pub metric: MetricChoice,
+    skipdays: (i64, i64), // (evaluation_start_days, evaluation_end_days)
 } // TODO: evicting pool, do not add invalid equations to the pool
 
 impl Pool {
@@ -41,6 +42,7 @@ impl Pool {
         device: tch::Device,
         adj_coeff: f64,
         metric: MetricChoice,
+        skipdays: (i64, i64),
     ) -> Self {
         Pool {
             asts: HashMap::new(),
@@ -53,6 +55,7 @@ impl Pool {
             device,
             adj_coeff,
             metric,
+            skipdays,
         }
     }
 
@@ -72,7 +75,7 @@ impl Pool {
         for (expr, r) in self.returns.iter() {
             let utility: f64 = self.utility(r);
             let marginal_utility =
-                f64::try_from(self.marginal_utility(&r.unsqueeze(0), 252, 0, false).max())
+                f64::try_from(self.marginal_utility(&r.unsqueeze(0), false).max())
                     .unwrap_or(f64::NAN); // TODO: pass evaluation start/end days
             let corr = self.corr(&self.portfolio_returns, r);
             let maxcorr = max_corrs.get(expr).copied().unwrap_or(f64::NAN);
@@ -191,8 +194,8 @@ impl Pool {
     fn marginal_utility(
         &self,
         returns_stacked: &Tensor,
-        evaluation_start_days: i64,
-        evaluation_end_days: i64,
+        // evaluation_start_days: i64,
+        // evaluation_end_days: i64,
         debug: bool,
     ) -> Tensor {
         let debug_tensor = if debug {
@@ -224,14 +227,13 @@ impl Pool {
         };
         // returns_stacked : [*, T]
         let t_dim = returns_stacked.size()[1];
-        let eval_len = t_dim - evaluation_start_days - evaluation_end_days;
+        let eval_offset = self.skipdays.0;
+        let eval_len = t_dim - self.skipdays.0 - self.skipdays.1;
+        // let eval_len = t_dim - evaluation_start_days - evaluation_end_days;
 
         debug_tensor("returns_stacked", returns_stacked);
-
-        let returns_eval = returns_stacked.narrow(1, evaluation_start_days, eval_len);
-        let port_eval = self
-            .portfolio_returns
-            .narrow(0, evaluation_start_days, eval_len);
+        let returns_eval = returns_stacked.narrow(1, eval_offset, eval_len);
+        let port_eval = self.portfolio_returns.narrow(0, eval_offset, eval_len);
 
         debug_tensor("returns_eval", &returns_eval);
         debug_tensor("port_eval", &port_eval);
@@ -346,7 +348,7 @@ impl Pool {
         // Calculate marginal utility and get the maximum
         // let show_debug = is_done == true;
         let show_debug = false;
-        let marginal_utility = self.marginal_utility(&returns_stacked, 252, 0, show_debug); // TODO: pass evaluation start/end days properly
+        let marginal_utility = self.marginal_utility(&returns_stacked, show_debug); // TODO: pass evaluation start/end days properly
 
         if bool::try_from(marginal_utility.isnan().any()).unwrap() == true {
             return Err("NaN in marginal utility.");

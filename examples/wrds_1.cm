@@ -12,7 +12,7 @@ Behavior FinancialRatio(
     aqc : DataFrame,
     at : DataFrame
 ) {
-    weights="weights/wrds_1.pth", train=true, supervised_epochs=100,
+    weights="weights/wrds_1.pth", train=true, epochs=500,
     operators = [add, subtract, divide, multiply, flip, cs_zscore, rank ], 
     integers = [ 1, 5, 21, 63 ], floats = [ 0.2, 0.8, 1.0, 5.0 ], strings=[]
 } -> DataFrame

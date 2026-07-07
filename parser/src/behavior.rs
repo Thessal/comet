@@ -28,7 +28,7 @@ pub struct BehaviorDecl {
 
     pub weights: Option<String>,
     pub train: Option<bool>,
-    pub supervised_epochs: Option<usize>,
+    pub epochs: Option<usize>,
 }
 
 impl BehaviorDecl {
@@ -43,7 +43,7 @@ impl BehaviorDecl {
             strings: None,
             weights: None,
             train: None,
-            supervised_epochs: None,
+            epochs: None,
             datadir: None,
             metric: None,
         }
@@ -78,8 +78,8 @@ impl fmt::Display for BehaviorDecl {
         if let Some(t) = self.train {
             props.push(format!("train = {}", t));
         }
-        if let Some(ss) = self.supervised_epochs {
-            props.push(format!("supervised_epochs = {}", ss));
+        if let Some(ss) = self.epochs {
+            props.push(format!("epochs = {}", ss));
         }
         if let Some(d) = &self.datadir {
             props.push(format!("datadir = \"{}\"", d));

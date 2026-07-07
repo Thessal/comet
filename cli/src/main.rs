@@ -70,6 +70,7 @@ fn _main(args: Args) {
     let episodes_per_batch = 32;
     let seq_len = 32;
     let weights_path = behavior_decl.weights.clone();
+    let epochs = behavior_decl.epochs.clone().unwrap_or(100);
     let metric = behavior_decl
         .metric
         .clone()
@@ -84,7 +85,7 @@ fn _main(args: Args) {
         batch_size,
         seq_len,
         &weights_path,
-        500,
+        epochs,
         metric,
         target_field.to_string(),
     );

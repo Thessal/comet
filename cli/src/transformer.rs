@@ -75,7 +75,15 @@ pub fn transformer_search(
     let metric: MetricChoice = metric.into();
 
     let backtester = BasicBacktest::new(&mut runtime.dmgr, &target_field, metric);
-    let pool = Pool::new(backtester, device, adj_coeff.unwrap_or(1.0), metric);
+    // let eval_skip_margins = (252, 0);
+    let eval_skip_margins = (0, 0);
+    let pool = Pool::new(
+        backtester,
+        device,
+        adj_coeff.unwrap_or(1.0),
+        metric,
+        eval_skip_margins,
+    );
 
     // let seq_len = 50;
     let mut env = Environment::new(
