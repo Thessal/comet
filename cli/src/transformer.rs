@@ -519,10 +519,11 @@ pub fn transformer_search(
                 // let nll: tch::Tensor =
                 //     (diff.pow_tensor_scalar(2.0) / (&variance * 2.0)) + &log_sigma;
 
-                let diff_abs = (&b_returns - &mu).square();
+                // let diff_abs = (&b_returns - &mu).abs(); // Laplacian
+                let diff_sq = (&b_returns - &mu).square();
                 // https://docs.pytorch.org/docs/2.13/generated/torch.nn.GaussianNLLLoss.html
                 // sqrt(2) ≈ 1.41421356
-                let nll: tch::Tensor = ((diff_abs * 1.41421356) / &sigma) + &log_sigma;
+                let nll: tch::Tensor = ((diff_sq * 1.41421356) / &sigma) + &log_sigma;
 
                 let value_loss = nll.mean(tch::Kind::Float);
 

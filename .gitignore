@@ -7,4 +7,8 @@
 *.tar.gz
 /_old
 /wrds/data
+/wrds/fields
 /result/logs
+/results_data
+/data
+/weights

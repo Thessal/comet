@@ -9,7 +9,7 @@ Here is a minimal `.cm` script formulating a ratio between a raw time-series fea
 
 ```comet
 Behavior Comparator(signal: DataFrame, reference: DataFrame) {
-    weights="behavior_1_compare.pth", train=true, supervised_epochs=100,
+    weights="behavior_1_compare.pth", train=true, epochs=100,
     operators = [add, divide],
     integers = [ ], floats = [ ], strings=[ ]
 } -> DataFrame
