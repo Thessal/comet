@@ -70,12 +70,19 @@ fn _main(args: Args) {
     let episodes_per_batch = 32;
     let seq_len = 32;
     let weights_path = behavior_decl.weights.clone();
+    let returns_path = format!(
+        "{}_returns.csv",
+        behavior_decl
+            .weights
+            .clone()
+            .unwrap_or("output".to_string())
+    );
     let epochs = behavior_decl.epochs.clone().unwrap_or(100);
     let metric = behavior_decl
         .metric
         .clone()
         .unwrap_or_else(|| "sharpe".to_string());
-    let (pool, model) = transformer::transformer_search(
+    let (pool, models) = transformer::transformer_search(
         network,
         action_space,
         device,
@@ -95,9 +102,9 @@ fn _main(args: Args) {
         println!("{}", expr);
     }
 
-    let _ = pool.save_returns("returns.csv");
+    let _ = pool.save_returns(&returns_path);
 
-    save(&model, &weights_path);
+    save(&models, &weights_path);
     // save model weights
 }
 

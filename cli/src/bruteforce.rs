@@ -69,7 +69,8 @@ pub fn brute_force(
             ep_lengths.push(traj.len());
             if let Some(last_step) = traj.last() {
                 if last_step.action == Action::Done {
-                    env.pool.insert(&mut runtime, machine.callgraph.clone());
+                    env.pool
+                        .insert(&mut runtime, machine.callgraph.clone(), 0, iteration);
                 }
             }
         });

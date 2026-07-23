@@ -1,0 +1,46 @@
+{
+    "_note": "accounts that appear in financial ratio list. categorized by account category in gaap / ifrs",
+    "is_sales": [
+        "revtq",
+        "gpq",
+        "cogsq"
+    ],
+    "is_income": [
+        "niq",
+        "oiadpq",
+        "piq"
+    ],
+    "is_costs": [
+        "txtq",
+        "xintq",
+        "xsgaq",
+        "xrent",
+        "dpq"
+    ],
+    "cf": [
+        "capx",
+        "oancf"
+    ],
+    "bs_assets": [
+        "atq",
+        "actq",
+        "cheq",
+        "invtq",
+        "rectq",
+        "ppentq"
+    ],
+    "bs_liabilities": [
+        "lctq",
+        "dlcq",
+        "dlttq",
+        "apq"
+    ],
+    "bs_equities": [
+        "ceqq",
+        "seqq",
+        "cshoq",
+        "cshpri",
+        "dvc",
+        "dvpq"
+    ]
+}

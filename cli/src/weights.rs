@@ -1,21 +1,24 @@
 use tch::nn::VarStore;
 
-pub fn save(vs: &VarStore, path: &Option<String>) {
-    if let Some(p) = path {
-        if let Some(parent) = std::path::Path::new(p).parent() {
-            if !parent.exists() && parent != std::path::Path::new("") {
-                if let Err(e) = std::fs::create_dir_all(parent) {
-                    eprintln!("Failed to create directory {:?}: {:?}", parent, e);
+pub fn save(vs: &Vec<VarStore>, path: &Option<String>) {
+    for (index, weight) in vs.iter().enumerate() {
+        if let Some(p) = path {
+            let filename = format!("{}.{}", p, index);
+            if let Some(parent) = std::path::Path::new(&filename).parent() {
+                if !parent.exists() && parent != std::path::Path::new("") {
+                    if let Err(e) = std::fs::create_dir_all(parent) {
+                        eprintln!("Failed to create directory {:?}: {:?}", parent, e);
+                    }
                 }
             }
-        }
-        if let Err(e) = vs.save(p) {
-            eprintln!("Failed to save weights to {}: {:?}", p, e);
+            if let Err(e) = weight.save(&filename) {
+                eprintln!("Failed to save weights to {}: {:?}", p, e);
+            } else {
+                println!("Weights saved to {}", p);
+            }
         } else {
-            println!("Weights saved to {}", p);
+            println!("No weights path specified. Skipping save.");
         }
-    } else {
-        println!("No weights path specified. Skipping save.");
     }
 }
 

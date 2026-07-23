@@ -258,31 +258,7 @@ impl Model for AgentModel {
         actions: &[i64],
     ) -> (Tensor, Tensor, Tensor) {
         let (stack, callgraph) = state.machine.get_stack();
-        let mut data_tensors = Vec::new();
-
-        for (_signal_decl, addr) in stack.iter() {
-            let signal = runtime.lookup_or_run(callgraph, *addr);
-            if let stdlib::types::Signal::DataFrame(Some(df)) = signal {
-                data_tensors.push(df.to_device(tch::Device::Cpu));
-            }
-        }
-
-        let mut alpha_matrix = if data_tensors.is_empty() {
-            Tensor::zeros(
-                [types::get_size()[0], types::get_size()[1]],
-                (tch::Kind::Float, *device),
-            )
-        } else {
-            let stacked = Tensor::stack(&data_tensors, 0);
-            let size = stacked.size();
-            let flattened: Vec<f32> = stacked.flatten(0, -1).try_into().unwrap_or_default();
-            let stacked = Tensor::from_slice(&flattened)
-                .view([size[0], size[1], size[2]])
-                .to(*device);
-            stacked.mean_dim(Some([0].as_slice()), false, tch::Kind::Float)
-        };
-        alpha_matrix = alpha_matrix.nan_to_num(0.0, 0.0, 0.0);
-        let alpha_matrix = alpha_matrix.unsqueeze(0); // batch_size=1
+        let alpha_matrix = Tensor::zeros([1, 1, 1], (tch::Kind::Float, *device));
 
         // Build shifted target tokens
         let mut target_tokens = actions.to_vec();

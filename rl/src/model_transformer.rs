@@ -97,7 +97,7 @@ impl TransformerDecoderLayer {
         }
     }
 
-    pub fn forward(&self, tgt: &Tensor, memory: &Tensor, tgt_mask: &Tensor) -> Tensor {
+    pub fn forward(&self, tgt: &Tensor, _memory: &Tensor, tgt_mask: &Tensor) -> Tensor {
         let size = tgt.size();
         let b = size[0];
         let s = size[1];
@@ -133,38 +133,9 @@ impl TransformerDecoderLayer {
 
         let tgt = (tgt + self_attn_out).apply(&self.ln1);
 
-        // 2. Cross Attention
-        let memory_size = memory.size();
-        let mem_s = memory_size[1];
+        // 2. Cross Attention removed
 
-        let q_cross = self
-            .cross_attn_q
-            .forward(&tgt)
-            .view([b, s, self.num_heads, self.head_dim])
-            .transpose(1, 2);
-        let k_cross = self
-            .cross_attn_k
-            .forward(memory)
-            .view([b, mem_s, self.num_heads, self.head_dim])
-            .transpose(1, 2);
-        let v_cross = self
-            .cross_attn_v
-            .forward(memory)
-            .view([b, mem_s, self.num_heads, self.head_dim])
-            .transpose(1, 2);
-
-        let scores_cross =
-            q_cross.matmul(&k_cross.transpose(-2, -1)) / (self.head_dim as f64).sqrt();
-        let attn_weights_cross = scores_cross.softmax(-1, Kind::Float);
-
-        let context_cross = attn_weights_cross
-            .matmul(&v_cross)
-            .transpose(1, 2)
-            .contiguous()
-            .view([b, s, e]);
-        let cross_attn_out = self.cross_attn_out.forward(&context_cross);
-
-        let tgt = (tgt + cross_attn_out).apply(&self.ln2);
+        let tgt = tgt.apply(&self.ln2);
 
         // 3. MLP
         let mlp_out = self.mlp2.forward(&self.mlp1.forward(&tgt).relu());
@@ -175,7 +146,6 @@ impl TransformerDecoderLayer {
 
 pub struct SRDecoderModel {
     pub d_model: i64,
-    alpha_context_encoder: AlphaConvEncoder,
     target_token_emb: nn::Embedding,
     pos_embedding: Tensor,
     layers: Vec<TransformerDecoderLayer>,
@@ -192,8 +162,6 @@ impl SRDecoderModel {
         nhid: i64,
         nlayers: i64,
     ) -> Self {
-        let alpha_context_encoder =
-            AlphaConvEncoder::new(&vs.sub("alpha_context_encoder"), 64, d_model, 5);
         let target_token_emb = nn::embedding(
             &vs.sub("target_token_emb"),
             vocab_size,
@@ -223,7 +191,6 @@ impl SRDecoderModel {
 
         Self {
             d_model,
-            alpha_context_encoder,
             target_token_emb,
             pos_embedding,
             layers,
@@ -232,16 +199,13 @@ impl SRDecoderModel {
         }
     }
 
-    pub fn forward(&self, shifted_target_tokens: &Tensor, alpha_matrix: &Tensor) -> Tensor {
+    pub fn forward(&self, shifted_target_tokens: &Tensor, _alpha_matrix: &Tensor) -> Tensor {
         let size = shifted_target_tokens.size();
         let _batch_size = size[0];
         let seq_len = size[1];
         let device = shifted_target_tokens.device();
 
-        let memory_context = self
-            .alpha_context_encoder
-            .forward(alpha_matrix)
-            .unsqueeze(1);
+        let memory_context = Tensor::zeros([1, 1, 1], (Kind::Float, device));
 
         let tgt_vectors =
             self.target_token_emb.forward(shifted_target_tokens) * (self.d_model as f64).sqrt();

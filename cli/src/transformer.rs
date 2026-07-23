@@ -70,7 +70,7 @@ pub fn transformer_search(
     num_iterations: usize,
     metric: String,
     target_field: String,
-) -> (rl::pool::Pool, tch::nn::VarStore) {
+) -> (rl::pool::Pool, Vec<tch::nn::VarStore>) {
     // let mut runtime = Runtime::new(10000, "data".into(), Some(device));
     let metric: MetricChoice = metric.into();
 
@@ -94,12 +94,16 @@ pub fn transformer_search(
         1,       // batch_size
     );
 
-    let mut vs = tch::nn::VarStore::new(device);
+    let num_agents = 30;
+    let mut agents = Vec::new();
     println!("Not loading weights");
-    // crate::weights::load(&mut vs, weights_path);
-    let mut model = AgentModel::new(&vs.root(), env.action_space.clone(), 256);
-    let mut opt = tch::nn::Adam::default().build(&vs, 1e-4).unwrap();
-    let mut buffer = RolloutBuffer::new();
+    for _ in 0..num_agents {
+        let vs = tch::nn::VarStore::new(device);
+        let model = AgentModel::new(&vs.root(), env.action_space.clone(), 256);
+        let opt = tch::nn::Adam::default().build(&vs, 1e-4).unwrap();
+        let buffer = RolloutBuffer::new();
+        agents.push((vs, model, opt, buffer));
+    }
 
     // let clip_param = 0.2;
     let clip_param = (0.2, 5.0); // max 5x importance sampling
@@ -117,7 +121,9 @@ pub fn transformer_search(
     let unfinished_penalty: f64 = 10.0;
 
     for iteration in 0..num_iterations {
-        println!("--- Iteration {} ---", iteration);
+        let agent_idx = iteration % num_agents;
+        println!("--- Iteration {} (Agent {}) ---", iteration, agent_idx);
+        let (_, model, opt, buffer) = &mut agents[agent_idx];
         buffer.clear();
 
         let mut ep_rewards = Vec::new();
@@ -251,7 +257,8 @@ pub fn transformer_search(
                 if is_done {
                     // insert to pool
                     let callgraph = env.state.machine.callgraph.clone();
-                    env.pool.insert(&mut runtime, callgraph);
+                    env.pool
+                        .insert(&mut runtime, callgraph, agent_idx, iteration);
                     break;
                 }
             }
@@ -624,5 +631,7 @@ pub fn transformer_search(
             );
         }
     }
+
+    let vs: Vec<tch::nn::VarStore> = agents.into_iter().map(|(vs, _, _, _)| vs).collect();
     (env.pool, vs)
 }

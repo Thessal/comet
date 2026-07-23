@@ -18,6 +18,9 @@ pub struct Pool {
     adj_coeff: f64,
     pub metric: MetricChoice,
     skipdays: (i64, i64), // (evaluation_start_days, evaluation_end_days)
+    pub agent_ids: HashMap<String, usize>,
+    pub iteration_idxs: HashMap<String, usize>,
+    pub metrics: HashMap<String, (f64, f64, f64)>, // (sharpe, mean_return, turnover)
 } // TODO: evicting pool, do not add invalid equations to the pool
 
 impl Pool {
@@ -30,8 +33,26 @@ impl Pool {
             let vals = Vec::<f64>::try_from(tensor.contiguous().to_kind(tch::Kind::Double))
                 .expect("Failed to convert tensor to Vec<f64>");
             let vals_str: Vec<String> = vals.iter().map(|v| v.to_string()).collect();
+
+            let agent_id = self.agent_ids.get(expr).copied().unwrap_or(0);
+            let iteration_idx = self.iteration_idxs.get(expr).copied().unwrap_or(0);
+            let (sharpe, mean_ret, turnover) =
+                self.metrics
+                    .get(expr)
+                    .copied()
+                    .unwrap_or((f64::NAN, f64::NAN, f64::NAN));
+
             let expr_escaped = expr.replace("\"", "\"\"");
-            let line = format!("\"{}\",{}\n", expr_escaped, vals_str.join(","));
+            let line = format!(
+                "\"{}\",{},{},{},{},{},{}\n",
+                expr_escaped,
+                iteration_idx,
+                agent_id,
+                sharpe,
+                mean_ret,
+                turnover,
+                vals_str.join(",")
+            );
             file.write_all(line.as_bytes())
                 .expect("Unable to write data");
         }
@@ -56,6 +77,9 @@ impl Pool {
             adj_coeff,
             metric,
             skipdays,
+            agent_ids: HashMap::new(),
+            metrics: HashMap::new(),
+            iteration_idxs: HashMap::new(),
         }
     }
 
@@ -100,15 +124,47 @@ impl Pool {
         }
     }
 
-    pub fn insert(&mut self, runtime: &mut Runtime, sub_ast: Network) {
+    pub fn insert(
+        &mut self,
+        runtime: &mut Runtime,
+        sub_ast: Network,
+        agent_idx: usize,
+        iteration_idx: usize,
+    ) {
         // you can use Network::extract_subtree to get subtrees
         let hash_str: String = sub_ast.format_node(sub_ast.root);
         if !self.asts.contains_key(&hash_str) {
             println!("Inserting new equation to the pool : {}", hash_str);
             let pos = runtime.lookup_or_run(&sub_ast, sub_ast.root);
-            let returns = self.backtester.calc_returns(&pos.to_dataframe(self.device));
+            let pos_tensor = pos.to_dataframe(self.device);
+            let returns = self.backtester.calc_returns(&pos_tensor);
+
+            let sharpe = self.utility(&returns);
+            let mean_ret = f64::try_from(returns.mean(None)).unwrap_or(f64::NAN);
+
+            let turnover = if pos_tensor.size()[0] > 1 {
+                let pos_curr = pos_tensor.narrow(0, 1, pos_tensor.size()[0] - 1);
+                let pos_prev = pos_tensor.narrow(0, 0, pos_tensor.size()[0] - 1);
+                let diff_abs = (&pos_curr - &pos_prev)
+                    .nan_to_num(0.0, 0.0, 0.0)
+                    .abs()
+                    .sum_dim_intlist(Some(&[1][..]), false, tch::Kind::Float);
+                let pos_abs = pos_prev.nan_to_num(0.0, 0.0, 0.0).abs().sum_dim_intlist(
+                    Some(&[1][..]),
+                    false,
+                    tch::Kind::Float,
+                );
+                let tvr = (&diff_abs / (pos_abs + 1e-9)).mean(None);
+                f64::try_from(tvr).unwrap_or(f64::NAN)
+            } else {
+                f64::NAN
+            };
+
             self.asts.insert(hash_str.clone(), sub_ast);
-            self.returns.insert(hash_str, returns);
+            self.returns.insert(hash_str.clone(), returns);
+            self.agent_ids.insert(hash_str.clone(), agent_idx);
+            self.iteration_idxs.insert(hash_str.clone(), iteration_idx);
+            self.metrics.insert(hash_str, (sharpe, mean_ret, turnover));
             self.calc_portfolio_returns();
         }
     }
