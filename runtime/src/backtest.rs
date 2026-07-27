@@ -34,14 +34,24 @@ impl BasicBacktest {
             metric,
         }
     }
+    fn ls_neutralize(position: &Tensor) -> Tensor {
+        let mean = position.nanmean(Some(&[1][..]), true, Kind::Float);
+        let demeaned = (position - mean).nan_to_num(0.0, 0.0, 0.0);
+        let pos = demeaned.relu();
+        let neg = (-&demeaned).relu();
+
+        let sum_pos = pos.sum_dim_intlist(Some(&[1][..]), true, Kind::Float) + 1e-10;
+        let sum_neg = neg.sum_dim_intlist(Some(&[1][..]), true, Kind::Float) + 1e-10;
+
+        let scaled_pos = &pos / &sum_pos;
+        let scaled_neg = &neg / &sum_neg;
+
+        scaled_pos - scaled_neg
+    }
+
     pub fn calc_returns(&self, position: &Tensor) -> Tensor {
-        // NOTE: This method is used for evaluation of intermediate stack state too.
-        //       So it is logically different from adding neutralization after the behavior.
         let clean_pos = if self.neutralize {
-            let clean_pos = position - position.nanmean(Some(&[1][..]), true, Kind::Float); // market neutral (See Giglio 2020 for omitted factor bias)
-            // TODO: max position clipping if needed
-            // TODO: long/short balance (side by side neutralization, if it is common practice in academia)
-            clean_pos.nan_to_num(0.0, 0.0, 0.0)
+            Self::ls_neutralize(position)
         } else {
             position.nan_to_num(0.0, 0.0, 0.0)
         };
@@ -50,6 +60,26 @@ impl BasicBacktest {
             MetricChoice::Sharpe => &clean_pos * &self.returns,
         };
         ret.mean_dim(Some(&[1][..]), false, Kind::Float)
+    }
+
+    pub fn calc_turnover(&self, position: &Tensor) -> Tensor {
+        let clean_pos = if self.neutralize {
+            Self::ls_neutralize(position)
+        } else {
+            position.nan_to_num(0.0, 0.0, 0.0)
+        };
+
+        let t_len = clean_pos.size()[0];
+        if t_len <= 1 {
+            return tch::Tensor::zeros(&[t_len], (Kind::Float, position.device()));
+        }
+
+        let w_t = clean_pos.slice(0, 1, t_len, 1);
+        let w_prev = clean_pos.slice(0, 0, t_len - 1, 1);
+        let diff = (&w_t - &w_prev).abs().sum_dim_intlist(Some(&[1][..]), false, Kind::Float);
+
+        let zero_day = tch::Tensor::zeros(&[1], (Kind::Float, position.device()));
+        tch::Tensor::cat(&[&zero_day, &diff], 0)
     }
 }
 
