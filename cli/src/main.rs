@@ -53,10 +53,10 @@ fn _main(args: Args) {
     let info = fs::read_to_string(format!("{}/info.json", datadir)).expect("Failed to read file");
     let info: serde_json::Value = serde_json::from_str(&info).expect("Failed to parse file");
     let target_field = info["target"].as_str().expect("Failed to parse file");
-    stdlib::types::set_size(
-        info["rows"].as_i64().expect("Failed to parse file"),
-        info["columns"].as_i64().expect("Failed to parse file"),
-    );
+        stdlib::types::set_size(
+            info["rows"].as_i64().expect("Failed to parse file"),
+            info["columns"].as_i64().expect("Failed to parse file"),
+        );
 
     let mut runtime = Runtime::new(300, datadir.into(), Some(device));
     // let batch_size = 64;
