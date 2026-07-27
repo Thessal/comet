@@ -35,18 +35,34 @@ impl BasicBacktest {
         }
     }
     fn ls_neutralize(position: &Tensor) -> Tensor {
+        let max_pos = 0.01; // 1% max position limit per stock
+        let iterations = 3;
+
         let mean = position.nanmean(Some(&[1][..]), true, Kind::Float);
-        let demeaned = (position - mean).nan_to_num(0.0, 0.0, 0.0);
-        let pos = demeaned.relu();
-        let neg = (-&demeaned).relu();
+        let mut current = (position - mean).nan_to_num(0.0, 0.0, 0.0);
 
-        let sum_pos = pos.sum_dim_intlist(Some(&[1][..]), true, Kind::Float) + 1e-10;
-        let sum_neg = neg.sum_dim_intlist(Some(&[1][..]), true, Kind::Float) + 1e-10;
+        for _ in 0..iterations {
+            let pos = current.relu();
+            let neg = (-&current).relu();
 
-        let scaled_pos = &pos / &sum_pos;
-        let scaled_neg = &neg / &sum_neg;
+            let sum_pos = pos.sum_dim_intlist(Some(&[1][..]), true, Kind::Float) + 1e-10;
+            let sum_neg = neg.sum_dim_intlist(Some(&[1][..]), true, Kind::Float) + 1e-10;
 
-        scaled_pos - scaled_neg
+            // Side-by-side scaling and clamp max position to 1%
+            let scaled_pos = (&pos / &sum_pos).clamp(0.0, max_pos);
+            let scaled_neg = (&neg / &sum_neg).clamp(0.0, max_pos);
+
+            let new_sum_pos = scaled_pos.sum_dim_intlist(Some(&[1][..]), true, Kind::Float) + 1e-10;
+            let new_sum_neg = scaled_neg.sum_dim_intlist(Some(&[1][..]), true, Kind::Float) + 1e-10;
+
+            // Re-normalize long/short arms after clipping
+            let final_pos = &scaled_pos / &new_sum_pos;
+            let final_neg = &scaled_neg / &new_sum_neg;
+
+            current = final_pos - final_neg;
+        }
+
+        current
     }
 
     pub fn calc_returns(&self, position: &Tensor) -> Tensor {
