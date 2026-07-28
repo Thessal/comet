@@ -191,11 +191,13 @@ pub fn transformer_search(
                     probs = mask.unsqueeze(0).to_kind(tch::Kind::Float);
                     let mask_sum = probs.sum(tch::Kind::Float);
                     if mask_sum.double_value(&[]) <= 1e-8 {
-                        println!(
-                            "ERROR: No valid action available at step {}. Resampling episode.",
-                            _step
-                        );
-                        resample_episode = true;
+                        if valid_count == 0{
+                            println!(
+                                "ERROR: No valid action available at step {}. Resampling episode.",
+                                _step
+                            );
+                            resample_episode = true;
+                        }
                         break;
                     }
                     probs = &probs / mask_sum;
