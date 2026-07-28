@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
 Mean-Variance Portfolio Optimization for Comet PnL Outputs (In-Sample & Out-Sample).
+Supports single or multiple input files/bases (e.g. output_4_4 or output_4_5 output_4_6).
 
-Optimizes portfolio weights using In-Sample returns (../{filename}_is.pnl),
-evaluates out-of-sample performance (../{filename}_os.pnl),
+Optimizes portfolio weights using In-Sample returns,
+evaluates out-of-sample performance,
 concatenates the return series, prints summary statistics, plots cumulative PnL charts,
-and exports an equation attribution CSV (portfolio_concatenated_{filename}.csv).
+and exports an equation attribution CSV.
 """
 
 import os
@@ -180,9 +181,9 @@ def calculate_stats(returns_series):
         "Max Drawdown": f"{max_dd * 100:.2f}%"
     }
 
-def resolve_file_paths(arg_path):
+def resolve_single_file_paths(arg_path):
     """
-    Resolve in-sample (IS) and out-sample (OS) file paths from user input.
+    Resolve in-sample (IS) and out-sample (OS) file paths from a single input string.
     """
     base = os.path.basename(arg_path)
     base_clean = base.replace(".pnl", "").replace("_is", "").replace("_os", "").replace(".csv", "")
@@ -216,17 +217,49 @@ def resolve_file_paths(arg_path):
 
     return path_is, path_os, base_clean
 
+def parse_input_targets(args):
+    """
+    Parse command line arguments into a list of base target names / file paths.
+    Supports space-separated or comma-separated targets.
+    """
+    if not args:
+        return ["output_4_4"]
+    
+    raw_list = []
+    for arg in args:
+        for item in arg.split(','):
+            item = item.strip()
+            if item:
+                raw_list.append(item)
+    return raw_list
+
 def main():
-    arg_input = sys.argv[1] if len(sys.argv) > 1 else "output_4_4"
-    path_is, path_os, base_name = resolve_file_paths(arg_input)
+    targets = parse_input_targets(sys.argv[1:])
 
-    print(f"--- Resolving Files ---")
-    print(f"In-Sample File  : {path_is}")
-    print(f"Out-Sample File : {path_os}")
+    resolved_items = []
+    base_names = []
 
-    # 1. Load Raw Data
-    df_is_raw = load_raw_pnl(path_is)
-    df_os_raw = load_raw_pnl(path_os)
+    print(f"--- Resolving Files for Targets: {targets} ---")
+    for target in targets:
+        path_is, path_os, bname = resolve_single_file_paths(target)
+        resolved_items.append((path_is, path_os, bname))
+        base_names.append(bname)
+        print(f"Target '{target}' -> IS: {path_is} | OS: {path_os}")
+
+    combined_base_name = "+".join(base_names)
+
+    # 1. Load & Concatenate Raw Data Across All Input Files
+    df_is_raw_list = []
+    df_os_raw_list = []
+
+    for path_is, path_os, _ in resolved_items:
+        df_is_raw_list.append(load_raw_pnl(path_is))
+        df_os_raw_list.append(load_raw_pnl(path_os))
+
+    df_is_raw = pd.concat(df_is_raw_list, axis=1).loc[:, lambda df: ~df.columns.duplicated()]
+    df_os_raw = pd.concat(df_os_raw_list, axis=1).loc[:, lambda df: ~df.columns.duplicated()]
+
+    print(f"\nCombined Raw Pool: {df_is_raw.shape[1]} total unique signals.")
 
     # 2. Preprocess & Feature Selection (Driven by IS Data)
     df_is, df_os, ind_sharpes = preprocess_and_select(df_is_raw, df_os_raw, min_sharpe=0.10, corr_threshold=0.85, max_signals=200, winsor_pct=0.05)
@@ -277,7 +310,7 @@ def main():
 
     df_summary = pd.DataFrame(stats_data)
     print("\n" + "=" * 80)
-    print("IN-SAMPLE VS OUT-OF-SAMPLE PORTFOLIO PERFORMANCE SUMMARY")
+    print(f"IN-SAMPLE VS OUT-OF-SAMPLE PORTFOLIO PERFORMANCE ({combined_base_name})")
     print("=" * 80)
     print(df_summary.to_string(index=False))
     print("=" * 80)
@@ -299,7 +332,7 @@ def main():
     axes[0].axvspan(0, is_len, alpha=0.06, color="blue", label="In-Sample (Training)")
     axes[0].axvspan(is_len, total_len, alpha=0.06, color="orange", label="Out-Sample (Evaluation)")
 
-    axes[0].set_title(f"Concatenated In-Sample & Out-of-Sample Portfolio Growth ({base_name})", fontsize=14, fontweight="bold")
+    axes[0].set_title(f"Concatenated In-Sample & Out-of-Sample Portfolio Growth ({combined_base_name})", fontsize=14, fontweight="bold")
     axes[0].set_xlabel("Trading Days (Concatenated IS + OS)", fontsize=11)
     axes[0].set_ylabel("Cumulative Return Factor", fontsize=11)
     axes[0].grid(True, linestyle=":", alpha=0.6)
@@ -318,18 +351,25 @@ def main():
     axes[1].legend(fontsize=10)
 
     plt.tight_layout()
-    output_img = f"portfolio_concatenated_{base_name}.png"
+    output_img = f"portfolio_concatenated_{combined_base_name}.png"
     plt.savefig(output_img, dpi=300)
     print(f"\nSaved concatenated portfolio PnL chart to: {output_img}")
 
     # 8. Export Equation Details CSV
+    df_is_tvr_list = []
+    df_os_tvr_list = []
+    for path_is, path_os, _ in resolved_items:
+        path_is_tvr = path_is.replace(".pnl", ".tvr").replace(".csv", ".tvr")
+        path_os_tvr = path_os.replace(".pnl", ".tvr").replace(".csv", ".tvr")
+        if os.path.exists(path_is_tvr):
+            df_is_tvr_list.append(load_raw_pnl(path_is_tvr))
+        if os.path.exists(path_os_tvr):
+            df_os_tvr_list.append(load_raw_pnl(path_os_tvr))
+
+    df_is_tvr = pd.concat(df_is_tvr_list, axis=1).loc[:, lambda df: ~df.columns.duplicated()] if df_is_tvr_list else None
+    df_os_tvr = pd.concat(df_os_tvr_list, axis=1).loc[:, lambda df: ~df.columns.duplicated()] if df_os_tvr_list else None
+
     ann_factor = np.sqrt(252)
-    path_is_tvr = path_is.replace(".pnl", ".tvr").replace(".csv", ".tvr")
-    path_os_tvr = path_os.replace(".pnl", ".tvr").replace(".csv", ".tvr")
-
-    df_is_tvr = load_raw_pnl(path_is_tvr) if os.path.exists(path_is_tvr) else None
-    df_os_tvr = load_raw_pnl(path_os_tvr) if os.path.exists(path_os_tvr) else None
-
     eq_details = []
     for i, col in enumerate(df_is.columns):
         # IS Sharpe
@@ -366,7 +406,7 @@ def main():
         })
 
     df_eq_details = pd.DataFrame(eq_details)
-    output_csv = f"portfolio_concatenated_{base_name}.csv"
+    output_csv = f"portfolio_concatenated_{combined_base_name}.csv"
     df_eq_details.to_csv(output_csv, index=False)
     print(f"Saved equation summary CSV to: {output_csv}")
 
