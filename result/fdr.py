@@ -290,17 +290,17 @@ if __name__ == "__main__":
 
         print("2-step Fama–MacBeth regression")
         alpha_is, u_is, adj_factor_is = fama_macbeth(R_is, betas_is, factors_is)
+        alpha_os, u_os, adj_factor_os = fama_macbeth(R_os, betas_os, factors_os)
 
-        print("t-statistics Calcuation")
-        
+        print("t-statistics Calcuation")        
         t_is, p_is = calc_test_statistics(alpha_is, u_is, adj_factor_is)
-        print(np.sort(p_is))
-        # p_os = calc_test_statistics(a_os, side=args.side)
+        t_os, p_os = calc_test_statistics(alpha_os, u_os, adj_factor_os)
 
         df_ecdf_is = calc_ecdf(p_is)
-        # df_ecdf_os = calc_ecdf(p_os) # for validation
+        df_ecdf_os = calc_ecdf(p_os)
 
         optimal_p_value = bh_procedure(df_ecdf_is, args.tau, M = len(names_is))
+        optimal_p_value_os = bh_procedure(df_ecdf_os, args.tau, M = len(names_is))
 
         print(f"\n--- FDR Selection Results (K={args.K}, tau={args.tau}, side={args.side}) ---")
         print(f"Total Assets (N): {len(names_is)}")
@@ -313,5 +313,17 @@ if __name__ == "__main__":
             "expected rejection rate" : df_ecdf_is["p_value"].values / args.tau 
         }, index=df_ecdf_is["p_value"].values).iloc[:1 + len(selected_idx) * 3].plot(xlabel = "p value")
         plt.savefig("output.png")
+
+        df_scatter = pd.DataFrame({
+            "t-value in-sample": t_is,
+            "t-value out-sample": t_os,
+        })
+        ax = df_scatter.plot.scatter(x="t-value in-sample", y="t-value out-sample", alpha=0.5)
+        # m, b = np.polyfit(t_is, t_os, 1)
+        m, b = np.corrcoef(t_is, t_os)[0,1], 0
+        x_vals = np.linspace(t_is.min(), t_is.max(), 100)
+        ax.plot(x_vals, m * x_vals + b, color="red", linestyle="--", label=f"Fit: y = {m:.2f}x + {b:.2f}")
+        ax.legend()
+        plt.savefig("t_scatter.png")
     else:
         raise Exception(f"is_pnl {args.is_pnl} or os_pnl {args.os_pnl} file missing")
