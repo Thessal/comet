@@ -71,11 +71,16 @@ impl BasicBacktest {
         } else {
             position.nan_to_num(0.0, 0.0, 0.0)
         };
-        let ret = match self.metric {
-            MetricChoice::Mae | MetricChoice::Mse => &clean_pos - &self.returns,
-            MetricChoice::Sharpe => &clean_pos * &self.returns,
-        };
-        ret.mean_dim(Some(&[1][..]), false, Kind::Float)
+        match self.metric {
+            MetricChoice::Mae | MetricChoice::Mse => {
+                let ret = &clean_pos - &self.returns;
+                ret.mean_dim(Some(&[1][..]), false, Kind::Float)
+            }
+            MetricChoice::Sharpe => {
+                let ret = &clean_pos * &self.returns;
+                ret.sum_dim_intlist(Some(&[1][..]), false, Kind::Float)
+            }
+        }
     }
 
     pub fn calc_turnover(&self, position: &Tensor) -> Tensor {
