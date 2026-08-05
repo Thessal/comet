@@ -1,0 +1,70 @@
+# https://www.cfainstitute.org/sites/default/files/-/media/documents/support/programs/cfa/cfa_program_level_ii_financial_ratio_list.pdf
+Behavior FinancialRatioWithPrice(
+    revtq: DataFrame, 
+    piq: DataFrame, 
+    niq: DataFrame, 
+    xintq: DataFrame, 
+    dlcq: DataFrame, 
+    seqq: DataFrame, 
+    dlttq: DataFrame, 
+    cogsq: DataFrame, 
+    rectq: DataFrame, 
+    dvpq: DataFrame, 
+    atq: DataFrame, 
+    lctq: DataFrame, 
+    invtq: DataFrame, 
+    dvc: DataFrame, 
+    cheq: DataFrame, 
+    apq: DataFrame, 
+    xrent: DataFrame, 
+    txtq: DataFrame, 
+    oiadpq: DataFrame, 
+    oancf: DataFrame, 
+    ceqq: DataFrame, 
+    capx: DataFrame, 
+    actq: DataFrame, 
+    xsgaq: DataFrame, 
+    ppentq: DataFrame, 
+    gpq: DataFrame, 
+    dpq: DataFrame, 
+    cshpri: DataFrame, 
+    cshoq: DataFrame
+) {
+    weights="weights/random_6_6.pth", train=true, epochs=500,
+    operators = [add, subtract, divide, multiply, flip, cs_zscore, rank, delta, ts_nanmean], 
+    integers = [ 5, 21, 42, 63, 126, 189, 252 ], floats = [], strings=[], datadir="./noise_is", metric="sharpe"
+} -> DataFrame
+Flow mixed {
+    revtq = data("ifndq_revtq")
+    piq = data("ifndq_piq")
+    niq = data("ifndq_niq")
+    xintq = data("ifndq_xintq")
+    dlcq = data("ifndq_dlcq")
+    seqq = data("ifndq_seqq")
+    dlttq = data("ifndq_dlttq")
+    cogsq = data("ifndq_cogsq")
+    rectq = data("ifndq_rectq")
+    dvpq = data("ifndq_dvpq")
+    atq = data("ifndq_atq")
+    lctq = data("ifndq_lctq")
+    invtq = data("ifndq_invtq")
+    dvc = data("afnd1_dvc")
+    cheq = data("ifndq_cheq")
+    apq = data("ifndq_apq")
+    xrent = data("afnd1_xrent")
+    txtq = data("ifndq_txtq")
+    oiadpq = data("ifndq_oiadpq")
+    oancf = data("afnd1_oancf")
+    ceqq = data("ifndq_ceqq")
+    capx = data("afnd1_capx")
+    actq = data("ifndq_actq")
+    xsgaq = data("ifndq_xsgaq")
+    ppentq = data("ifndq_ppentq")
+    gpq = data("ifndq_gpq")
+    dpq = data("ifndq_dpq")
+    cshpri = data("afnd1_cshpri")
+    cshoq = data("ifndq_cshoq")
+    signal = FinancialRatioWithPrice(revtq, piq, niq, xintq, dlcq, seqq, dlttq, cogsq, rectq, dvpq, atq, lctq, invtq, dvc, cheq, apq, xrent, txtq, oiadpq, oancf, ceqq, capx, actq, xsgaq, ppentq, gpq, dpq, cshpri, cshoq)
+    neutralized = neutralize(signal)
+    neutralized
+}

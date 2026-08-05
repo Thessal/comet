@@ -1,0 +1,22 @@
+# https://www.cfainstitute.org/sites/default/files/-/media/documents/support/programs/cfa/cfa_program_level_ii_financial_ratio_list.pdf
+Behavior PriceOnly(
+    price: DataFrame,
+    high: DataFrame,
+    low: DataFrame,
+    volume: DataFrame,
+    returns: DataFrame
+) {
+    weights="weights/mixed_5_5.pth", train=true, epochs=2000,
+    operators = [add, subtract, divide, multiply, flip, cs_zscore, rank, delta, ts_nanmean], 
+    integers = [ 5, 21, 42, 63, 126, 189, 252 ], floats = [], strings=[], datadir="./data_is", metric="sharpe"
+} -> DataFrame
+Flow mixed {
+    price = data("close")
+    high = divide(data("high"), price)
+    low = divide(data("low"), price)
+    volume = divide(data("volume"), ts_nanmean(data("volume"),20))
+    returns = data("returns")
+    signal = PriceOnly(price, high, low, volume, returns)
+    neutralized = neutralize(signal)
+    neutralized
+}

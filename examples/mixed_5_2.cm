@@ -1,0 +1,21 @@
+Behavior PriceOnly(
+    price: DataFrame,
+    high: DataFrame,
+    low: DataFrame,
+    volume: DataFrame,
+    returns: DataFrame
+) {
+    weights="weights/mixed_5_2.pth", train=true, epochs=2000,
+    operators = [add, subtract, divide, multiply, flip, cs_zscore, rank, delta, ts_nanmean], 
+    integers = [ 1, 2, 3, 5, 21  ], floats = [], strings=[], datadir="./data_is", metric="sharpe"
+} -> DataFrame
+Flow mixed {
+    price = data("close")
+    high = divide(data("high"), price)
+    low = divide(data("low"), price)
+    volume = divide(data("volume"), ts_nanmean(data("volume"),20))
+    returns = data("returns")
+    signal = PriceOnly(price, high, low, volume, returns)
+    neutralized = neutralize(signal)
+    neutralized
+}
