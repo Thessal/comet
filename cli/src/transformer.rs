@@ -94,7 +94,7 @@ pub fn transformer_search(
         1,       // batch_size
     );
 
-    let num_agents = 5;
+    let num_agents = 1;
     let mut agents = Vec::new();
     println!("Not loading weights");
     for _ in 0..num_agents {

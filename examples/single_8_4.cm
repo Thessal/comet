@@ -1,0 +1,114 @@
+# https://www.cfainstitute.org/sites/default/files/-/media/documents/support/programs/cfa/cfa_program_level_ii_financial_ratio_list.pdf
+Behavior FinancialRatio(
+    defensive_interval_ratio : DataFrame, 
+receivables_turnover_ratio : DataFrame, 
+days_of_sales_outstanding : DataFrame, 
+inventory_turnover_ratio : DataFrame, 
+payables_turnover_ratio : DataFrame, 
+number_of_days_of_payables : DataFrame, 
+cash_conversion_cycle : DataFrame, 
+working_capital_turnover_ratio : DataFrame, 
+fixed_asset_turnover_ratio : DataFrame, 
+total_asset_turnover_ratio : DataFrame, 
+gross_profit_margin : DataFrame, 
+operating_profit_margin : DataFrame, 
+pretax_margin : DataFrame, 
+net_profit_margin : DataFrame, 
+operating_return_on_assets : DataFrame, 
+return_on_assets : DataFrame, 
+return_on_equity : DataFrame, 
+return_on_invested_capital : DataFrame, 
+return_on_common_equity : DataFrame, 
+tax_burden : DataFrame, 
+interest_burden : DataFrame, 
+ebit_margin : DataFrame, 
+financial_leverage_ratio : DataFrame, 
+total_debt : DataFrame, 
+debt_to_assets_ratio : DataFrame, 
+debt_to_equity_ratio : DataFrame, 
+debt_to_capital_ratio : DataFrame, 
+interest_coverage_ratio : DataFrame, 
+fixed_charge_coverage_ratio : DataFrame, 
+dividend_payout_ratio : DataFrame, 
+retention_rate : DataFrame, 
+earnings_per_share : DataFrame, 
+book_value_per_share : DataFrame
+) {
+    weights="weights/single_8_4.pth", train=true, epochs=4000,
+    operators = [add, subtract, divide, multiply, flip, cs_zscore, rank, delta, ts_nanmean], 
+    integers = [ 5, 21, 42, 63, 126, 189, 252 ], floats = [], strings=[], datadir="./data_is", metric="sharpe"
+} -> DataFrame
+Flow mixed {
+
+    revtq = data("ifndq_revtq")
+    piq = data("ifndq_piq")
+    niq = data("ifndq_niq")
+    xintq = data("ifndq_xintq")
+    dlcq = data("ifndq_dlcq")
+    seqq = data("ifndq_seqq")
+    dlttq = data("ifndq_dlttq")
+    cogsq = data("ifndq_cogsq")
+    rectq = data("ifndq_rectq")
+    dvpq = data("ifndq_dvpq")
+    atq = data("ifndq_atq")
+    lctq = data("ifndq_lctq")
+    invtq = data("ifndq_invtq")
+    dvc = data("afnd1_dvc")
+    cheq = data("ifndq_cheq")
+    apq = data("ifndq_apq")
+    xrent = data("afnd1_xrent")
+    txtq = data("ifndq_txtq")
+    oiadpq = data("ifndq_oiadpq")
+    oancf = data("afnd1_oancf")
+    ceqq = data("ifndq_ceqq")
+    capx = data("afnd1_capx")
+    actq = data("ifndq_actq")
+    xsgaq = data("ifndq_xsgaq")
+    ppentq = data("ifndq_ppentq")
+    gpq = data("ifndq_gpq")
+    dpq = data("ifndq_dpq")
+    cshpri = data("afnd1_cshpri")
+    cshoq = data("ifndq_cshoq")
+    ebit = data("afnd1_ebit")
+    xint = data("afnd1_xint")
+    current_ratio = divide(actq, lctq)
+    quick_ratio = divide(add(cheq, rectq), lctq)
+    cash_ratio = divide(cheq, lctq)
+    defensive_interval_ratio        = divide(add(cheq, rectq) , subtract(add( add ( cogsq , xsgaq ), dpq)))
+    receivables_turnover_ratio      = divide( revtq , rectq )
+    days_of_sales_outstanding       = divide( rectq , revtq )
+    inventory_turnover_ratio        = divide( cogsq , invtq )
+    payables_turnover_ratio         = divide ( add ( cogsq , delta(invtq,63 )) , apq)
+    number_of_days_of_payables      = divide(apq , ( add ( cogsq , delta(invtq,63 ))) )
+    cash_conversion_cycle           = subtract( add( divide( cogsq ,  invtq) , divide(rectq, revtq ) ) , divide(apq , ( add ( cogsq , delta(invtq,63 )))) ) 
+    working_capital_turnover_ratio  = divide(revtq , subtract (actq, lctq))
+    fixed_asset_turnover_ratio      = divide(revtq, ppentq)
+    total_asset_turnover_ratio      = divide( revtq , atq )
+    gross_profit_margin             = divide( gpq , revtq )
+    operating_profit_margin         = divide( oiadpq , revtq )
+    pretax_margin                   = divide( piq , revtq )
+    net_profit_margin               = divide( niq , revtq )
+    operating_return_on_assets      = divide( oiadpq , atq )
+    return_on_assets                = divide( niq , atq )
+    return_on_equity                = divide(niq , seqq)
+    return_on_invested_capital      = divide( ( add ( piq , xintq )) , (add( add ( dlcq , dlttq ) , seqq )) )
+    return_on_common_equity         = divide( subtract (niq , dvpq) , ceqq)
+    tax_burden                      = divide( niq , piq )
+    interest_burden                 = divide(piq, ( add ( piq , xintq )))
+    ebit_margin                     = divide( add ( piq , xintq ),  revtq)
+    financial_leverage_ratio        = divide( atq , seqq )
+    total_debt                      =  add ( dlcq , dlttq )
+    debt_to_assets_ratio            =  divide( add ( dlcq , dlttq ) , atq)
+    debt_to_equity_ratio            =  divide( add ( dlcq , dlttq ) , seqq)
+    debt_to_capital_ratio           = divide( add ( dlcq , dlttq ) , add ( add ( dlcq , dlttq ) , seqq))
+    interest_coverage_ratio         = divide( add ( piq , xintq ),  xintq)
+    fixed_charge_coverage_ratio     = divide( add ( ebit , xrent ) , add ( xint, xrent ) )
+    dividend_payout_ratio           = divide( dvc , subtract (niq , dvpq) )
+    retention_rate                  = flip( divide( dvc, subtract(niq , dvpq)))
+    earnings_per_share              = divide( subtract(niq, dvpq) , cshpri)
+    book_value_per_share            = divide( ceqq , cshoq )
+
+    signal = FinancialRatio(defensive_interval_ratio, receivables_turnover_ratio, days_of_sales_outstanding, inventory_turnover_ratio, payables_turnover_ratio, number_of_days_of_payables, cash_conversion_cycle, working_capital_turnover_ratio, fixed_asset_turnover_ratio, total_asset_turnover_ratio, gross_profit_margin, operating_profit_margin, pretax_margin, net_profit_margin, operating_return_on_assets, return_on_assets, return_on_equity, return_on_invested_capital, return_on_common_equity, tax_burden, interest_burden, ebit_margin, financial_leverage_ratio, total_debt, debt_to_assets_ratio, debt_to_equity_ratio, debt_to_capital_ratio, interest_coverage_ratio, fixed_charge_coverage_ratio, dividend_payout_ratio, retention_rate, earnings_per_share, book_value_per_share)
+    neutralized = neutralize(signal)
+    neutralized
+}

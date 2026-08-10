@@ -1,0 +1,33 @@
+# https://www.cfainstitute.org/sites/default/files/-/media/documents/support/programs/cfa/cfa_program_level_ii_financial_ratio_list.pdf
+Behavior FinancialRatioWithPrice(
+    atq: DataFrame, 
+    cheq: DataFrame, 
+    revtq: DataFrame, 
+    niq: DataFrame, 
+    dlttq: DataFrame, 
+    lctq: DataFrame, 
+    invtq: DataFrame, 
+    apq: DataFrame, 
+    oiadpq: DataFrame, 
+    oancf: DataFrame
+) {
+    weights="weights/single_8_3.pth", train=true, epochs=4000,
+    operators = [add, subtract, divide, multiply, flip, cs_zscore, rank, delta, ts_nanmean], 
+    integers = [ 5, 21, 42, 63, 126, 189, 252 ], floats = [], strings=[], datadir="./data_is", metric="sharpe"
+} -> DataFrame
+Flow mixed {
+    atq = data("ifndq_atq")
+    cheq = data("ifndq_cheq")
+    revtq = data("ifndq_revtq")
+    niq = data("ifndq_niq")
+    dlttq = data("ifndq_dlttq")
+    lctq = data("ifndq_lctq")
+    invtq = data("ifndq_invtq")
+    apq = data("ifndq_apq")
+    oiadpq = data("ifndq_oiadpq")
+    oancf = data("afnd1_oancf")
+    
+    signal = FinancialRatioWithPrice(atq, cheq, revtq, niq, dlttq, lctq, invtq, apq, oiadpq, oancf)
+    neutralized = neutralize(signal)
+    neutralized
+}
