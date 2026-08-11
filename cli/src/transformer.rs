@@ -99,7 +99,7 @@ pub fn transformer_search(
     println!("Not loading weights");
     for _ in 0..num_agents {
         let vs = tch::nn::VarStore::new(device);
-        let model = AgentModel::new(&vs.root(), env.action_space.clone(), 256);
+        let model = AgentModel::new(&vs.root(), env.action_space.clone(), 4);
         let opt = tch::nn::Adam::default().build(&vs, 1e-4).unwrap();
         let buffer = RolloutBuffer::new();
         agents.push((vs, model, opt, buffer));

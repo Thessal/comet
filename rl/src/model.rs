@@ -184,21 +184,21 @@ impl AgentModel {
     pub fn new(vs: &nn::Path, action_space: ActionSpace, d_model: i64) -> Self {
         let vocab_size = action_space.size() as i64;
         let decoder =
-            crate::model_transformer::SRDecoderModel::new(vs, vocab_size, d_model, 8, 512, 4);
+            crate::model_transformer::SRDecoderModel::new(vs, vocab_size, d_model, 4, 8, 2);
 
         let vs_v = vs.sub("value_net");
         let value_net = nn::seq()
-            .add(nn::linear(&vs_v.sub("l1"), 5, 64, Default::default()))
+            .add(nn::linear(&vs_v.sub("l1"), 5, 8, Default::default()))
             .add_fn(|x| x.relu())
-            .add(nn::linear(&vs_v.sub("l2"), 64, 64, Default::default()))
+            .add(nn::linear(&vs_v.sub("l2"), 8, 8, Default::default()))
             .add_fn(|x| x.relu())
-            .add(nn::linear(&vs_v.sub("l3"), 64, 2, Default::default()));
+            .add(nn::linear(&vs_v.sub("l3"), 8, 2, Default::default()));
 
         Self {
             action_space,
             decoder,
             value_net,
-            seq_len: 50,
+            seq_len: 32,
         }
     }
 
@@ -282,7 +282,7 @@ impl Model for AgentModel {
         let log_sigma = value_out.select(0, 1).clamp(-20.0, 2.0);
         let sigma = log_sigma.exp();
         // let value: tch::Tensor = &mu + 1.96 * &sigma; // 5% quantile // 0.05 0.95 : 2-sigma
-        let value: tch::Tensor = &mu + 0.5 * &sigma; // 5% quantile // 0.05 0.95 : 2-sigma
+        let value: tch::Tensor = &mu + 1.0 * &sigma; // 5% quantile // 0.05 0.95 : 2-sigma
         // let value = value.clamp_min(0);
         // let value: tch::Tensor = &mu + &sigma;
         // let value: tch::Tensor = &mu + &sigma;

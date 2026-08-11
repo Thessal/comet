@@ -409,7 +409,8 @@ impl Pool {
         if bool::try_from(marginal_utility.isnan().any()).unwrap() == true {
             return Err("NaN in marginal utility.");
         }
-        let potential = f64::try_from(marginal_utility.max()).unwrap().exp() - 1.0; // exponential utility
+        // let potential = f64::try_from(marginal_utility.max()).unwrap().exp() - 1.0; // exponential utility
+        let potential = f64::try_from(marginal_utility.max()).unwrap(); // sharpe utility
         if potential.is_nan() || potential.is_infinite() {
             for (_signal_spec, addr) in stack {
                 let incoming_pos = runtime
