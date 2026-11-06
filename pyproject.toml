@@ -1,0 +1,19 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "comet"
+version = "0.1.0"
+description = "Comet Quant Algo Fuzzer & Symbolic Regression Engine"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "torch",
+]
+
+[tool.maturin]
+python-source = "python"
+module-name = "comet.comet_rs"
+manifest-path = "crates/runtime/Cargo.toml"

@@ -4,6 +4,11 @@ let
       (import (fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz"))
     ];
   };
+  unstable = import <nixos-unstable> { config = { 
+    allowUnfree = true; 
+    cudaSupport = false;
+    rocmSupport = false;
+  }; };
   rustVersion = "1.91.1";
   myRust = pkgs.rust-bin.stable.${rustVersion}.default.override {
     extensions = [
@@ -11,8 +16,6 @@ let
       "rust-analyzer"
     ];
   };
-
-  antigravity = pkgs.callPackage ./antigravity.nix {};
 
 in pkgs.mkShell.override { stdenv = pkgs.clangStdenv; } {
   buildInputs = with pkgs; [
@@ -24,28 +27,22 @@ in pkgs.mkShell.override { stdenv = pkgs.clangStdenv; } {
     # rocmPackages.rocblas
   ];
   packages = [
-    #pkgs.antigravity
-    pkgs.google-chrome
-    antigravity
     myRust
+    unstable.antigravity-cli
   ] ++ (with pkgs; [
     cargo rustc gcc rustfmt clippy rust-analyzer gdb
-    python313 python313.pkgs.numpy libtorch-bin
-  ]) ;
+    python313 libtorch-bin
+  ]) ++ (with pkgs.python313Packages; [ 
+    numpy torch jupyter notebook ipykernel 
+  ]);
   RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
 
-  # libtorch
+  # libtorch & development environment
   shellHook = ''
     # Point LIBTORCH to the root of the package, not the .so file
     export LIBTORCH=${pkgs.libtorch-bin}
     export LIBTORCH_INCLUDE="${pkgs.libtorch-bin.dev}";
-    # 
-    # # Ensure the dynamic linker can find the libraries at runtime
-    # export LD_LIBRARY_PATH=${pkgs.libtorch-bin}/lib:$LD_LIBRARY_PATH
-    # 
-    # # Use the dev output for headers if the crate requires manual include paths
-    # # Though LIBTORCH usually handles this automatically for torch-sys
-    # export CXXFLAGS="-I${pkgs.libtorch-bin.dev}/include -I${pkgs.libtorch-bin.dev}/include/torch/csrc/api/include $CXXFLAGS"
+    export PYTHONPATH="$PWD/python:$PYTHONPATH"
   '';
 
   # # CUDA

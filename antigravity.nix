@@ -3,9 +3,12 @@
 stdenv.mkDerivation rec {
   pname = "antigravity";
   version = "1.23.2-4781536860569600";
+
   src = fetchurl {
-    url = "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/${version}/linux-x64/Antigravity.tar.gz";
-    sha256 = "sha256-UjKkBI/0+hVoXZqYG6T7pXPil/PvybdvY455S693VyU=";
+    # url = "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/${version}/linux-x64/Antigravity.tar.gz";
+    # url = "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/2.1.1-6123990880747520/linux-x64/Antigravity%20IDE.tar.gz"
+    url = "https://storage.googleapis.com/antigravity-public/antigravity-hub/${version}/linux-x64/Antigravity.tar.gz";
+    sha256 = "sha256-ehmSFJ45bswS56QrFVY4lYcB2qplvtB83P5jm4Jnx0U=";
   };
 
   nativeBuildInputs = [
@@ -99,8 +102,8 @@ stdenv.mkDerivation rec {
     fi
 
     # Make binaries executable
-    chmod +x $out/lib/antigravity/antigravity
-    chmod +x $out/lib/antigravity/chrome-sandbox
+    # chmod +x $out/lib/antigravity/antigravity
+    # chmod +x $out/lib/antigravity/chrome-sandbox
 
     # Create wrapper script for the main binary
     makeWrapper $out/lib/antigravity/antigravity $out/bin/antigravity \

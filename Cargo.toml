@@ -1,4 +1,8 @@
 [workspace]
-members = ["parser", "runtime", "rl", "stdlib", "cli"]
+members = [
+    "crates/parser",
+    "crates/runtime",
+    "crates/stdlib",
+]
 resolver = "2"
 exclude = ["data"]
